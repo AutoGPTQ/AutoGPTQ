@@ -12,7 +12,7 @@ def check_and_get_model_type(model_dir):
     return model_type
 
 
-class AutoGPTQModelForCausalLM:
+class AutoGPTQForCausalLM:
     def __init__(self):
         raise EnvironmentError(
             "AutoGPTQModelForCausalLM is designed to be instantiated\n"
@@ -51,4 +51,4 @@ class AutoGPTQModelForCausalLM:
         )
 
 
-__all__ = ["AutoGPTQModelForCausalLM"]
+__all__ = ["AutoGPTQForCausalLM"]

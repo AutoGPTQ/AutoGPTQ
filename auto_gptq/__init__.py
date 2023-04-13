@@ -1,1 +1,1 @@
-from modeling_auto import AutoGPTQModelForCausalLM
+from .modeling_auto import AutoGPTQForCausalLM
