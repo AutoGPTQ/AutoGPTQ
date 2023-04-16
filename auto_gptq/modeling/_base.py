@@ -2,8 +2,8 @@ import json
 import os
 from dataclasses import dataclass, field, fields
 from logging import getLogger
-from os.path import exists, join
-from typing import Dict, List
+from os.path import join
+from typing import Dict, List, Union
 
 import torch
 import torch.nn as nn
@@ -205,6 +205,9 @@ class BaseGPTQForCausalLM:
         )
         self._quantized = True
         self.model.config.use_cache = forward_pass_use_cache
+
+    def to(self, device: Union[str, torch.device]):
+        self.model.to(device)
 
     def generate(self, inputs, **kwargs):
         """shortcut for model.generate"""
