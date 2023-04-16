@@ -3,7 +3,9 @@ Automatically compress almost all Causal LMs in transformers using GPTQ algorith
 
 ## Installation
 ### Install from source
-First, clone the source code:
+First, install `torch` with minimum version of 1.13.0 following [pytorch installation guide](https://pytorch.org/get-started/locally/)
+
+Second, clone the source code:
 ```shell
 git clone https://github.com/PanQiWei/AutoGPTQ.git && cd AutoGPTQ
 ```
