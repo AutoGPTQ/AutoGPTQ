@@ -13,7 +13,8 @@ requirements = [
 ]
 
 extras_require = {
-    "llama": ["transformers>=4.28.0"]
+    "llama": ["transformers>=4.28.0"],
+    "gptj": ["transformers>=4.26.1, <=4.27.4"]
 }
 
 extensions = [
