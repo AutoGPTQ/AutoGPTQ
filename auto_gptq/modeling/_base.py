@@ -62,6 +62,7 @@ class BaseGPTQForCausalLM:
         self.model_type = self.model.config.model_type
         self._quantized = quantized
         self.quantize_config = quantize_config
+        self.config = self.model.config
 
     @property
     def quantized(self):
