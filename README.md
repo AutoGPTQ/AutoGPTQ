@@ -17,6 +17,10 @@ For some people want to try LLaMa and whose `transformers` version not meet the 
 ```shell
 pip install .[llama]
 ```
+Currently, there is a bug in GPTJ model about position_ids if `transformers>=4.28.0`, so if you want to use GPTJ (and in this case LLaMa will be unavailable), you can install using:
+```shell
+pip intall .[gptj]
+```
 
 ## Supported Models
 Currently, `auto_gptq` supports: `bloom`, `gpt_neox`, `gptj`, `llama` and `opt`; more CausalLMs will come soon!
