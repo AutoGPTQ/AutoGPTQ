@@ -1,5 +1,5 @@
 # AutoGPTQ
-Automatically compress almost all Causal LMs in transformers using GPTQ algorithm.
+An easy-to-use model quantization package with user-friendly apis, based on GPTQ algorithm.
 
 ## Installation
 ### Install from source
