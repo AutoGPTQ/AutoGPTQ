@@ -53,12 +53,14 @@ class BaseQuantizeConfig:
         }
 
 
-class BaseGPTQForCausalLM:
+class BaseGPTQForCausalLM(nn.Module):
     layers_block_name: str = None
     outside_layer_modules: List[str] = None
     inside_layer_modules: List[List[str]] = None
 
     def __init__(self, model: PreTrainedModel, quantized: bool, quantize_config: BaseQuantizeConfig):
+        super().__init__()
+
         self.model = model
         self.model_type = self.model.config.model_type
         self._quantized = quantized
@@ -120,7 +122,7 @@ class BaseGPTQForCausalLM:
         layers[0] = LayerHijacker(layers[0])
         for example in examples:
             for k, v in example.items():
-                if k == "input_ids" and len(v.shape) == 1:
+                if len(v.shape) == 1:
                     v = v.unsqueeze(0)
                 example[k] = v.to(CUDA)
             try:
@@ -209,9 +211,12 @@ class BaseGPTQForCausalLM:
     def to(self, device: Union[str, torch.device]):
         self.model.to(device)
 
-    def generate(self, inputs, **kwargs):
+    def forward(self, **kwargs):
+        return self.model(**kwargs)
+
+    def generate(self, **kwargs):
         """shortcut for model.generate"""
-        return self.model.generate(inputs, **kwargs)
+        return self.model.generate(**kwargs)
 
     def prepare_inputs_for_generation(self, *args, **kwargs):
         """shortcut for model.prepare_inputs_for_generation"""
@@ -318,7 +323,7 @@ class BaseGPTQForCausalLM:
         model.eval()
         model.to(device)
 
-        return model
+        return cls(model, True, quantize_config)
 
 
 __all__ = ["BaseGPTQForCausalLM", "BaseQuantizeConfig"]
