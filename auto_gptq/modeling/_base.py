@@ -1,8 +1,9 @@
 import json
+import os
 from dataclasses import dataclass, field, fields
 from logging import getLogger
-from os.path import join
-from typing import Dict, List, Optional
+from os.path import exists, join
+from typing import Dict, List
 
 import torch
 import torch.nn as nn
@@ -209,6 +210,10 @@ class BaseGPTQForCausalLM:
 
     def save_quantized(self, save_dir: str, use_safetensors: bool = False):
         """save quantized model and configs to local disk"""
+        if not exists(save_dir):
+            logger.warning("save_dir not exist, will create a new one.")
+            os.makedirs(save_dir)
+
         if not self.quantized:
             raise EnvironmentError("can only save quantized model, please execute .quantize first.")
 
@@ -244,7 +249,7 @@ class BaseGPTQForCausalLM:
         torch.nn.init.uniform_ = skip
         torch.nn.init.normal_ = skip
 
-        config = AutoConfig.from_pretrained(model_init_kwargs["pretrained_model_name_or_path"])
+        config = AutoConfig.from_pretrained(pretrained_model_name_or_path)
         if config.model_type not in SUPPORTED_MODELS:
             raise TypeError(f"{config.model_type} isn't supported yet.")
 
