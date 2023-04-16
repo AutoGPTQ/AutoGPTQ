@@ -210,9 +210,7 @@ class BaseGPTQForCausalLM:
 
     def save_quantized(self, save_dir: str, use_safetensors: bool = False):
         """save quantized model and configs to local disk"""
-        if not exists(save_dir):
-            logger.warning("save_dir not exist, will create a new one.")
-            os.makedirs(save_dir)
+        os.makedirs(save_dir, exist_ok=True)
 
         if not self.quantized:
             raise EnvironmentError("can only save quantized model, please execute .quantize first.")
@@ -278,7 +276,7 @@ class BaseGPTQForCausalLM:
 
         quantize_config = BaseQuantizeConfig.from_pretrained(save_dir)
 
-        model_save_name = f"gptq_model-{quantize_config.bits}bit"
+        model_save_name = join(save_dir, f"gptq_model-{quantize_config.bits}bit")
         if use_safetensors:
             model_save_name += ".safetensors"
         else:
@@ -293,7 +291,7 @@ class BaseGPTQForCausalLM:
 
         transformers.modeling_utils._init_weights = False
         torch.set_default_dtype(torch.half)
-        model = AutoModelForCausalLM.from_config(config, **{"low_cpu_mem_usage": False, "device_map": None})
+        model = AutoModelForCausalLM.from_config(config)
         torch.set_default_dtype(torch.float)
         model = model.eval()
         layers = find_layers(model)
