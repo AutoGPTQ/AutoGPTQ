@@ -7,6 +7,7 @@ from typing import Dict, List, Optional
 import torch
 import torch.nn as nn
 import transformers
+from safetensors.torch import load_file as safe_load, save_file as safe_save
 from transformers import AutoConfig, AutoModelForCausalLM, PreTrainedModel
 
 from ._const import *
@@ -207,15 +208,6 @@ class BaseGPTQForCausalLM:
 
     def save_quantized(self, save_dir: str, use_safetensors: bool = False):
         """save quantized model and configs to local disk"""
-        if use_safetensors:
-            try:
-                import safetensors
-            except ImportError:
-                logger.warning("safetensors is not installed, will save to .bin file.")
-                use_safetensors = False
-            else:
-                from safetensors.torch import save_file as safe_save
-
         if not self.quantized:
             raise EnvironmentError("can only save quantized model, please execute .quantize first.")
 
@@ -274,15 +266,6 @@ class BaseGPTQForCausalLM:
         use_safetensors: bool = False
     ):
         """load quantized model from local disk"""
-        if use_safetensors:
-            try:
-                import safetensors
-            except ImportError:
-                logger.warning("safetensors is not installed, will load .bin file.")
-                use_safetensors = False
-            else:
-                from safetensors.torch import load_file as safe_load
-
         config = AutoConfig.from_pretrained(save_dir)
         if config.model_type not in SUPPORTED_MODELS:
             raise TypeError(f"{config.model_type} isn't supported yet.")
