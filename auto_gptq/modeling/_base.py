@@ -81,6 +81,10 @@ class BaseGPTQForCausalLM(nn.Module):
     def _resize_attention_mask(attention_mask: List[torch.LongTensor]):
         return attention_mask
 
+    @staticmethod
+    def _resize_position_ids(position_ids: List[torch.LongTensor]):
+        return position_ids
+
     @torch.no_grad()
     def quantize(self, examples: List[Dict[str, torch.LongTensor]]):
         if self.quantized:
@@ -88,6 +92,7 @@ class BaseGPTQForCausalLM(nn.Module):
 
         layer_inputs = []
         attention_masks = []
+        position_ids = []
         layer_outputs = []
 
         class LayerHijacker(nn.Module):
@@ -105,8 +110,10 @@ class BaseGPTQForCausalLM(nn.Module):
                             break
                 bsz = inp.size(0)
                 for i in range(bsz):
-                    layer_inputs.append(inp[i].to(CPU))
+                    layer_inputs.append(inp[i].unsqueeze(0).to(CPU))
                     attention_masks.append(kwargs["attention_mask"][i].to(CPU))
+                    if (pos_ids := kwargs.get("position_ids", None)) is not None:
+                        position_ids.append(pos_ids[i].unsqueeze(0).to(CPU))
                 raise ValueError
 
         forward_pass_use_cache = self.model.config.use_cache
@@ -138,6 +145,7 @@ class BaseGPTQForCausalLM(nn.Module):
 
         # resize attention mask for some special models
         attention_masks = self._resize_attention_mask(attention_masks)
+        position_ids = self._resize_position_ids(position_ids)
 
         quantizers = {}
         for i in range(len(layers)):
@@ -168,9 +176,14 @@ class BaseGPTQForCausalLM(nn.Module):
                 for name in subset:
                     handles.append(subset[name].register_forward_hook(add_batch(name)))
                 for j in range(num_examples):
-                    layer_input = layer_inputs[j].unsqueeze(0).to("cuda:0")
-                    layer_attention_mask = attention_masks[j].to("cuda:0")
-                    layer(layer_input, attention_mask=layer_attention_mask)
+                    layer_input = layer_inputs[j].to(CUDA)
+                    layer_attention_mask = attention_masks[j].to(CUDA)
+                    additional_layer_inputs = {
+                        "attention_mask": layer_attention_mask
+                    }
+                    if (layer_position_ids := None if not position_ids else position_ids[j].to(CUDA)) is not None:
+                        additional_layer_inputs["position_ids"] = layer_position_ids
+                    layer(layer_input, **additional_layer_inputs)[0][0].cpu()
                 for h in handles:
                     h.remove()
 
@@ -187,10 +200,15 @@ class BaseGPTQForCausalLM(nn.Module):
                     gptq[name].free()
 
             for j in range(num_examples):
-                layer_input = layer_inputs[j].unsqueeze(0).to(CUDA)
+                layer_input = layer_inputs[j].to(CUDA)
                 layer_attention_mask = attention_masks[j].to(CUDA)
-                layer_output = layer(layer_input, attention_mask=layer_attention_mask)[0][0].cpu()
-                layer_outputs.append(layer_output)
+                additional_layer_inputs = {
+                    "attention_mask": layer_attention_mask
+                }
+                if (layer_position_ids := None if not position_ids else position_ids[j].to(CUDA)) is not None:
+                    additional_layer_inputs["position_ids"] = layer_position_ids
+                layer_output = layer(layer_input, **additional_layer_inputs)[0][0].cpu()
+                layer_outputs.append(layer_output.unsqueeze(0))
 
             layers[i] = layer.to(CPU)
             del layer
