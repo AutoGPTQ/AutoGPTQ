@@ -2,8 +2,9 @@
 An easy-to-use model quantization package with user-friendly apis, based on GPTQ algorithm.
 
 ## News or Update
-- (Work in progress) - (Update) - Evaluation and benchmark on multiple (down-stream) tasks such as: language-modeling, text-classification, text-summarization.
-- 2023-04-20 - (News) - AutoGPTQ is automatically compatible with Stability-AI's newly released `gpt_neox` type model family [StableLM](https://github.com/Stability-AI/StableLM)
+- (Work in progress) - (Update) - Support evaluation and benchmark on multiple (down-stream) tasks such as: language-modeling, text-classification, text-summarization.
+- 2023-04-20 - (News) - AutoGPTQ is automatically compatible with Stability-AI's newly released `gpt_neox` type model family [StableLM](https://github.com/Stability-AI/StableLM).
+- 2023-04-16 - (Update) - Support quantization and inference for `bloom`, `gpt_neox`, `gptj`, `llama` and `opt`.
 
 ## Installation
 ### Install from source
