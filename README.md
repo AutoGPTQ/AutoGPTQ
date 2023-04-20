@@ -1,6 +1,10 @@
 # AutoGPTQ
 An easy-to-use model quantization package with user-friendly apis, based on GPTQ algorithm.
 
+## News or Update
+- (Work in progress) - (Update) - Evaluation and benchmark on multiple (down-stream) tasks such as: language-modeling, text-classification, text-summarization.
+- 2023-04-20 - (News) - AutoGPT is automatically compatible with Stability-AI's newly released model family [StableLM](https://github.com/Stability-AI/StableLM)
+
 ## Installation
 ### Install from source
 First, install `torch` with minimum version of 1.13.0 following [pytorch installation guide](https://pytorch.org/get-started/locally/)
