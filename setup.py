@@ -6,6 +6,7 @@ from torch.utils import cpp_extension
 project_root = dirname(abspath(__file__))
 
 requirements = [
+    "datasets",
     "numpy",
     "torch>=1.13.0",
     "safetensors",
