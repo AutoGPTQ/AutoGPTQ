@@ -3,6 +3,7 @@ An easy-to-use model quantization package with user-friendly apis, based on GPTQ
 
 ## News or Update
 - (Work in progress) - (Update) - Support evaluation and benchmark on multiple (down-stream) tasks such as: language-modeling, text-classification, text-summarization.
+- 2023-04-22 - (News) - qwopqwop200's [AutoGPTQ-triton](https://github.com/qwopqwop200/AutoGPTQ-triton) provides faster speed to integrate with quantized model, for everyone who can access to triton, try and enjoy yourself!
 - 2023-04-20 - (News) - AutoGPTQ is automatically compatible with Stability-AI's newly released `gpt_neox` type model family [StableLM](https://github.com/Stability-AI/StableLM).
 - 2023-04-16 - (Update) - Support quantization and inference for `bloom`, `gpt_neox`, `gptj`, `llama` and `opt`.
 
