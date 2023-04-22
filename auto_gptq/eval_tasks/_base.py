@@ -53,7 +53,7 @@ class BaseTask:
                 for k, v in batch_data.items():
                     if isinstance(v, torch.Tensor):
                         batch_data[k] = v.to(self.device)
-                predictions += self._predict(batch_data, **predict_kwargs)
                 labels += self._parse_labels(batch_data["label"])
+                predictions += self._predict(batch_data, **predict_kwargs)
 
         return self._metric(predictions, labels)

@@ -91,10 +91,11 @@ class SequenceClassificationTask(BaseTask):
 
     def _predict(self, batch_data: Dict[str, Any], *args, **kwargs) -> List[int]:
         generation_config = kwargs["generation_config"]
-        for key in batch_data:
-            if key not in ["input_ids", "attention_mask"]:
-                batch_data.pop(key)
-        output_ids = self.model.generate(generation_config=generation_config, **batch_data)
+        output_ids = self.model.generate(
+            input_ids=batch_data["input_ids"],
+            attention_mask=batch_data["attention_mask"],
+            generation_config=generation_config
+        )
         return get_predictions(
             batch_data["input_ids"],
             output_ids,
