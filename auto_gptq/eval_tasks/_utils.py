@@ -33,7 +33,7 @@ def make_data_block(
         at least contains `prompt_col_name` and `label_col_name`
     :param sample_max_len: int, defaults to 1024, max tokens number of each sample (before padding)
     :param block_max_len: int, defaults to 2048, max tokens number of each data block (after padding)
-    :param add_eos_token: bool, defaults to True, whether add eos_token or not to the label
+    :param add_eos_token: bool, defaults to False, whether add eos_token or not to the label
     :param truncate_prompt: bool, defaults to True, whether to truncate prompt if the sample's total tokens
         number exceeds `sample_max_len`, if not, will truncate label and drop this sample when all tokens
         in label are truncated
@@ -185,8 +185,9 @@ def get_dataloader(
     num_samples: int = 128,
     sample_max_len: int = 1024,
     block_max_len: int = 2048,
-    add_eos_token: bool = True,
+    add_eos_token: bool = False,
     truncate_prompt: bool = True,
+    merge_prompt_label: bool = False,
     load_fn_kwargs: Optional[dict] = None,
     preprocess_fn_kwargs: Optional[dict] = None,
     **kwargs
@@ -205,6 +206,7 @@ def get_dataloader(
     :param block_max_len: int, see `make_data_block`
     :param add_eos_token: bool, see `make_data_block`
     :param truncate_prompt: bool, see `make_data_block`
+    :param merge_prompt_label: bool, see `make_data_block`
     :param load_fn_kwargs: Optional[dict], defaults to None, keyword arguments used
         for `load_fn` or `datasets.load_dataset`
     :param preprocess_fn_kwargs: Optional[dict], defaults to None, keyword arguments used
@@ -248,7 +250,8 @@ def get_dataloader(
             "sample_max_len": sample_max_len,
             "block_max_len": block_max_len,
             "add_eos_token": add_eos_token,
-            "truncate_prompt": truncate_prompt
+            "truncate_prompt": truncate_prompt,
+            "merge_prompt_label": merge_prompt_label
         }
     )
 

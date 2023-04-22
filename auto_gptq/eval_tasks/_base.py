@@ -34,15 +34,15 @@ class BaseTask:
             self.device = torch.device(self.device)
 
     @abstractmethod
-    def predict(self, batch_data: Dict[str, Any], **kwargs) -> List[Any]:
+    def _predict(self, batch_data: Dict[str, Any], **kwargs) -> List[Any]:
         pass
 
     @abstractmethod
-    def parse_labels(self, label_ids: torch.LongTensor) -> List[Any]:
+    def _parse_labels(self, label_ids: torch.LongTensor) -> List[Any]:
         pass
 
     @abstractmethod
-    def metric(self, pred: List[Any], label: List[Any]) -> Dict[str, float]:
+    def _metric(self, pred: List[Any], label: List[Any]) -> Dict[str, float]:
         pass
 
     def run(self, **predict_kwargs) -> Dict[str, float]:
@@ -53,7 +53,7 @@ class BaseTask:
                 for k, v in batch_data.items():
                     if isinstance(v, torch.Tensor):
                         batch_data[k] = v.to(self.device)
-                predictions += self.predict(batch_data, **predict_kwargs)
-                labels += self.parse_labels(batch_data["label"])
+                predictions += self._predict(batch_data, **predict_kwargs)
+                labels += self._parse_labels(batch_data["label"])
 
-        return self.metric(predictions, labels)
+        return self._metric(predictions, labels)
