@@ -1,15 +1,19 @@
-from transformers import AutoConfig
+from ._base import BaseQuantizeConfig
+from ._utils import check_and_get_model_type
+from .bloom import BloomGPTQForCausalLM
+from .gpt_neox import GPTNeoXGPTQForCausalLM
+from .gptj import GPTJGPTQForCausalLM
+from .llama import LlamaGPTQForCausalLM
+from .opt import OPTGPTQForCausalLM
 
-from .modeling import BaseQuantizeConfig, GPTQ_CAUSAL_LM_MODEL_MAP
-from .modeling._const import SUPPORTED_MODELS
 
-
-def check_and_get_model_type(model_dir):
-    config = AutoConfig.from_pretrained(model_dir)
-    if config.model_type not in SUPPORTED_MODELS:
-        raise TypeError(f"{config.model_type} isn't supported yet.")
-    model_type = config.model_type
-    return model_type
+GPTQ_CAUSAL_LM_MODEL_MAP = {
+    "bloom": BloomGPTQForCausalLM,
+    "gpt_neox": GPTNeoXGPTQForCausalLM,
+    "gptj": GPTJGPTQForCausalLM,
+    "llama": LlamaGPTQForCausalLM,
+    "opt": OPTGPTQForCausalLM
+}
 
 
 class AutoGPTQForCausalLM:
