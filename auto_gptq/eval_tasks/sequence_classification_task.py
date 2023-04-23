@@ -27,7 +27,7 @@ def get_predictions(
     for sub_generated_texts in generated_texts:
         sub_predictions = []
         for gen_text in sub_generated_texts:
-            sub_predictions.append(get_closest_label(gen_text, classes))
+            sub_predictions.append(get_closest_label(gen_text.lower().strip(), classes))
         predictions.append(Counter(sub_predictions).most_common(1)[0][0])
     return predictions
 
@@ -99,3 +99,6 @@ class SequenceClassificationTask(BaseTask):
             )
         generation_config.max_new_tokens = self.max_new_tokens
         return super().run(generation_config=generation_config)
+
+
+__all__ = ["SequenceClassificationTask"]

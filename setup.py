@@ -8,6 +8,7 @@ project_root = dirname(abspath(__file__))
 requirements = [
     "datasets",
     "numpy",
+    "rouge",
     "torch>=1.13.0",
     "safetensors",
     "transformers>=4.26.1"
