@@ -31,6 +31,7 @@ Currently, `auto_gptq` supports: `bloom`, `gpt_neox`, `gptj`, `llama` and `opt`;
 
 ### Basic
 > warning: this is just a show case of the usage of basic apis in AutoGPTQ, which uses only one sample to quantize a much small model, thus may not performs as well as expected in LLMs.
+
 Below is an example for the simplest use of auto_gptq: 
 ```python
 from transformers import AutoTokenizer, TextGenerationPipeline
