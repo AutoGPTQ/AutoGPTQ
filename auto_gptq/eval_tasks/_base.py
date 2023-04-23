@@ -3,7 +3,7 @@ from typing import Any, Dict, List, Optional
 
 import torch
 
-from ._utils import get_dataloader
+from ._utils.data_utils import get_dataloader
 
 
 class BaseTask:

@@ -1,4 +1,3 @@
-import sys
 from collections import Counter
 from typing import Any, Dict, List, Optional
 
@@ -7,36 +6,8 @@ from torch import LongTensor
 from transformers import PreTrainedTokenizer, GenerationConfig
 
 from ._base import BaseTask
-
-
-def levenshtein_distance(str1: str, str2: str):
-    if str1 == str2:
-        return 0
-    num_rows = len(str1) + 1
-    num_cols = len(str2) + 1
-    dp_matrix = np.empty((num_rows, num_cols))
-    dp_matrix[0, :] = range(num_cols)
-    dp_matrix[:, 0] = range(num_rows)
-
-    for i in range(1, num_rows):
-        for j in range(1, num_cols):
-            if str1[i - 1] == str2[j - 1]:
-                dp_matrix[i, j] = dp_matrix[i - 1, j - 1]
-            else:
-                dp_matrix[i, j] = min(dp_matrix[i - 1, j - 1], dp_matrix[i - 1, j], dp_matrix[i, j - 1]) + 1
-
-    return dp_matrix[num_rows - 1, num_cols - 1]
-
-
-def get_closest_label(pred: str, classes: List[str]) -> int:
-    min_id = sys.maxsize
-    min_edit_distance = sys.maxsize
-    for i, class_label in enumerate(classes):
-        edit_distance = levenshtein_distance(pred, class_label)
-        if edit_distance < min_edit_distance:
-            min_id = i
-            min_edit_distance = edit_distance
-    return min_id
+from ._utils.generation_utils import postprocess_generation_ids
+from ._utils.classification_utils import get_closest_label
 
 
 def get_predictions(
@@ -47,15 +18,13 @@ def get_predictions(
     classes: List[str]
 ) -> List[int]:
     predictions = []
-    for idx, start in enumerate(range(0, len(output_ids), num_return_sequences)):
-        sub_output_ids = output_ids[start: start + num_return_sequences]
-        sub_generated_ids = sub_output_ids[..., input_ids[idx].size(0):]
-        sub_generated_texts = [
-            each.lower().strip() for each in tokenizer.batch_decode(
-                sub_generated_ids,
-                clean_up_tokenization_spaces=True
-            )
-        ]
+    generated_texts = postprocess_generation_ids(
+        input_ids=input_ids,
+        output_ids=output_ids,
+        num_return_sequences=num_return_sequences,
+        tokenizer=tokenizer
+    )
+    for sub_generated_texts in generated_texts:
         sub_predictions = []
         for gen_text in sub_generated_texts:
             sub_predictions.append(get_closest_label(gen_text, classes))
