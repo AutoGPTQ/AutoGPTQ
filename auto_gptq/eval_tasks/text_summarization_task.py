@@ -67,6 +67,8 @@ class TextSummarizationTask(BaseTask):
                 max_new_tokens=128
             )
         generation_config.num_return_sequences = 1
+        generation_config.eos_token_id = self.tokenizer.eos_token_id
+        generation_config.pad_token_id = self.tokenizer.pad_token_id
         return super().run(generation_config=generation_config)
 
 

@@ -77,7 +77,8 @@ class SequenceClassificationTask(BaseTask):
         labels = []
         for one_label_ids in label_ids:
             one_label_ids = one_label_ids[(one_label_ids == -100).sum():]
-            label = self.classes.index(self.tokenizer.decode(one_label_ids).lower().strip())
+            label = self.tokenizer.decode(one_label_ids, clean_up_tokenization_spaces=True).lower().strip()
+            label = get_closest_label(label, self.classes)
             labels.append(label)
 
         return labels
@@ -98,6 +99,8 @@ class SequenceClassificationTask(BaseTask):
                 num_return_sequences=1
             )
         generation_config.max_new_tokens = self.max_new_tokens
+        generation_config.eos_token_id = self.tokenizer.eos_token_id
+        generation_config.pad_token_id = self.tokenizer.pad_token_id
         return super().run(generation_config=generation_config)
 
 

@@ -17,7 +17,7 @@ def make_data_block(
     tokenizer: PreTrainedTokenizer,
     preprocess_fn: Optional[Callable] = None,
     sample_max_len: int = 1024,
-    block_max_len: int = 2046,
+    block_max_len: int = 2048,
     add_eos_token: bool = False,
     truncate_prompt: bool = True,
     merge_prompt_label: bool = False
@@ -76,7 +76,7 @@ def make_data_block(
             (p, l) for idx, (p, l) in enumerate(zip(tokenized_prompts, tokenized_labels))
             if idx not in dropped_indices
         ],
-        key=lambda x: len(x[0]) + len(x[1])
+        key=lambda x: (len(x[0]) + len(x[1])) if merge_prompt_label else len(x[0])
     )
     sample_blocks = []
     sample_block = []
@@ -87,9 +87,9 @@ def make_data_block(
         ori_sample_len = len(prompt_ids)
         if merge_prompt_label:
             ori_sample_len += len(label_ids)
-        if ori_sample_len <= block_max_len:
-            additional_len = block_max_len
-            sample_len = block_max_len
+        if ori_sample_len <= blk_max_len:
+            additional_len = blk_max_len
+            sample_len = blk_max_len
         else:
             additional_len = len(sample_block) * (ori_sample_len - blk_max_len) + ori_sample_len
             sample_len = ori_sample_len
@@ -107,7 +107,7 @@ def make_data_block(
         blk_total_len += additional_len
 
     if sample_block:
-        sample_blocks.append(copy.copy(sample_block))
+        sample_blocks.append((copy.copy(sample_block), blk_max_len))
     del sample_block
     del blk_max_len
     del blk_total_len
@@ -115,7 +115,7 @@ def make_data_block(
     new_samples = {
         "input_ids": [],
         "attention_mask": [],
-        "label": []
+        "labels": []
     }
     # padding each data block internally
     for block, blk_max_len in sample_blocks:
@@ -129,7 +129,7 @@ def make_data_block(
             sample_len = len(tokenized_prompt)
             if merge_prompt_label:
                 sample_len += len(tokenized_label)
-            pad_num = blk_max_len - sample
+            pad_num = blk_max_len - sample_len
             if merge_prompt_label:
                 input_ids.append([tokenizer.pad_token_id] * pad_num + tokenized_prompt + tokenized_label)
                 label_ids.append([-100] * (pad_num + len(tokenized_prompt)) + tokenized_label)
@@ -138,20 +138,20 @@ def make_data_block(
                 label_ids.append([-100] * (label_max_len - len(tokenized_label)) + tokenized_label)
             attention_mask.append([0] * pad_num + [1] * sample_len)
 
-        new_samples["input_ids"].append(LongTensor(input_ids))
-        new_samples["attention_mask"].append(LongTensor(attention_mask))
-        new_samples["label"].append(LongTensor(label_ids))
+        new_samples["input_ids"].append(input_ids)
+        new_samples["attention_mask"].append(attention_mask)
+        new_samples["labels"].append(label_ids)
 
     return new_samples
 
 
-def collate_data(blocks: List[Dict[str, LongTensor]], pad_token_id: int) -> Dict[str, LongTensor]:
+def collate_data(blocks: List[Dict[str, List[List[int]]]], pad_token_id: int) -> Dict[str, LongTensor]:
     def pad_block(block, pads):
         return torch.cat((pads.to(block.device), block), dim=-1)
 
-    input_ids_blocks = [block["input_ids"] for block in blocks]
-    attention_mask_blocks = [block["attention_mask"] for block in blocks]
-    label_blocks = [block["label"] for block in blocks]
+    input_ids_blocks = [LongTensor(block["input_ids"]) for block in blocks]
+    attention_mask_blocks = [LongTensor(block["attention_mask"]) for block in blocks]
+    label_blocks = [LongTensor(block["labels"]) for block in blocks]
 
     bsz = len(blocks)
     inp_max_len = max([block.size(-1) for block in input_ids_blocks])
@@ -171,7 +171,7 @@ def collate_data(blocks: List[Dict[str, LongTensor]], pad_token_id: int) -> Dict
     return {
         "input_ids": torch.cat(input_ids_blocks, dim=0).long(),
         "attention_mask": torch.cat(attention_mask_blocks, dim=0).long(),
-        "label": torch.cat(label_blocks, dim=0).long()
+        "labels": torch.cat(label_blocks, dim=0).long()
     }
 
 

@@ -28,11 +28,11 @@ class LanguageModelingTask(BaseTask):
             **kwargs
         )
 
-    def _predict(self, batch_data: Dict[str, Any], *args, **kwargs) -> List[Any]:
+    def _predict(self, batch_data: Dict[str, Any], *args, **kwargs) -> List[float]:
         outputs = self.model(**batch_data)
-        loss = outputs.loss.view([1, -1]).squeeze().cpu().numpy().tolist()
+        loss = outputs.loss.cpu().item()
 
-        return loss
+        return [loss]
 
     def _parse_labels(self, label_ids: LongTensor) -> List[Any]:
         return []

@@ -226,6 +226,10 @@ class BaseGPTQForCausalLM(nn.Module):
         self._quantized = True
         self.model.config.use_cache = forward_pass_use_cache
 
+    @property
+    def device(self):
+        return self.model.device
+
     def to(self, device: Union[str, torch.device]):
         self.model.to(device)
 

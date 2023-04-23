@@ -1,22 +1,30 @@
 from abc import abstractmethod
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 import torch
+from transformers import PreTrainedTokenizer, PreTrainedModel
 
 from ._utils.data_utils import get_dataloader
+from ..modeling import BaseGPTQForCausalLM
 
 
 class BaseTask:
     def __init__(
         self,
-        model,
-        tokenizer,
+        model: Union[BaseGPTQForCausalLM, PreTrainedModel],
+        tokenizer: PreTrainedTokenizer,
         data_name_or_path: str,
         prompt_col_name: str,
         label_col_name: str,
         device: Optional[str] = None,
         **kwargs
     ):
+        self.model = model
+        self.tokenizer = tokenizer
+        if self.tokenizer.pad_token_id is None:
+            self.tokenizer.pad_token = self.tokenizer.eos_token
+            self.tokenizer.pad_token_id = self.tokenizer.eos_token_id
+            self.model.config.pad_token_id = self.tokenizer.eos_token_id
         self.dl = get_dataloader(
             data_name_or_path,
             prompt_col_name=prompt_col_name,
@@ -24,8 +32,6 @@ class BaseTask:
             tokenizer=tokenizer,
             **kwargs
         )
-        self.model = model
-        self.tokenizer = tokenizer
 
         self.device = device
         if not self.device:
@@ -53,7 +59,7 @@ class BaseTask:
                 for k, v in batch_data.items():
                     if isinstance(v, torch.Tensor):
                         batch_data[k] = v.to(self.device)
-                labels += self._parse_labels(batch_data["label"])
+                labels += self._parse_labels(batch_data["labels"])
                 predictions += self._predict(batch_data, **predict_kwargs)
 
         return self._metric(predictions, labels)
