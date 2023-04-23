@@ -31,7 +31,7 @@ extensions = [
 setup(
     name="auto_gptq",
     packages=find_packages(),
-    version="v0.0.1-dev",
+    version="v0.0.2",
     install_requires=requirements,
     extras_require=extras_require,
     ext_modules=extensions,
