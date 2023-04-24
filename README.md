@@ -17,7 +17,7 @@ git clone https://github.com/PanQiWei/AutoGPTQ.git && cd AutoGPTQ
 ```
 Then, install from source:
 ```shell
-pip instal .
+pip install .
 ```
 For some people want to try LLaMa and whose `transformers` version not meet the newest one that supports it, using:
 ```shell
