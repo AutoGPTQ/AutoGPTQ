@@ -116,7 +116,7 @@ After this, you can use `OPTGPTQForCausalLM.from_pretrained` and other functions
 ### Evaluation on Downstream Tasks
 One can use tasks defined in `auto_gptq.eval_tasks` to evaluate model's performance on specific down-stream task before and after quantization.
 
-The predefined tasks support all causal-language-models implemented in [huggingface transformers](https://github.com/huggingface/transformers) and in this project.
+The predefined tasks support all causal-language-models implemented in [Hugging Face transformers](https://github.com/huggingface/transformers) and in this project.
 
 Below is an example to evaluate `EleutherAI/gpt-j-6b` on sequence-classification task using `cardiffnlp/tweet_sentiment_multilingual` dataset:
 ```python
