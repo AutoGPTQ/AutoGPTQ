@@ -94,6 +94,7 @@ class BaseGPTQForCausalLM(nn.Module):
         attention_masks = []
         position_ids = []
         layer_outputs = []
+        layer_input_kwargs = []
 
         class LayerHijacker(nn.Module):
             """hijack layer's forward pass to cache data"""
@@ -114,6 +115,14 @@ class BaseGPTQForCausalLM(nn.Module):
                     attention_masks.append(kwargs["attention_mask"][i].to(CPU))
                     if (pos_ids := kwargs.get("position_ids", None)) is not None:
                         position_ids.append(pos_ids[i].unsqueeze(0).to(CPU))
+                    one_kwargs = dict()
+                    for k, v in kwargs.items():  # make sure other arguments also be captured
+                        if k not in ["hidden_states", "attention_mask", "position_ids"]:
+                            if isinstance(v, torch.Tensor):
+                                one_kwargs[k] = v[i].unsqueeze(0).to(CPU)
+                            else:
+                                one_kwargs[k] = v
+                    layer_input_kwargs.append(one_kwargs)
                 raise ValueError
 
         forward_pass_use_cache = self.model.config.use_cache
@@ -183,6 +192,11 @@ class BaseGPTQForCausalLM(nn.Module):
                     }
                     if (layer_position_ids := None if not position_ids else position_ids[j].to(CUDA)) is not None:
                         additional_layer_inputs["position_ids"] = layer_position_ids
+                    for k, v in layer_input_kwargs[j].items():
+                        if isinstance(v, torch.Tensor):
+                            additional_layer_inputs[k] = v.to(CUDA)
+                        else:
+                            additional_layer_inputs[k] = v
                     layer(layer_input, **additional_layer_inputs)[0][0].cpu()
                 for h in handles:
                     h.remove()
@@ -207,6 +221,11 @@ class BaseGPTQForCausalLM(nn.Module):
                 }
                 if (layer_position_ids := None if not position_ids else position_ids[j].to(CUDA)) is not None:
                     additional_layer_inputs["position_ids"] = layer_position_ids
+                for k, v in layer_input_kwargs[j].items():
+                    if isinstance(v, torch.Tensor):
+                        additional_layer_inputs[k] = v.to(CUDA)
+                    else:
+                        additional_layer_inputs[k] = v
                 layer_output = layer(layer_input, **additional_layer_inputs)[0][0].cpu()
                 layer_outputs.append(layer_output.unsqueeze(0))
 
@@ -349,7 +368,16 @@ class BaseGPTQForCausalLM(nn.Module):
             model.load_state_dict(safe_load(model_save_name, "cpu"))
         else:
             model.load_state_dict(torch.load(model_save_name))
-        model.seqlen = model.config.max_position_embeddings
+        model_config = model.config.to_dict()
+        seq_len_keys = ["max_position_embeddings", "seq_length"]
+        if any([k in model_config for k in seq_len_keys]):
+            for key in seq_len_keys:
+                if key in model_config:
+                    model.seqlen = model_config[key]
+                    break
+        else:
+            logger.warning("can't get model's sequence length from model config, will set to 4096.")
+            model.seqlen = 4096
 
         model.eval()
         model.to(device)
