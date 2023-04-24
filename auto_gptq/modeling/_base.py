@@ -293,7 +293,16 @@ class BaseGPTQForCausalLM(nn.Module):
         model_init_kwargs["low_cpu_mem_usage"] = False
 
         model = AutoModelForCausalLM.from_pretrained(pretrained_model_name_or_path, **model_init_kwargs)
-        model.seqlen = model.config.max_position_embeddings
+        model_config = model.config.to_dict()
+        seq_len_keys = ["max_position_embeddings", "seq_length"]
+        if any([k in model_config for k in seq_len_keys]):
+            for key in seq_len_keys:
+                if key in model_config:
+                    model.seqlen = model_config[key]
+                    break
+        else:
+            logger.warning("can't get model's sequence length from model config, will set to 4096.")
+            model.seqlen = 4096
         model.eval()
 
         return cls(model, False, quantize_config)
