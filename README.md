@@ -2,6 +2,7 @@
 An easy-to-use model quantization package with user-friendly apis, based on GPTQ algorithm.
 
 ## News or Update
+- 2023-04-25 - (News&Update) - [MOSS](https://github.com/OpenLMLab/MOSS) is an open-sourced Chinese Large Language Model, quantization is now supported in AutoGPTQ.
 - 2023-04-23 - (Update) - Support evaluation on multiple (down-stream) tasks such as: language-modeling, text-classification, text-summarization.
 - 2023-04-22 - (News) - qwopqwop200's [AutoGPTQ-triton](https://github.com/qwopqwop200/AutoGPTQ-triton) provides faster speed to integrate with quantized model, for everyone who can access to triton, try and enjoy yourself!
 - 2023-04-20 - (News) - AutoGPTQ is automatically compatible with Stability-AI's newly released `gpt_neox` type model family [StableLM](https://github.com/Stability-AI/StableLM).
@@ -25,7 +26,7 @@ pip install .[llama]
 ```
 
 ## Supported Models
-Currently, `auto_gptq` supports: `bloom`, `gpt_neox`, `gptj`, `llama` and `opt`; more CausalLMs will come soon!
+Currently, `auto_gptq` supports: `bloom`, `gpt_neox`, `gptj`, `llama`, `moss` and `opt`; more CausalLMs will come soon!
 
 ## Supported Evaluation Tasks
 Currently, `auto_gptq` supports: `LanguageModelingTask`, `SequenceClassificationTask` and `TextSummarizationTask`; more Tasks will come soon!
