@@ -172,8 +172,6 @@ class QuantLinear(nn.Module):
         self.qzeros = torch.from_numpy(qzeros)
 
     def forward(self, x: torch.Tensor):
-        device = x.device
-        dtype = x.dtype
         out_shape = x.shape[:-1] + (self.outfeatures,)
         x = x.reshape(-1, x.shape[-1])
         if self.quant_cuda_available and (
@@ -190,7 +188,7 @@ class QuantLinear(nn.Module):
                 quant_cuda.vecquant8matmul(x.float(), self.qweight, out, self.scales.float(), self.qzeros, self.g_idx)
             else:
                 raise NotImplementedError("Only 2,3,4,8 bits are supported.")
-            out = out.to(device, dtype=dtype)
+            out = out.half()
         else:
             if self.bits in [2, 4, 8]:
                 zeros = torch.bitwise_right_shift(
