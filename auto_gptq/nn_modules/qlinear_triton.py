@@ -12,7 +12,6 @@ try:
     import triton.language as tl
     from .triton_utils import custom_autotune
 
-
     # code based https://github.com/fpgaminer/GPTQ-triton
 
     @custom_autotune.autotune(
@@ -377,9 +376,12 @@ class QuantLinear(nn.Module):
         intweight = torch.cat(intweight, dim=1)
         intweight = intweight.t().contiguous()
         intweight = intweight.numpy().astype(np.uint32)
-        qweight = np.zeros((intweight.shape[0] // 32 * self.bits, intweight.shape[1]), dtype=np.uint32)
+
         i = 0
         row = 0
+        qweight = np.zeros(
+            (intweight.shape[0] // 32 * self.bits, intweight.shape[1]), dtype=np.uint32
+        )
         while row < qweight.shape[0]:
             if self.bits in [2, 4, 8]:
                 for j in range(i, i + (32 // self.bits)):
