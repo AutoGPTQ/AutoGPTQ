@@ -99,7 +99,7 @@ def main():
         for example in examples
     ]
 
-    model.quantize(examples_for_quant)
+    model.quantize(examples_for_quant, use_triton=args.use_triton, autotune_warmup_after_quantized=args.use_triton)
 
     if not args.quantized_model_dir:
         args.quantized_model_dir = args.pretrained_model_dir
