@@ -80,6 +80,7 @@ def main():
     parser.add_argument("--num_samples", type=int, default=128)
     parser.add_argument("--save_and_reload", action="store_true")
     parser.add_argument("--fast_tokenizer", action="store_true")
+    parser.add_argument("--use_triton", action="store_true")
     args = parser.parse_args()
 
     tokenizer = AutoTokenizer.from_pretrained(
@@ -105,7 +106,11 @@ def main():
 
     if args.save_and_reload:
         model.save_quantized(args.quantized_model_dir)
-        model = AutoGPTQForCausalLM.from_quantized(args.quantized_model_dir, device="cuda:0")
+        model = AutoGPTQForCausalLM.from_quantized(
+            args.quantized_model_dir,
+            device="cuda:0",
+            use_triton=args.use_triton
+        )
 
     pipeline = TextGenerationPipeline(model=model, tokenizer=tokenizer, device="cuda:0")
     for example in random.sample(examples, k=min(4, len(examples))):
