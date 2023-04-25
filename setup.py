@@ -37,7 +37,7 @@ if TORCH_AVAILABLE:
     setup(
         name="auto_gptq",
         packages=find_packages(),
-        version="v0.0.4-dev",
+        version="v0.0.4",
         install_requires=requirements,
         extras_require=extras_require,
         include_dirs=["quant_cuda"],
