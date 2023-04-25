@@ -338,6 +338,12 @@ class BaseGPTQForCausalLM(nn.Module):
         use_triton: bool = False
     ):
         """load quantized model from local disk"""
+        if use_triton:
+            from ..nn_modules.qlinear_triton import autotune_warmup_linear
+
+            logger.warning("use_triton will force moving the hole model to GPU, make sure you have enough VRAM.")
+            device = "cuda:0"
+
         config = AutoConfig.from_pretrained(save_dir, trust_remote_code=True)
         if config.model_type not in SUPPORTED_MODELS:
             raise TypeError(f"{config.model_type} isn't supported yet.")
@@ -385,6 +391,9 @@ class BaseGPTQForCausalLM(nn.Module):
 
         model.eval()
         model.to(device)
+
+        if use_triton:
+            autotune_warmup_linear(model, seqlen=model.seqlen)
 
         return cls(model, True, quantize_config)
 

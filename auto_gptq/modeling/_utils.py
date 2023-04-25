@@ -3,7 +3,7 @@ from logging import getLogger
 import torch.nn as nn
 from transformers import AutoConfig
 
-from ._const import SUPPORTED_MODELS
+from ._const import SUPPORTED_MODELS, CUDA
 
 
 logger = getLogger(__name__)
@@ -26,7 +26,7 @@ def get_module_by_name(model, module_name: str):
 
 def make_quant(module, names, bits, groupsize, name='', use_triton=False):
     if use_triton:
-        raise NotImplementedError("triton not supported yet")
+        from ..nn_modules.qlinear_triton import QuantLinear
     else:
         from ..nn_modules.qlinear import QuantLinear
 
@@ -42,9 +42,9 @@ def make_quant(module, names, bits, groupsize, name='', use_triton=False):
         make_quant(child, names, bits, groupsize, name + '.' + name1 if name != '' else name1)
 
 
-def pack_model(model, quantizers, bits, group_size, use_triton=False):
+def pack_model(model, quantizers, bits, group_size, use_triton=False, autotune_warmup: bool = False):
     if use_triton:
-        raise NotImplementedError("triton not supported yet.")
+        from ..nn_modules.qlinear_triton import QuantLinear, autotune_warmup_linear
     else:
         from ..nn_modules.qlinear import QuantLinear
 
@@ -59,6 +59,12 @@ def pack_model(model, quantizers, bits, group_size, use_triton=False):
         quantizers[name], scale, zero, g_idx = quantizers[name]
         qlayers[name].pack(layers[name], scale, zero, g_idx)
     logger.info('Model packed.')
+
+    if use_triton and autotune_warmup:
+        logger.warning(
+            "using autotune_warmup will move model to GPU, make sure you have enough VRAM to load the hole model."
+        )
+        autotune_warmup_linear(model.to(CUDA), seqlen=model.seqlen)
 
 
 def check_and_get_model_type(model_dir):
