@@ -39,7 +39,7 @@ def pack_model(model, quantizers, bits, group_size):
 
 
 def check_and_get_model_type(model_dir):
-    config = AutoConfig.from_pretrained(model_dir)
+    config = AutoConfig.from_pretrained(model_dir, trust_remote_code=True)
     if config.model_type not in SUPPORTED_MODELS:
         raise TypeError(f"{config.model_type} isn't supported yet.")
     model_type = config.model_type
