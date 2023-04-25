@@ -287,8 +287,8 @@ def matmul248(input, qweight, scales, qzeros, g_idx, bits, maxq):
             bits, maxq,
             input.stride(0), input.stride(1),
             qweight.stride(0), qweight.stride(1),
-            output.stride(0), output.stride(1), scales.stride(0),
-            qzeros.stride(0)
+            output.stride(0), output.stride(1),
+            scales.stride(0), qzeros.stride(0)
         )
         return output
 
