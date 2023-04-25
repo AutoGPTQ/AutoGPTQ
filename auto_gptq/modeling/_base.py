@@ -87,7 +87,12 @@ class BaseGPTQForCausalLM(nn.Module):
         return position_ids
 
     @torch.no_grad()
-    def quantize(self, examples: List[Dict[str, torch.LongTensor]], use_triton: bool = False):
+    def quantize(
+        self,
+        examples: List[Dict[str, torch.LongTensor]],
+        use_triton: bool = False,
+        autotune_warmup_after_quantized: bool = False
+    ):
         if self.quantized:
             raise EnvironmentError("can't execute quantize because the model is quantized.")
 
@@ -242,7 +247,8 @@ class BaseGPTQForCausalLM(nn.Module):
             quantizers=quantizers,
             bits=self.quantize_config.bits,
             group_size=self.quantize_config.group_size,
-            use_triton=use_triton
+            use_triton=use_triton,
+            autotune_warmup=autotune_warmup_after_quantized
         )
         self._quantized = True
         self.model.config.use_cache = forward_pass_use_cache
