@@ -265,7 +265,8 @@ class BaseGPTQForCausalLM(nn.Module):
 
     def generate(self, **kwargs):
         """shortcut for model.generate"""
-        return self.model.generate(**kwargs)
+        with torch.inference_mode(), torch.amp.autocast(device_type=self.device.type):
+            return self.model.generate(**kwargs)
 
     def prepare_inputs_for_generation(self, *args, **kwargs):
         """shortcut for model.prepare_inputs_for_generation"""
