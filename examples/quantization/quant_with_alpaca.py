@@ -82,7 +82,11 @@ def main():
     parser.add_argument("--fast_tokenizer", action="store_true")
     args = parser.parse_args()
 
-    tokenizer = AutoTokenizer.from_pretrained(args.pretrained_model_dir, use_fast=args.fast_tokenizer)
+    tokenizer = AutoTokenizer.from_pretrained(
+        args.pretrained_model_dir,
+        use_fast=args.fast_tokenizer,
+        trust_remote_code=True
+    )
     model = AutoGPTQForCausalLM.from_pretrained(
         args.pretrained_model_dir,
         quantize_config=BaseQuantizeConfig(bits=args.bits, group_size=args.group_size)

@@ -4,6 +4,7 @@ from .bloom import BloomGPTQForCausalLM
 from .gpt_neox import GPTNeoXGPTQForCausalLM
 from .gptj import GPTJGPTQForCausalLM
 from .llama import LlamaGPTQForCausalLM
+from .moss import MOSSGPTQForCausalLM
 from .opt import OPTGPTQForCausalLM
 
 
@@ -12,7 +13,8 @@ GPTQ_CAUSAL_LM_MODEL_MAP = {
     "gpt_neox": GPTNeoXGPTQForCausalLM,
     "gptj": GPTJGPTQForCausalLM,
     "llama": LlamaGPTQForCausalLM,
-    "opt": OPTGPTQForCausalLM
+    "opt": OPTGPTQForCausalLM,
+    "moss": MOSSGPTQForCausalLM
 }
 
 
