@@ -13,7 +13,7 @@ from transformers import AutoConfig, AutoModelForCausalLM, PreTrainedModel
 
 from ._const import *
 from ._utils import *
-from ..quantization import *
+from ..quantization import GPTQ, Quantizer
 
 logger = getLogger(__name__)
 
@@ -87,7 +87,7 @@ class BaseGPTQForCausalLM(nn.Module):
         return position_ids
 
     @torch.no_grad()
-    def quantize(self, examples: List[Dict[str, torch.LongTensor]]):
+    def quantize(self, examples: List[Dict[str, torch.LongTensor]], use_triton: bool = False):
         if self.quantized:
             raise EnvironmentError("can't execute quantize because the model is quantized.")
 
@@ -241,7 +241,8 @@ class BaseGPTQForCausalLM(nn.Module):
             model=self.model,
             quantizers=quantizers,
             bits=self.quantize_config.bits,
-            group_size=self.quantize_config.group_size
+            group_size=self.quantize_config.group_size,
+            use_triton=use_triton
         )
         self._quantized = True
         self.model.config.use_cache = forward_pass_use_cache
@@ -333,7 +334,8 @@ class BaseGPTQForCausalLM(nn.Module):
         cls,
         save_dir: str,
         device: str = "cpu",
-        use_safetensors: bool = False
+        use_safetensors: bool = False,
+        use_triton: bool = False
     ):
         """load quantized model from local disk"""
         config = AutoConfig.from_pretrained(save_dir, trust_remote_code=True)
@@ -364,7 +366,7 @@ class BaseGPTQForCausalLM(nn.Module):
         for name in [cls.lm_head_name]:
             if name in layers:
                 del layers[name]
-        make_quant(model, layers, quantize_config.bits, quantize_config.group_size)
+        make_quant(model, layers, quantize_config.bits, quantize_config.group_size, use_triton=use_triton)
 
         if model_save_name.endswith('.safetensors'):
             model.load_state_dict(safe_load(model_save_name, "cpu"))

@@ -4,7 +4,7 @@ import torch.nn as nn
 from transformers import AutoConfig
 
 from ._const import SUPPORTED_MODELS
-from ..quantization import make_quant, QuantLinear
+
 
 logger = getLogger(__name__)
 
@@ -24,12 +24,35 @@ def get_module_by_name(model, module_name: str):
             return module
 
 
-def pack_model(model, quantizers, bits, group_size):
+def make_quant(module, names, bits, groupsize, name='', use_triton=False):
+    if use_triton:
+        raise NotImplementedError("triton not supported yet")
+    else:
+        from ..nn_modules.qlinear import QuantLinear
+
+    if isinstance(module, QuantLinear):
+        return
+    for attr in dir(module):
+        tmp = getattr(module, attr)
+        name1 = name + '.' + attr if name != '' else attr
+        if name1 in names:
+            delattr(module, attr)
+            setattr(module, attr, QuantLinear(bits, groupsize, tmp.in_features, tmp.out_features, tmp.bias is not None))
+    for name1, child in module.named_children():
+        make_quant(child, names, bits, groupsize, name + '.' + name1 if name != '' else name1)
+
+
+def pack_model(model, quantizers, bits, group_size, use_triton=False):
+    if use_triton:
+        raise NotImplementedError("triton not supported yet.")
+    else:
+        from ..nn_modules.qlinear import QuantLinear
+
     model.cpu()
     logger.info('Packing model...')
     layers = find_layers(model)
     layers = {n: layers[n] for n in quantizers}
-    make_quant(model, quantizers, bits, group_size)
+    make_quant(model, quantizers, bits, group_size, use_triton=use_triton)
     qlayers = find_layers(model, [QuantLinear])
     for name in qlayers:
         logger.info(name)
@@ -46,4 +69,4 @@ def check_and_get_model_type(model_dir):
     return model_type
 
 
-__all__ = ["find_layers", "get_module_by_name", "pack_model", "check_and_get_model_type"]
+__all__ = ["find_layers", "get_module_by_name", "make_quant", "pack_model", "check_and_get_model_type"]
