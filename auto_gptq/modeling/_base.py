@@ -303,7 +303,7 @@ class BaseGPTQForCausalLM(nn.Module):
         torch.nn.init.uniform_ = skip
         torch.nn.init.normal_ = skip
 
-        config = AutoConfig.from_pretrained(pretrained_model_name_or_path)
+        config = AutoConfig.from_pretrained(pretrained_model_name_or_path, trust_remote_code=True)
         if config.model_type not in SUPPORTED_MODELS:
             raise TypeError(f"{config.model_type} isn't supported yet.")
 
@@ -311,6 +311,7 @@ class BaseGPTQForCausalLM(nn.Module):
         model_init_kwargs["device_map"] = None
         model_init_kwargs["torch_dtype"] = torch.bfloat16 if bf16 else torch.float16
         model_init_kwargs["low_cpu_mem_usage"] = False
+        model_init_kwargs["trust_remote_code"] = True
 
         model = AutoModelForCausalLM.from_pretrained(pretrained_model_name_or_path, **model_init_kwargs)
         model_config = model.config.to_dict()
@@ -335,7 +336,7 @@ class BaseGPTQForCausalLM(nn.Module):
         use_safetensors: bool = False
     ):
         """load quantized model from local disk"""
-        config = AutoConfig.from_pretrained(save_dir)
+        config = AutoConfig.from_pretrained(save_dir, trust_remote_code=True)
         if config.model_type not in SUPPORTED_MODELS:
             raise TypeError(f"{config.model_type} isn't supported yet.")
 
