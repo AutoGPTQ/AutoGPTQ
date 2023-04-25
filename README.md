@@ -25,6 +25,11 @@ For some people want to try LLaMa and whose `transformers` version not meet the 
 ```shell
 pip install .[llama]
 ```
+To integrate with `triton`, using:
+```shell
+pip install .[triton]
+```
+
 
 ## Supported Models
 Currently, `auto_gptq` supports: `bloom`, `gpt_neox`, `gptj`, `llama`, `moss` and `opt`; more CausalLMs will come soon!
@@ -63,7 +68,7 @@ model = AutoGPTQForCausalLM.from_pretrained(pretrained_model_dir, quantize_confi
 
 # quantize model, the examples should be list of dict whose keys can only be "input_ids" and "attention_mask" 
 # with value under torch.LongTensor type.
-model.quantize([example])
+model.quantize([example], use_triton=False)
 
 # save quantized model
 model.save_quantized(quantized_model_dir)
@@ -72,7 +77,7 @@ model.save_quantized(quantized_model_dir)
 model.save_quantized(quantized_model_dir, use_safetensors=True)
 
 # load quantized model, currently only support cpu or single gpu
-model = AutoGPTQForCausalLM.from_quantized(quantized_model_dir, device="cuda:0")
+model = AutoGPTQForCausalLM.from_quantized(quantized_model_dir, device="cuda:0", use_triton=False)
 
 # inference with model.generate
 print(tokenizer.decode(model.generate(**tokenizer("auto_gptq is", return_tensors="pt").to("cuda:0"))[0]))
