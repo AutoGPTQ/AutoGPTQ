@@ -13,7 +13,7 @@ from transformers import AutoConfig, AutoModelForCausalLM, PreTrainedModel
 
 from ._const import *
 from ._utils import *
-from ..quantization import GPTQ, Quantizer
+from ..quantization import GPTQ
 
 logger = getLogger(__name__)
 
@@ -173,7 +173,6 @@ class BaseGPTQForCausalLM(nn.Module):
                 gptq = {}
                 for name in subset:
                     gptq[name] = GPTQ(subset[name])
-                    gptq[name].quantizer = Quantizer()
                     gptq[name].quantizer.configure(
                         self.quantize_config.bits,
                         perchannel=True,

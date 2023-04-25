@@ -7,6 +7,8 @@ import torch
 import torch.nn as nn
 import transformers
 
+from .quantizer import Quantizer
+
 
 logger = getLogger(__name__)
 
@@ -27,6 +29,7 @@ class GPTQ:
         self.columns = W.shape[1]
         self.H = torch.zeros((self.columns, self.columns), device=self.dev)
         self.nsamples = 0
+        self.quantizer = Quantizer()
 
     def add_batch(self, inp, out):
         if os.environ.get("DEBUG"):
