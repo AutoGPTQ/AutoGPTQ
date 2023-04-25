@@ -357,7 +357,7 @@ class BaseGPTQForCausalLM(nn.Module):
 
         transformers.modeling_utils._init_weights = False
         torch.set_default_dtype(torch.half)
-        model = AutoModelForCausalLM.from_config(config)
+        model = AutoModelForCausalLM.from_config(config, trust_remote_code=True)
         torch.set_default_dtype(torch.float)
         model = model.eval()
         layers = find_layers(model)
