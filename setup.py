@@ -13,12 +13,12 @@ requirements = [
     "rouge",
     "torch>=1.13.0",
     "safetensors",
-    "transformers>=4.26.1",
-    "triton>=2.0.0"
+    "transformers>=4.26.1"
 ]
 
 extras_require = {
-    "llama": ["transformers>=4.28.0"]
+    "llama": ["transformers>=4.28.0"],
+    "triton": ["triton>=2.0.0"]
 }
 
 
