@@ -1,9 +1,10 @@
 import datasets
 from argparse import ArgumentParser
-from transformers import AutoTokenizer
 
+import torch
 from auto_gptq import AutoGPTQForCausalLM, BaseQuantizeConfig
 from auto_gptq.eval_tasks import LanguageModelingTask
+from transformers import AutoTokenizer
 
 
 DATASET = "tatsu-lab/alpaca"
@@ -63,6 +64,7 @@ def main():
     task.model = None
     model.cpu()
     del model
+    torch.cuda.empty_cache()
 
     model = AutoGPTQForCausalLM.from_quantized(args.quantized_model_dir, device="cuda:0", use_triton=args.use_triton)
     task.model = model
