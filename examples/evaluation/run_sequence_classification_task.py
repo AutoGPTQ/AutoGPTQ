@@ -2,10 +2,10 @@ from argparse import ArgumentParser
 from functools import partial
 
 import datasets
-from transformers import AutoTokenizer
-
+import torch
 from auto_gptq import AutoGPTQForCausalLM, BaseQuantizeConfig
 from auto_gptq.eval_tasks import SequenceClassificationTask
+from transformers import AutoTokenizer
 
 
 DATASET = "cardiffnlp/tweet_sentiment_multilingual"
@@ -67,6 +67,7 @@ def main():
     task.model = None
     model.cpu()
     del model
+    torch.cuda.empty_cache()
 
     model = AutoGPTQForCausalLM.from_quantized(args.quantized_model_dir, device="cuda:0", use_triton=args.use_triton)
     task.model = model

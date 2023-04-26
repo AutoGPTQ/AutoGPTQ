@@ -2,10 +2,10 @@ import os
 from argparse import ArgumentParser
 
 import datasets
-from transformers import AutoTokenizer, GenerationConfig
-
+import torch
 from auto_gptq import AutoGPTQForCausalLM, BaseQuantizeConfig
 from auto_gptq.eval_tasks import TextSummarizationTask
+from transformers import AutoTokenizer, GenerationConfig
 
 
 os.system("pip install py7zr")
@@ -61,6 +61,7 @@ def main():
     task.model = None
     model.cpu()
     del model
+    torch.cuda.empty_cache()
 
     model = AutoGPTQForCausalLM.from_quantized(args.quantized_model_dir, device="cuda:0", use_triton=args.use_triton)
     task.model = model
