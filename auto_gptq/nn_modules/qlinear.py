@@ -11,7 +11,7 @@ try:
     import quant_cuda
 
     _quant_cuda_available = True
-except:
+except ImportError:
     logger.warning('CUDA extension not installed.')
     _quant_cuda_available = False
 
@@ -92,9 +92,12 @@ class QuantLinear(nn.Module):
 
         intweight = []
         for idx in range(self.infeatures):
-            intweight.append(torch.round(
-                (linear.weight.data[:, idx] + scale_zeros[self.g_idx[idx]]) / self.scales[self.g_idx[idx]]).to(
-                torch.int)[:, None])
+            intweight.append(
+                torch.round(
+                    (
+                        linear.weight.data[:, idx] + scale_zeros[self.g_idx[idx]]) / self.scales[self.g_idx[idx]]
+                ).to(torch.int)[:, None]
+            )
         intweight = torch.cat(intweight, dim=1)
         intweight = intweight.t().contiguous()
         intweight = intweight.numpy().astype(np.uint32)
