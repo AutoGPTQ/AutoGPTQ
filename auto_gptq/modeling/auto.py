@@ -1,4 +1,4 @@
-from ._base import BaseQuantizeConfig
+from ._base import BaseQuantizeConfig, BaseGPTQForCausalLM
 from ._utils import check_and_get_model_type
 from .bloom import BloomGPTQForCausalLM
 from .gpt_neox import GPTNeoXGPTQForCausalLM
@@ -33,7 +33,7 @@ class AutoGPTQForCausalLM:
         quantize_config: BaseQuantizeConfig,
         bf16: bool = False,
         **model_init_kwargs
-    ):
+    ) -> BaseGPTQForCausalLM:
         model_type = check_and_get_model_type(pretrained_model_name_or_path)
         return GPTQ_CAUSAL_LM_MODEL_MAP[model_type].from_pretrained(
             pretrained_model_name_or_path=pretrained_model_name_or_path,
@@ -49,7 +49,7 @@ class AutoGPTQForCausalLM:
         device: str = "cpu",
         use_safetensors: bool = False,
         use_triton: bool = False
-    ):
+    ) -> BaseGPTQForCausalLM:
         model_type = check_and_get_model_type(save_dir)
         return GPTQ_CAUSAL_LM_MODEL_MAP[model_type].from_quantized(
             save_dir=save_dir,

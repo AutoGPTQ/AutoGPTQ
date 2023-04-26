@@ -10,6 +10,7 @@ import torch.nn as nn
 import transformers
 from safetensors.torch import load_file as safe_load, save_file as safe_save
 from transformers import AutoConfig, AutoModelForCausalLM, PreTrainedModel
+from transformers.utils.hub import PushToHubMixin
 
 from ._const import *
 from ._utils import *
@@ -19,7 +20,7 @@ logger = getLogger(__name__)
 
 
 @dataclass
-class BaseQuantizeConfig:
+class BaseQuantizeConfig(PushToHubMixin):
     bits: int = field(default=4, metadata={"choices": [2, 3, 4, 8]})
     damp_percent: float = field(default=0.01)
     desc_act: bool = field(default=True)
@@ -35,7 +36,7 @@ class BaseQuantizeConfig:
         if self.group_size != -1 and self.group_size <= 0:
             raise ValueError("unless equal to -1, group_size must greater then 0.")
 
-    def save_pretrained(self, save_dir: str):
+    def save_pretrained(self, save_dir: str, **kwargs):
         with open(join(save_dir, "quantize_config.json"), "w", encoding="utf-8") as f:
             json.dump(self.to_dict(), f, indent=2)
 
@@ -53,7 +54,7 @@ class BaseQuantizeConfig:
         }
 
 
-class BaseGPTQForCausalLM(nn.Module):
+class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
     layers_block_name: str = None
     outside_layer_modules: List[str] = None
     inside_layer_modules: List[List[str]] = None
@@ -293,6 +294,11 @@ class BaseGPTQForCausalLM(nn.Module):
         self.model.config.save_pretrained(save_dir)
         self.quantize_config.save_pretrained(save_dir)
 
+    def save_pretrained(self, save_dir: str, use_safetensors: bool = False, **kwargs):
+        """alias of save_quantized"""
+        logger.warning("you are using save_pretrained, which will re-direct to save_quantized.")
+        self.save_quantized(save_dir, use_safetensors)
+
     @classmethod
     def from_pretrained(
         cls,
@@ -322,7 +328,7 @@ class BaseGPTQForCausalLM(nn.Module):
 
         model = AutoModelForCausalLM.from_pretrained(pretrained_model_name_or_path, **model_init_kwargs)
         model_config = model.config.to_dict()
-        seq_len_keys = ["max_position_embeddings", "seq_length"]
+        seq_len_keys = ["max_position_embeddings", "seq_length", "n_positions"]
         if any([k in model_config for k in seq_len_keys]):
             for key in seq_len_keys:
                 if key in model_config:
