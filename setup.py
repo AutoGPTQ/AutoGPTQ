@@ -1,3 +1,4 @@
+import os
 from setuptools import setup, find_packages
 
 try:
@@ -25,6 +26,8 @@ extras_require = {
 if TORCH_AVAILABLE:
     from torch.utils import cpp_extension
 
+    BUILD_CUDA_EXT = int(os.environ.get('BUILD_CUDA_EXT', '1')) == 1
+
     extensions = [
         cpp_extension.CUDAExtension(
             "quant_cuda",
@@ -34,6 +37,12 @@ if TORCH_AVAILABLE:
             ]
         )
     ]
+    additional_setup_kwargs = dict()
+    if BUILD_CUDA_EXT:
+        additional_setup_kwargs = {
+            "ext_modules": extensions,
+            "cmdclass": {'build_ext': cpp_extension.BuildExtension}
+        }
     setup(
         name="auto_gptq",
         packages=find_packages(),
@@ -41,8 +50,7 @@ if TORCH_AVAILABLE:
         install_requires=requirements,
         extras_require=extras_require,
         include_dirs=["quant_cuda"],
-        ext_modules=extensions,
-        cmdclass={'build_ext': cpp_extension.BuildExtension}
+        **additional_setup_kwargs
     )
 else:
     setup(
