@@ -393,7 +393,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         else:
             model.load_state_dict(torch.load(model_save_name))
         model_config = model.config.to_dict()
-        seq_len_keys = ["max_position_embeddings", "seq_length"]
+        seq_len_keys = ["max_position_embeddings", "seq_length", "n_positions"]
         if any([k in model_config for k in seq_len_keys]):
             for key in seq_len_keys:
                 if key in model_config:
