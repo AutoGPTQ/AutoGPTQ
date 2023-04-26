@@ -381,8 +381,10 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         torch.set_default_dtype(torch.float)
         model = model.eval()
         layers = find_layers(model)
-        for name in [cls.lm_head_name]:
-            if name in layers:
+        ignore_layers = [cls.lm_head_name] + cls.outside_layer_modules
+        for name in list(layers.keys()):
+            if any([name.startswith(ignore_layer) for ignore_layer in ignore_layers]):
+                logger.info(f"{name} not been quantized, will be ignored when make_quant.")
                 del layers[name]
         make_quant(model, layers, quantize_config.bits, quantize_config.group_size, use_triton=use_triton)
 
