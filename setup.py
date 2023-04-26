@@ -56,7 +56,7 @@ else:
     setup(
         name="auto_gptq",
         packages=find_packages(),
-        version="v0.0.5-dev",
+        version="v0.0.5",
         install_requires=requirements,
         extras_require=extras_require,
         include_dirs=["quant_cuda"]
