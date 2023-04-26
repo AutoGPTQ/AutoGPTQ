@@ -9,7 +9,10 @@ from ._const import SUPPORTED_MODELS, CUDA
 logger = getLogger(__name__)
 
 
-def find_layers(module, layers=[nn.Conv2d, nn.Linear], name=''):
+def find_layers(module, layers=None, name=''):
+    if not layers:
+        layers = [nn.Conv2d, nn.Linear]
+
     if type(module) in layers:
         return {name: module}
     res = {}
@@ -39,7 +42,7 @@ def make_quant(module, names, bits, groupsize, name='', use_triton=False):
             delattr(module, attr)
             setattr(module, attr, QuantLinear(bits, groupsize, tmp.in_features, tmp.out_features, tmp.bias is not None))
     for name1, child in module.named_children():
-        make_quant(child, names, bits, groupsize, name + '.' + name1 if name != '' else name1)
+        make_quant(child, names, bits, groupsize, name + '.' + name1 if name != '' else name1, use_triton=use_triton)
 
 
 def pack_model(model, quantizers, bits, group_size, use_triton=False, autotune_warmup: bool = False):

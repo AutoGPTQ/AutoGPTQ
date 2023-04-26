@@ -336,7 +336,6 @@ class QuantLinearFunction(torch.autograd.Function):
 
 
 class QuantLinear(nn.Module):
-
     def __init__(
         self,
         bits,
