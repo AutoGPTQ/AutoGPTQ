@@ -3,7 +3,7 @@ from logging import getLogger
 import torch.nn as nn
 from transformers import AutoConfig
 
-from ._const import SUPPORTED_MODELS, CUDA
+from ._const import SUPPORTED_MODELS, CUDA_0
 
 
 logger = getLogger(__name__)
@@ -67,7 +67,7 @@ def pack_model(model, quantizers, bits, group_size, use_triton=False, autotune_w
         logger.warning(
             "using autotune_warmup will move model to GPU, make sure you have enough VRAM to load the hole model."
         )
-        autotune_warmup_linear(model.to(CUDA), seqlen=model.seqlen)
+        autotune_warmup_linear(model.to(CUDA_0), seqlen=model.seqlen)
 
 
 def check_and_get_model_type(model_dir):

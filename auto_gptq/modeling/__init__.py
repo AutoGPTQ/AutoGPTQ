@@ -4,4 +4,5 @@ from .bloom import *
 from .gpt_neox import *
 from .gptj import *
 from .llama import *
+from .moss import *
 from .opt import *

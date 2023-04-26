@@ -3,8 +3,9 @@ import os
 from dataclasses import dataclass, field, fields
 from logging import getLogger
 from os.path import join
-from typing import Dict, List, Union
+from typing import Dict, List, Optional, Union
 
+import accelerate
 import torch
 import torch.nn as nn
 import transformers
@@ -55,6 +56,7 @@ class BaseQuantizeConfig(PushToHubMixin):
 
 
 class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
+    layer_type: str = None
     layers_block_name: str = None
     outside_layer_modules: List[str] = None
     inside_layer_modules: List[List[str]] = None
@@ -138,8 +140,8 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         num_examples = len(examples)
         layers = get_module_by_name(self.model, self.layers_block_name)
 
-        layers[0] = layers[0].to(CUDA)
-        self._move_outside_layer_modules(CUDA)
+        layers[0] = layers[0].to(CUDA_0)
+        self._move_outside_layer_modules(CUDA_0)
 
         # get inputs for first layer
         layers[0] = LayerHijacker(layers[0])
@@ -147,7 +149,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             for k, v in example.items():
                 if len(v.shape) == 1:
                     v = v.unsqueeze(0)
-                example[k] = v.to(CUDA)
+                example[k] = v.to(CUDA_0)
             try:
                 self.model(**example)
             except ValueError:
@@ -166,7 +168,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         quantizers = {}
         for i in range(len(layers)):
             logger.info(f"Start quantizing layer {i + 1}/{len(layers)}")
-            layer = layers[i].to(CUDA)
+            layer = layers[i].to(CUDA_0)
 
             full = find_layers(layer)
             for names in self.inside_layer_modules:
@@ -191,16 +193,16 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                 for name in subset:
                     handles.append(subset[name].register_forward_hook(add_batch(name)))
                 for j in range(num_examples):
-                    layer_input = layer_inputs[j].to(CUDA)
-                    layer_attention_mask = attention_masks[j].to(CUDA)
+                    layer_input = layer_inputs[j].to(CUDA_0)
+                    layer_attention_mask = attention_masks[j].to(CUDA_0)
                     additional_layer_inputs = {
                         "attention_mask": layer_attention_mask
                     }
-                    if (layer_position_ids := None if not position_ids else position_ids[j].to(CUDA)) is not None:
+                    if (layer_position_ids := None if not position_ids else position_ids[j].to(CUDA_0)) is not None:
                         additional_layer_inputs["position_ids"] = layer_position_ids
                     for k, v in layer_input_kwargs[j].items():
                         if isinstance(v, torch.Tensor):
-                            additional_layer_inputs[k] = v.to(CUDA)
+                            additional_layer_inputs[k] = v.to(CUDA_0)
                         else:
                             additional_layer_inputs[k] = v
                     layer(layer_input, **additional_layer_inputs)[0][0].cpu()
@@ -220,16 +222,16 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                     gptq[name].free()
 
             for j in range(num_examples):
-                layer_input = layer_inputs[j].to(CUDA)
-                layer_attention_mask = attention_masks[j].to(CUDA)
+                layer_input = layer_inputs[j].to(CUDA_0)
+                layer_attention_mask = attention_masks[j].to(CUDA_0)
                 additional_layer_inputs = {
                     "attention_mask": layer_attention_mask
                 }
-                if (layer_position_ids := None if not position_ids else position_ids[j].to(CUDA)) is not None:
+                if (layer_position_ids := None if not position_ids else position_ids[j].to(CUDA_0)) is not None:
                     additional_layer_inputs["position_ids"] = layer_position_ids
                 for k, v in layer_input_kwargs[j].items():
                     if isinstance(v, torch.Tensor):
-                        additional_layer_inputs[k] = v.to(CUDA)
+                        additional_layer_inputs[k] = v.to(CUDA_0)
                     else:
                         additional_layer_inputs[k] = v
                 layer_output = layer(layer_input, **additional_layer_inputs)[0][0].cpu()
@@ -304,10 +306,13 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         cls,
         pretrained_model_name_or_path: str,
         quantize_config: BaseQuantizeConfig,
-        bf16: bool = False,
+        max_memory_per_gpu: Optional[int] = None,
         **model_init_kwargs
     ):
         """load un-quantized pretrained model to cpu"""
+
+        if not torch.cuda.is_available():
+            raise EnvironmentError("Load pretrained model to do quantization requires CUDA available.")
 
         def skip(*args, **kwargs):
             pass
@@ -321,10 +326,41 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             raise TypeError(f"{config.model_type} isn't supported yet.")
 
         # enforce some values despite user specified
-        model_init_kwargs["device_map"] = None
-        model_init_kwargs["torch_dtype"] = torch.bfloat16 if bf16 else torch.float16
-        model_init_kwargs["low_cpu_mem_usage"] = False
+        model_init_kwargs["torch_dtype"] = torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
         model_init_kwargs["trust_remote_code"] = True
+        max_memory = None
+        if "max_memory" in model_init_kwargs:
+            max_memory = model_init_kwargs.pop("max_memory")
+        if max_memory_per_gpu is not None:
+            max_memory = {
+                cuda_id: f"{max_memory_per_gpu}GIB" for cuda_id in range(torch.cuda.device_count())
+            }
+        if max_memory:
+            with accelerate.init_empty_weights():
+                model = AutoModelForCausalLM.from_config(config)
+            model.tie_weights()
+
+            max_memory = accelerate.utils.get_balanced_memory(
+                model,
+                max_memory=max_memory,
+                no_split_module_classes=[cls.layer_type],
+                dtype=model_init_kwargs["torch_dtype"],
+                low_zero=False
+            )
+            model_init_kwargs["device_map"] = accelerate.infer_auto_device_map(
+                model,
+                max_memory=max_memory,
+                no_split_module_classes=[cls.layer_type],
+                dtype=model_init_kwargs["torch_dtype"]
+            )
+            model_init_kwargs["low_cpu_mem_usage"] = True
+
+            del model
+        else:
+            model_init_kwargs["device_map"] = None
+            model_init_kwargs["low_cpu_mem_usage"] = False
+
+        torch.cuda.empty_cache()
 
         model = AutoModelForCausalLM.from_pretrained(pretrained_model_name_or_path, **model_init_kwargs)
         model_config = model.config.to_dict()

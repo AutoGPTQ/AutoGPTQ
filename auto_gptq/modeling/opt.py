@@ -2,6 +2,7 @@ from ._base import *
 
 
 class OPTGPTQForCausalLM(BaseGPTQForCausalLM):
+    layer_type = "OPTDecoderLayer"
     layers_block_name = "model.decoder.layers"
     outside_layer_modules = [
         "model.decoder.embed_tokens", "model.decoder.embed_positions", "model.decoder.project_out",
