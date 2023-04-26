@@ -25,21 +25,22 @@ extras_require = {
 
 
 if TORCH_AVAILABLE:
-    from torch.utils import cpp_extension
-
     BUILD_CUDA_EXT = int(os.environ.get('BUILD_CUDA_EXT', '1')) == 1
 
-    extensions = [
-        cpp_extension.CUDAExtension(
-            "quant_cuda",
-            [
-                "quant_cuda/quant_cuda.cpp",
-                "quant_cuda/quant_cuda_kernel.cu"
-            ]
-        )
-    ]
     additional_setup_kwargs = dict()
-    if BUILD_CUDA_EXT:
+    if BUILD_CUDA_EXT and torch.cuda.is_available():
+        from torch.utils import cpp_extension
+
+        extensions = [
+            cpp_extension.CUDAExtension(
+                "quant_cuda",
+                [
+                    "quant_cuda/quant_cuda.cpp",
+                    "quant_cuda/quant_cuda_kernel.cu"
+                ]
+            )
+        ]
+
         additional_setup_kwargs = {
             "ext_modules": extensions,
             "cmdclass": {'build_ext': cpp_extension.BuildExtension}
