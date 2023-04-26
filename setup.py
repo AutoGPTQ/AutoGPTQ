@@ -7,7 +7,7 @@ try:
 except ImportError:
     TORCH_AVAILABLE = False
 
-version = "v0.1.0-dev0"
+version = "v0.1.0-dev"
 
 requirements = [
     "datasets",
