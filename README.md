@@ -2,6 +2,7 @@
 An easy-to-use model quantization package with user-friendly apis, based on GPTQ algorithm.
 
 ## News or Update
+- 2023-04-25 - (Update) - Using `triton` to speed up inference is now supported.
 - 2023-04-25 - (News&Update) - [MOSS](https://github.com/OpenLMLab/MOSS) is an open-source tool-augmented conversational language model from Fudan University, quantization is now supported in AutoGPTQ.
 - 2023-04-23 - (Update) - Support evaluation on multiple (down-stream) tasks such as: language-modeling, text-classification, text-summarization.
 - 2023-04-22 - (News) - qwopqwop200's [AutoGPTQ-triton](https://github.com/qwopqwop200/AutoGPTQ-triton) provides faster speed to integrate with quantized model, for everyone who can access to triton, try and enjoy yourself!
@@ -9,10 +10,29 @@ An easy-to-use model quantization package with user-friendly apis, based on GPTQ
 - 2023-04-16 - (Update) - Support quantization and inference for `bloom`, `gpt_neox`, `gptj`, `llama` and `opt`.
 
 ## Installation
-### Install from source
-First, install `torch` with minimum version of 1.13.0 following [pytorch installation guide](https://pytorch.org/get-started/locally/)
 
-Second, clone the source code:
+### Quick Installation
+You can install the latest stable release of AutoGPTQ from pip:
+```shell
+pip install auto-gptq
+```
+By default, pytorch extensions will be installed when `torch` is already in your virtual environment, if you don't want to use cuda extensions, using:
+```shell
+BUILD_CUDA_EXT=0 pip install auto-gptq
+```
+For some people want to try LLaMa and whose `transformers` version not meet the newest one that supports it, using:
+```shell
+pip install auto-gptq[llama]
+```
+To integrate with `triton`, using:
+> warning: 3-bit quantization is not supported when using triton
+
+```shell
+pip install auto-gptq[triton]
+```
+
+### Install from source
+Clone the source code:
 ```shell
 git clone https://github.com/PanQiWei/AutoGPTQ.git && cd AutoGPTQ
 ```
@@ -20,10 +40,12 @@ Then, install from source:
 ```shell
 pip install .
 ```
-For some people want to try LLaMa and whose `transformers` version not meet the newest one that supports it, using:
-```shell
-pip install .[llama]
-```
+Like quick installation, you can also set `BUILD_CUDA_EXT=0` to disable pytorch extension building.
+
+Use `.[llama]` if you want to try LLaMa model.
+
+Use `.[triton]` if you want to integrate with triton and it's available on your operating system.
+
 
 ## Supported Models
 Currently, `auto_gptq` supports: `bloom`, `gpt_neox`, `gptj`, `llama`, `moss` and `opt`; more CausalLMs will come soon!
@@ -62,7 +84,7 @@ model = AutoGPTQForCausalLM.from_pretrained(pretrained_model_dir, quantize_confi
 
 # quantize model, the examples should be list of dict whose keys can only be "input_ids" and "attention_mask" 
 # with value under torch.LongTensor type.
-model.quantize([example])
+model.quantize([example], use_triton=False)
 
 # save quantized model
 model.save_quantized(quantized_model_dir)
@@ -71,7 +93,7 @@ model.save_quantized(quantized_model_dir)
 model.save_quantized(quantized_model_dir, use_safetensors=True)
 
 # load quantized model, currently only support cpu or single gpu
-model = AutoGPTQForCausalLM.from_quantized(quantized_model_dir, device="cuda:0")
+model = AutoGPTQForCausalLM.from_quantized(quantized_model_dir, device="cuda:0", use_triton=False)
 
 # inference with model.generate
 print(tokenizer.decode(model.generate(**tokenizer("auto_gptq is", return_tensors="pt").to("cuda:0"))[0]))
@@ -121,7 +143,6 @@ The predefined tasks support all causal-language-models implemented in [Hugging 
 
 Below is an example to evaluate `EleutherAI/gpt-j-6b` on sequence-classification task using `cardiffnlp/tweet_sentiment_multilingual` dataset:
 ```python
-from argparse import ArgumentParser
 from functools import partial
 
 import datasets
@@ -170,9 +191,14 @@ task = SequenceClassificationTask(
             "num_samples": 1000,  # how many samples will be sampled to evaluation
             "sample_max_len": 1024,  # max tokens for each sample
             "block_max_len": 2048,  # max tokens for each data block
-            "load_fn": partial(datasets.load_dataset, name="english"),  # function to load dataset, one must only accept data_name_or_path as input and return datasets.Dataset
-            "preprocess_fn": ds_refactor_fn,  # function to preprocess dataset, which is used for datasets.Dataset.map, must return Dict[str, list] with only two keys: [prompt_col_name, label_col_name]
-            "truncate_prompt": False  # truncate label when sample's length exceed sample_max_len
+            # function to load dataset, one must only accept data_name_or_path as input 
+            # and return datasets.Dataset
+            "load_fn": partial(datasets.load_dataset, name="english"),  
+            # function to preprocess dataset, which is used for datasets.Dataset.map, 
+            # must return Dict[str, list] with only two keys: [prompt_col_name, label_col_name]
+            "preprocess_fn": ds_refactor_fn,  
+            # truncate label when sample's length exceed sample_max_len
+            "truncate_prompt": False  
         }
     )
 

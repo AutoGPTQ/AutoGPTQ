@@ -7,7 +7,8 @@ import torch
 import torch.nn as nn
 import transformers
 
-from .quant import *
+from .quantizer import Quantizer
+
 
 logger = getLogger(__name__)
 
@@ -28,6 +29,7 @@ class GPTQ:
         self.columns = W.shape[1]
         self.H = torch.zeros((self.columns, self.columns), device=self.dev)
         self.nsamples = 0
+        self.quantizer = Quantizer()
 
     def add_batch(self, inp, out):
         if os.environ.get("DEBUG"):
@@ -122,9 +124,7 @@ class GPTQ:
                         zero.append(self.quantizer.zero)
                         now_idx += 1
 
-                q = quantize(
-                    w.unsqueeze(1), self.quantizer.scale, self.quantizer.zero, self.quantizer.maxq
-                ).flatten()
+                q = self.quantizer.quantize(w.unsqueeze(1)).flatten()
                 Q1[:, i] = q
                 Losses1[:, i] = (w - q) ** 2 / d ** 2
 
@@ -176,5 +176,6 @@ class GPTQ:
         self.Losses = None
         self.Trace = None
         torch.cuda.empty_cache()
+
 
 __all__ = ["GPTQ"]

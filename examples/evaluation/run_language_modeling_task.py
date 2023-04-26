@@ -35,6 +35,7 @@ def main():
     parser.add_argument("--num_samples", type=int, default=100, help="how many samples will be sampled to evaluation")
     parser.add_argument("--sample_max_len", type=int, default=1024, help="max tokens for each sample")
     parser.add_argument("--block_max_len", type=int, default=2048, help="max tokens for each data block")
+    parser.add_argument("--use_triton", action="store_true")
     args = parser.parse_args()
 
     tokenizer = AutoTokenizer.from_pretrained(args.base_model_dir)
@@ -63,7 +64,7 @@ def main():
     model.cpu()
     del model
 
-    model = AutoGPTQForCausalLM.from_quantized(args.quantized_model_dir, device="cuda:0")
+    model = AutoGPTQForCausalLM.from_quantized(args.quantized_model_dir, device="cuda:0", use_triton=args.use_triton)
     task.model = model
     task.device = model.device
     print(f"eval result for quantized model: {task.run()}")

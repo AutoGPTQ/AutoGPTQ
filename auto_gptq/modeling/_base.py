@@ -13,7 +13,7 @@ from transformers import AutoConfig, AutoModelForCausalLM, PreTrainedModel
 
 from ._const import *
 from ._utils import *
-from ..quantization import *
+from ..quantization import GPTQ
 
 logger = getLogger(__name__)
 
@@ -87,7 +87,12 @@ class BaseGPTQForCausalLM(nn.Module):
         return position_ids
 
     @torch.no_grad()
-    def quantize(self, examples: List[Dict[str, torch.LongTensor]]):
+    def quantize(
+        self,
+        examples: List[Dict[str, torch.LongTensor]],
+        use_triton: bool = False,
+        autotune_warmup_after_quantized: bool = False
+    ):
         if self.quantized:
             raise EnvironmentError("can't execute quantize because the model is quantized.")
 
@@ -168,7 +173,6 @@ class BaseGPTQForCausalLM(nn.Module):
                 gptq = {}
                 for name in subset:
                     gptq[name] = GPTQ(subset[name])
-                    gptq[name].quantizer = Quantizer()
                     gptq[name].quantizer.configure(
                         self.quantize_config.bits,
                         perchannel=True,
@@ -241,7 +245,9 @@ class BaseGPTQForCausalLM(nn.Module):
             model=self.model,
             quantizers=quantizers,
             bits=self.quantize_config.bits,
-            group_size=self.quantize_config.group_size
+            group_size=self.quantize_config.group_size,
+            use_triton=use_triton,
+            autotune_warmup=autotune_warmup_after_quantized
         )
         self._quantized = True
         self.model.config.use_cache = forward_pass_use_cache
@@ -258,7 +264,8 @@ class BaseGPTQForCausalLM(nn.Module):
 
     def generate(self, **kwargs):
         """shortcut for model.generate"""
-        return self.model.generate(**kwargs)
+        with torch.inference_mode(), torch.amp.autocast(device_type=self.device.type):
+            return self.model.generate(**kwargs)
 
     def prepare_inputs_for_generation(self, *args, **kwargs):
         """shortcut for model.prepare_inputs_for_generation"""
@@ -333,9 +340,16 @@ class BaseGPTQForCausalLM(nn.Module):
         cls,
         save_dir: str,
         device: str = "cpu",
-        use_safetensors: bool = False
+        use_safetensors: bool = False,
+        use_triton: bool = False
     ):
         """load quantized model from local disk"""
+        if use_triton:
+            from ..nn_modules.qlinear_triton import autotune_warmup_linear
+
+            logger.warning("use_triton will force moving the hole model to GPU, make sure you have enough VRAM.")
+            device = "cuda:0"
+
         config = AutoConfig.from_pretrained(save_dir, trust_remote_code=True)
         if config.model_type not in SUPPORTED_MODELS:
             raise TypeError(f"{config.model_type} isn't supported yet.")
@@ -364,7 +378,7 @@ class BaseGPTQForCausalLM(nn.Module):
         for name in [cls.lm_head_name]:
             if name in layers:
                 del layers[name]
-        make_quant(model, layers, quantize_config.bits, quantize_config.group_size)
+        make_quant(model, layers, quantize_config.bits, quantize_config.group_size, use_triton=use_triton)
 
         if model_save_name.endswith('.safetensors'):
             model.load_state_dict(safe_load(model_save_name, "cpu"))
@@ -383,6 +397,9 @@ class BaseGPTQForCausalLM(nn.Module):
 
         model.eval()
         model.to(device)
+
+        if use_triton:
+            autotune_warmup_linear(model, seqlen=model.seqlen)
 
         return cls(model, True, quantize_config)
 

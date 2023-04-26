@@ -1,9 +1,12 @@
-from os.path import abspath, dirname, join
-from setuptools import setup, find_packages, Extension
+import os
+from setuptools import setup, find_packages
 
-from torch.utils import cpp_extension
+try:
+    import torch
+    TORCH_AVAILABLE = True
+except ImportError:
+    TORCH_AVAILABLE = False
 
-project_root = dirname(abspath(__file__))
 
 requirements = [
     "datasets",
@@ -15,25 +18,46 @@ requirements = [
 ]
 
 extras_require = {
-    "llama": ["transformers>=4.28.0"]
+    "llama": ["transformers>=4.28.0"],
+    "triton": ["triton>=2.0.0"]
 }
 
-extensions = [
-    cpp_extension.CUDAExtension(
-        "quant_cuda",
-        [
-            join(project_root, "auto_gptq/quantization/quant_cuda.cpp"),
-            join(project_root, "auto_gptq/quantization/quant_cuda_kernel.cu")
-        ]
-    )
-]
 
-setup(
-    name="auto_gptq",
-    packages=find_packages(),
-    version="v0.0.4-dev",
-    install_requires=requirements,
-    extras_require=extras_require,
-    ext_modules=extensions,
-    cmdclass={'build_ext': cpp_extension.BuildExtension}
-)
+if TORCH_AVAILABLE:
+    from torch.utils import cpp_extension
+
+    BUILD_CUDA_EXT = int(os.environ.get('BUILD_CUDA_EXT', '1')) == 1
+
+    extensions = [
+        cpp_extension.CUDAExtension(
+            "quant_cuda",
+            [
+                "quant_cuda/quant_cuda.cpp",
+                "quant_cuda/quant_cuda_kernel.cu"
+            ]
+        )
+    ]
+    additional_setup_kwargs = dict()
+    if BUILD_CUDA_EXT:
+        additional_setup_kwargs = {
+            "ext_modules": extensions,
+            "cmdclass": {'build_ext': cpp_extension.BuildExtension}
+        }
+    setup(
+        name="auto_gptq",
+        packages=find_packages(),
+        version="v0.0.4",
+        install_requires=requirements,
+        extras_require=extras_require,
+        include_dirs=["quant_cuda"],
+        **additional_setup_kwargs
+    )
+else:
+    setup(
+        name="auto_gptq",
+        packages=find_packages(),
+        version="v0.0.4",
+        install_requires=requirements,
+        extras_require=extras_require,
+        include_dirs=["quant_cuda"]
+    )

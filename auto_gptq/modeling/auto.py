@@ -47,13 +47,15 @@ class AutoGPTQForCausalLM:
         cls,
         save_dir: str,
         device: str = "cpu",
-        use_safetensors: bool = False
+        use_safetensors: bool = False,
+        use_triton: bool = False
     ):
         model_type = check_and_get_model_type(save_dir)
         return GPTQ_CAUSAL_LM_MODEL_MAP[model_type].from_quantized(
             save_dir=save_dir,
             device=device,
-            use_safetensors=use_safetensors
+            use_safetensors=use_safetensors,
+            use_triton=use_triton
         )
 
 
