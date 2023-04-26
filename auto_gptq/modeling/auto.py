@@ -1,3 +1,5 @@
+from typing import Optional
+
 from ._base import BaseQuantizeConfig, BaseGPTQForCausalLM
 from ._utils import check_and_get_model_type
 from .bloom import BloomGPTQForCausalLM
@@ -31,14 +33,14 @@ class AutoGPTQForCausalLM:
         cls,
         pretrained_model_name_or_path: str,
         quantize_config: BaseQuantizeConfig,
-        bf16: bool = False,
+        max_memory_per_gpu: Optional[int] = None,
         **model_init_kwargs
     ) -> BaseGPTQForCausalLM:
         model_type = check_and_get_model_type(pretrained_model_name_or_path)
         return GPTQ_CAUSAL_LM_MODEL_MAP[model_type].from_pretrained(
             pretrained_model_name_or_path=pretrained_model_name_or_path,
             quantize_config=quantize_config,
-            bf16=bf16,
+            max_memory_per_gpu=max_memory_per_gpu,
             **model_init_kwargs
         )
 
