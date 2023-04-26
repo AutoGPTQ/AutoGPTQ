@@ -11,6 +11,12 @@ To Execute `basic_usage.py`, using command like this:
 python basic_usage.py
 ```
 
+To Execute `basic_usage_with_wikitext2.py`, using command like this:
+```shell
+python basic_usage_with_wikitext2.py
+```
+> Note: There is about 0.6 ppl degrade on opt-125m model using AutoGPTQ, compared to GPTQ-for-LLaMa.
+
 ### Quantize with Alpaca
 To Execute `quant_with_alpaca.py`, using command like this:
 ```shell
