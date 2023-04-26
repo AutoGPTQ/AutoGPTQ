@@ -11,15 +11,17 @@ An easy-to-use model quantization package with user-friendly apis, based on GPTQ
 
 ## Installation
 ### Install from source
-First, install `torch` with minimum version of 1.13.0 following [pytorch installation guide](https://pytorch.org/get-started/locally/)
-
-Second, clone the source code:
+Clone the source code:
 ```shell
 git clone https://github.com/PanQiWei/AutoGPTQ.git && cd AutoGPTQ
 ```
 Then, install from source:
 ```shell
 pip install .
+```
+By default, cuda extensions will be installed when `torch` is already in your virtual environment, if you don't want to use cuda extensions, using:
+```shell
+BUILD_CUDA_EXT=0 pip install .
 ```
 For some people want to try LLaMa and whose `transformers` version not meet the newest one that supports it, using:
 ```shell
