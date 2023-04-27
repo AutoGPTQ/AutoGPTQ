@@ -31,7 +31,7 @@ class BaseQuantizeConfig(PushToHubMixin):
     group_size: int = field(default=-1)
     sym: bool = field(default=True)
     true_sequential: bool = field(default=True)
-    
+
     def __post_init__(self):
         fields_info = fields(self)
 
@@ -60,7 +60,7 @@ class BaseQuantizeConfig(PushToHubMixin):
             "sym": self.sym,
             "true_sequential": self.true_sequential,
         }
-    
+
 
 class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
     layer_type: str = None
@@ -206,10 +206,10 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         ori_outside_layer_module_devices = {}
         for module_name in self.outside_layer_modules:
             module = get_module_by_name(self.model, module_name)
-            
+
             if module is None:
                 continue
-                
+
             ori_outside_layer_module_devices[module_name] = get_device(module)
             if module is not None:
                 move_to_device(module, cur_layer_device)
@@ -480,7 +480,8 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         use_safetensors: bool = False,
         use_triton: bool = False,
         max_memory: Optional[dict] = None,
-        device_map: Optional[str] = None
+        device_map: Optional[str] = None,
+        quantize_config: BaseQuantizeConfig | None = None
     ):
         """load quantized model from local disk"""
         if use_triton:
@@ -493,7 +494,8 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         if config.model_type not in SUPPORTED_MODELS:
             raise TypeError(f"{config.model_type} isn't supported yet.")
 
-        quantize_config = BaseQuantizeConfig.from_pretrained(save_dir)
+        if quantize_config is None:
+            quantize_config = BaseQuantizeConfig.from_pretrained(save_dir)
 
         model_save_name = join(save_dir, f"gptq_model-{quantize_config.bits}bit")
         if use_safetensors:
@@ -520,16 +522,16 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             if any([name.startswith(ignore_layer) for ignore_layer in ignore_layers]):
                 logger.info(f"{name} not been quantized, will be ignored when make_quant.")
                 del layers[name]
-                
+
         with accelerate.init_empty_weights():
             make_quant(model, layers, quantize_config.bits, quantize_config.group_size, use_triton=use_triton)
         model.tie_weights()
-                        
+
         if max_memory and not device_map:
             device_map = "auto"
         if not max_memory and not device_map:
             device_map = {"": device}
-            
+
         model = accelerate.load_checkpoint_and_dispatch(
             model, model_save_name, device_map, max_memory, no_split_module_classes=[cls.layer_type]
         )
