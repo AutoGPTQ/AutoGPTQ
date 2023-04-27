@@ -25,7 +25,9 @@ class BaseQuantizeConfig(PushToHubMixin):
     damp_percent: float = field(default=0.01)
     desc_act: bool = field(default=True)
     group_size: int = field(default=-1)
-
+    sym: bool = field(default=True)
+    true_sequential: bool = field(default=True)
+    
     def __post_init__(self):
         fields_info = fields(self)
 
@@ -50,9 +52,11 @@ class BaseQuantizeConfig(PushToHubMixin):
             "bits": self.bits,
             "damp_percent": self.damp_percent,
             "desc_act": self.desc_act,
-            "group_size": self.group_size
+            "group_size": self.group_size,
+            "sym": self.sym,
+            "true_sequential": self.true_sequential,
         }
-
+    
 
 class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
     layers_block_name: str = None
@@ -163,6 +167,8 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         attention_masks = self._resize_attention_mask(attention_masks)
         position_ids = self._resize_position_ids(position_ids)
 
+        if not(self.quantize_config.true_sequential):
+            self.inside_layer_modules = [sum(self.inside_layer_modules, [])]
         quantizers = {}
         for i in range(len(layers)):
             logger.info(f"Start quantizing layer {i + 1}/{len(layers)}")
@@ -177,10 +183,9 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                     gptq[name].quantizer.configure(
                         self.quantize_config.bits,
                         perchannel=True,
-                        sym=True,
-                        mse=False
+                        sym=self.quantize_config.sym,
+                        mse=False,
                     )
-
                 def add_batch(name):
                     def tmp(_, inp, out):
                         gptq[name].add_batch(inp[0].data, out.data)
