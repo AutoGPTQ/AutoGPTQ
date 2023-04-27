@@ -372,6 +372,8 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         model_init_kwargs["torch_dtype"] = torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
         model_init_kwargs["trust_remote_code"] = True
         if max_memory:
+            if "disk" in max_memory:
+                raise NotImplementedError("disk offload not support yet.")
             with accelerate.init_empty_weights():
                 model = AutoModelForCausalLM.from_config(config)
             model.tie_weights()
