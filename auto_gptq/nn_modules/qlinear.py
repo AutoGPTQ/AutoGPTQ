@@ -59,23 +59,14 @@ class QuantLinear(nn.Module):
 
         # is performed by unpacking the weights and using torch.matmul
         if self.bits in [2, 4, 8]:
-            self.register_buffer(
-                'wf',
-                torch.tensor(list(range(0, 32, self.bits)), dtype=torch.int32).unsqueeze(0),
-                persistent=False
-            )
+            self.wf = torch.tensor(list(range(0, 32, self.bits)), dtype=torch.int32).unsqueeze(0)
         elif self.bits == 3:
-            self.register_buffer(
-                'wf',
-                torch.tensor(
-                    [
-                        [0, 3, 6, 9, 12, 15, 18, 21, 24, 27, 30, 0],
-                        [0, 1, 4, 7, 10, 13, 16, 19, 22, 25, 28, 31],
-                        [0, 2, 5, 8, 11, 14, 17, 20, 23, 26, 29, 0],
-                    ],
-                    dtype=torch.int32).reshape(1, 3, 12),
-                persistent=False
-            )
+            self.wf = torch.tensor([
+                                        [0, 3, 6, 9, 12, 15, 18, 21, 24, 27, 30, 0],
+                                        [0, 1, 4, 7, 10, 13, 16, 19, 22, 25, 28, 31],
+                                        [0, 2, 5, 8, 11, 14, 17, 20, 23, 26, 29, 0],
+                                   ], 
+                                   dtype=torch.int32).reshape(1, 3, 12)
 
         self.kernel_switch_threshold = kernel_switch_threshold
         self.quant_cuda_available = _quant_cuda_available
@@ -193,6 +184,9 @@ class QuantLinear(nn.Module):
                 raise NotImplementedError("Only 2,3,4,8 bits are supported.")
             out = out.half()
         else:
+            if self.wf.device != self.qzeros.device:
+                self.wf = self.wf.to(self.qzeros.device)
+                
             if self.bits in [2, 4, 8]:
                 zeros = torch.bitwise_right_shift(
                     torch.unsqueeze(self.qzeros, 2).expand(-1, -1, 32 // self.bits),
