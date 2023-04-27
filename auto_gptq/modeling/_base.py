@@ -9,6 +9,7 @@ import accelerate
 import torch
 import torch.nn as nn
 import transformers
+from accelerate.hooks import remove_hook_from_submodules
 from safetensors.torch import load_file as safe_load, save_file as safe_save
 from transformers import AutoConfig, AutoModelForCausalLM, PreTrainedModel
 from transformers.utils.hub import PushToHubMixin
@@ -75,12 +76,6 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
     def quantized(self):
         return self._quantized
 
-    def _move_outside_layer_modules(self, device):
-        for module_name in self.outside_layer_modules:
-            module = get_module_by_name(self.model, module_name)
-            if module is not None:
-                module.to(device)
-
     @staticmethod
     def _resize_attention_mask(attention_mask: List[torch.LongTensor]):
         return attention_mask
@@ -94,7 +89,8 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         self,
         examples: List[Dict[str, torch.LongTensor]],
         use_triton: bool = False,
-        autotune_warmup_after_quantized: bool = False
+        autotune_warmup_after_quantized: bool = False,
+        cache_examples_on_gpu: bool = True
     ):
         if self.quantized:
             raise EnvironmentError("can't execute quantize because the model is quantized.")
@@ -102,15 +98,16 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         layer_inputs = []
         attention_masks = []
         position_ids = []
-        layer_outputs = []
         layer_input_kwargs = []
+        layer_outputs = []
 
         class LayerHijacker(nn.Module):
             """hijack layer's forward pass to cache data"""
 
-            def __init__(self, m):
+            def __init__(self, m, device):
                 super().__init__()
                 self.module = m
+                self.data_device = device if cache_examples_on_gpu else CPU
 
             def forward(self, inp=None, **kwargs):
                 if inp is None:  # some models use all key-value arguments in forward pass call
@@ -120,15 +117,15 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                             break
                 bsz = inp.size(0)
                 for i in range(bsz):
-                    layer_inputs.append(inp[i].unsqueeze(0).to(CPU))
-                    attention_masks.append(kwargs["attention_mask"][i].to(CPU))
+                    layer_inputs.append(move_to_device(inp[i].unsqueeze(0), self.data_device))
+                    attention_masks.append(kwargs["attention_mask"][i].to(self.data_device))
                     if (pos_ids := kwargs.get("position_ids", None)) is not None:
-                        position_ids.append(pos_ids[i].unsqueeze(0).to(CPU))
+                        position_ids.append(move_to_device(pos_ids[i].unsqueeze(0), self.data_device))
                     one_kwargs = dict()
                     for k, v in kwargs.items():  # make sure other arguments also be captured
                         if k not in ["hidden_states", "attention_mask", "position_ids"]:
                             if isinstance(v, torch.Tensor):
-                                one_kwargs[k] = v[i].unsqueeze(0).to(CPU)
+                                one_kwargs[k] = move_to_device(v[i].unsqueeze(0), self.data_device)
                             else:
                                 one_kwargs[k] = v
                     layer_input_kwargs.append(one_kwargs)
@@ -140,35 +137,53 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         num_examples = len(examples)
         layers = get_module_by_name(self.model, self.layers_block_name)
 
-        layers[0] = layers[0].to(CUDA_0)
-        self._move_outside_layer_modules(CUDA_0)
+        force_layer_back_to_cpu = False
+        if get_device(layers[0]) == CPU:
+            layers[0] = layers[0].to(CUDA_0)
+            force_layer_back_to_cpu = True
+
+        cur_layer_device = get_device(layers[0])
+        ori_outside_layer_module_devices = {}
+        for module_name in self.outside_layer_modules:
+            module = get_module_by_name(self.model, module_name)
+            ori_outside_layer_module_devices[module_name] = get_device(module)
+            if module is not None:
+                move_to_device(module, cur_layer_device)
 
         # get inputs for first layer
-        layers[0] = LayerHijacker(layers[0])
+        layers[0] = LayerHijacker(layers[0], cur_layer_device)
         for example in examples:
             for k, v in example.items():
                 if len(v.shape) == 1:
                     v = v.unsqueeze(0)
-                example[k] = v.to(CUDA_0)
+                example[k] = move_to_device(v, cur_layer_device)
             try:
                 self.model(**example)
             except ValueError:
                 pass
         layers[0] = layers[0].module
 
-        layers[0] = layers[0].cpu()
-        self._move_outside_layer_modules(CPU)
+        move_to_device(layers[0], CPU if force_layer_back_to_cpu else cur_layer_device)
+        for module_name in self.outside_layer_modules:
+            module = get_module_by_name(self.model, module_name)
+            if module is not None:
+                move_to_device(module, ori_outside_layer_module_devices[module_name])
 
         torch.cuda.empty_cache()
 
-        # resize attention mask for some special models
+        # resize attention mask and position ids for some special models
         attention_masks = self._resize_attention_mask(attention_masks)
         position_ids = self._resize_position_ids(position_ids)
 
         quantizers = {}
         for i in range(len(layers)):
             logger.info(f"Start quantizing layer {i + 1}/{len(layers)}")
-            layer = layers[i].to(CUDA_0)
+            layer = layers[i]
+            force_layer_back_to_cpu = False
+            if get_device(layer) == CPU:
+                move_to_device(layer, CUDA_0)
+                force_layer_back_to_cpu = True
+            cur_layer_device = get_device(layer)
 
             full = find_layers(layer)
             for names in self.inside_layer_modules:
@@ -193,19 +208,22 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                 for name in subset:
                     handles.append(subset[name].register_forward_hook(add_batch(name)))
                 for j in range(num_examples):
-                    layer_input = layer_inputs[j].to(CUDA_0)
-                    layer_attention_mask = attention_masks[j].to(CUDA_0)
+                    layer_input = move_to_device(layer_inputs[j], cur_layer_device)
+                    layer_attention_mask = move_to_device(attention_masks[j], cur_layer_device)
                     additional_layer_inputs = {
                         "attention_mask": layer_attention_mask
                     }
-                    if (layer_position_ids := None if not position_ids else position_ids[j].to(CUDA_0)) is not None:
+                    if (
+                        layer_position_ids := None if not position_ids
+                        else move_to_device(position_ids[j], cur_layer_device)
+                    ) is not None:
                         additional_layer_inputs["position_ids"] = layer_position_ids
                     for k, v in layer_input_kwargs[j].items():
                         if isinstance(v, torch.Tensor):
-                            additional_layer_inputs[k] = v.to(CUDA_0)
+                            additional_layer_inputs[k] = move_to_device(v, cur_layer_device)
                         else:
                             additional_layer_inputs[k] = v
-                    layer(layer_input, **additional_layer_inputs)[0][0].cpu()
+                    layer(layer_input, **additional_layer_inputs)
                 for h in handles:
                     h.remove()
 
@@ -217,32 +235,41 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                         actorder=self.quantize_config.desc_act
                     )
                     quantizers[f'{self.layers_block_name}.{i}.{name}'] = (
-                        gptq[name].quantizer.cpu(), scale.cpu(), zero.cpu(), g_idx.cpu()
+                        gptq[name].quantizer.to(CPU if force_layer_back_to_cpu else cur_layer_device),
+                        move_to_device(scale, CPU if force_layer_back_to_cpu else cur_layer_device),
+                        move_to_device(zero, CPU if force_layer_back_to_cpu else cur_layer_device),
+                        move_to_device(g_idx, CPU if force_layer_back_to_cpu else cur_layer_device)
                     )
                     gptq[name].free()
 
             for j in range(num_examples):
-                layer_input = layer_inputs[j].to(CUDA_0)
-                layer_attention_mask = attention_masks[j].to(CUDA_0)
+                layer_input = move_to_device(layer_inputs[j], cur_layer_device)
+                layer_attention_mask = move_to_device(attention_masks[j], cur_layer_device)
                 additional_layer_inputs = {
                     "attention_mask": layer_attention_mask
                 }
-                if (layer_position_ids := None if not position_ids else position_ids[j].to(CUDA_0)) is not None:
+                if (
+                    layer_position_ids := None if not position_ids
+                    else move_to_device(position_ids[j], cur_layer_device)
+                ) is not None:
                     additional_layer_inputs["position_ids"] = layer_position_ids
                 for k, v in layer_input_kwargs[j].items():
                     if isinstance(v, torch.Tensor):
-                        additional_layer_inputs[k] = v.to(CUDA_0)
+                        additional_layer_inputs[k] = move_to_device(v, cur_layer_device)
                     else:
                         additional_layer_inputs[k] = v
-                layer_output = layer(layer_input, **additional_layer_inputs)[0][0].cpu()
-                layer_outputs.append(layer_output.unsqueeze(0))
+                layer_output = move_to_device(
+                    layer(layer_input, **additional_layer_inputs)[0],
+                    cur_layer_device if cache_examples_on_gpu else CPU
+                )
+                layer_outputs.append(layer_output)
 
-            layers[i] = layer.to(CPU)
+            layers[i] = move_to_device(layer, CPU if force_layer_back_to_cpu else cur_layer_device)
             del layer
             del gptq
-            torch.cuda.empty_cache()
-
+            del layer_inputs
             layer_inputs, layer_outputs = layer_outputs, []
+            torch.cuda.empty_cache()
 
         pack_model(
             model=self.model,
@@ -250,10 +277,15 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             bits=self.quantize_config.bits,
             group_size=self.quantize_config.group_size,
             use_triton=use_triton,
-            autotune_warmup=autotune_warmup_after_quantized
+            autotune_warmup=autotune_warmup_after_quantized,
+            force_layer_back_to_cpu=force_layer_back_to_cpu
         )
-        self._quantized = True
+
+        if getattr(self.model, "hf_device_map", None) is not None:
+            remove_hook_from_submodules(self.model)
         self.model.config.use_cache = forward_pass_use_cache
+
+        self._quantized = True
 
     @property
     def device(self):
@@ -306,7 +338,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         cls,
         pretrained_model_name_or_path: str,
         quantize_config: BaseQuantizeConfig,
-        max_memory_per_gpu: Optional[int] = None,
+        max_memory: Optional[dict] = None,
         **model_init_kwargs
     ):
         """load un-quantized pretrained model to cpu"""
@@ -328,13 +360,6 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         # enforce some values despite user specified
         model_init_kwargs["torch_dtype"] = torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
         model_init_kwargs["trust_remote_code"] = True
-        max_memory = None
-        if "max_memory" in model_init_kwargs:
-            max_memory = model_init_kwargs.pop("max_memory")
-        if max_memory_per_gpu is not None:
-            max_memory = {
-                cuda_id: f"{max_memory_per_gpu}GIB" for cuda_id in range(torch.cuda.device_count())
-            }
         if max_memory:
             with accelerate.init_empty_weights():
                 model = AutoModelForCausalLM.from_config(config)

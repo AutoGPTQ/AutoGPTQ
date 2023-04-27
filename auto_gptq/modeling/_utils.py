@@ -1,12 +1,26 @@
 from logging import getLogger
+from typing import Union
 
+import torch
 import torch.nn as nn
 from transformers import AutoConfig
 
-from ._const import SUPPORTED_MODELS, CUDA_0
+from ._const import SUPPORTED_MODELS, CPU, CUDA_0
 
 
 logger = getLogger(__name__)
+
+
+def get_device(obj: Union[torch.Tensor, nn.Module]):
+    if isinstance(obj, torch.Tensor):
+        return obj.device
+    return next(obj.parameters()).device
+
+
+def move_to_device(obj: Union[torch.Tensor, nn.Module], device: torch.device):
+    if get_device(obj) != device:
+        obj.to(device)
+    return obj
 
 
 def find_layers(module, layers=None, name=''):
@@ -39,19 +53,32 @@ def make_quant(module, names, bits, groupsize, name='', use_triton=False):
         tmp = getattr(module, attr)
         name1 = name + '.' + attr if name != '' else attr
         if name1 in names:
+            ori_layer_device = get_device(getattr(module, attr))
             delattr(module, attr)
-            setattr(module, attr, QuantLinear(bits, groupsize, tmp.in_features, tmp.out_features, tmp.bias is not None))
+            new_layer = QuantLinear(bits, groupsize, tmp.in_features, tmp.out_features, tmp.bias is not None)
+            new_layer.device = ori_layer_device
+            setattr(module, attr, new_layer.to(ori_layer_device))
     for name1, child in module.named_children():
         make_quant(child, names, bits, groupsize, name + '.' + name1 if name != '' else name1, use_triton=use_triton)
 
 
-def pack_model(model, quantizers, bits, group_size, use_triton=False, autotune_warmup: bool = False):
+def pack_model(
+    model,
+    quantizers,
+    bits,
+    group_size,
+    use_triton=False,
+    autotune_warmup: bool = False,
+    force_layer_back_to_cpu: bool = False
+):
     if use_triton:
         from ..nn_modules.qlinear_triton import QuantLinear, autotune_warmup_linear
     else:
         from ..nn_modules.qlinear import QuantLinear
 
-    model.cpu()
+    if force_layer_back_to_cpu:
+        model.to(CPU)
+
     logger.info('Packing model...')
     layers = find_layers(model)
     layers = {n: layers[n] for n in quantizers}
@@ -60,7 +87,12 @@ def pack_model(model, quantizers, bits, group_size, use_triton=False, autotune_w
     for name in qlayers:
         logger.info(name)
         quantizers[name], scale, zero, g_idx = quantizers[name]
+        # so far can only pack layer on CPU
+        layer_device = qlayers[name].device
+        qlayers[name].to(CPU)
+        layers[name], scale, zero, g_idx = layers[name].to(CPU), scale.to(CPU), zero.to(CPU), g_idx.to(CPU)
         qlayers[name].pack(layers[name], scale, zero, g_idx)
+        qlayers[name].to(layer_device)
     logger.info('Model packed.')
 
     if use_triton and autotune_warmup:
@@ -78,4 +110,12 @@ def check_and_get_model_type(model_dir):
     return model_type
 
 
-__all__ = ["find_layers", "get_module_by_name", "make_quant", "pack_model", "check_and_get_model_type"]
+__all__ = [
+    "get_device",
+    "move_to_device",
+    "find_layers",
+    "get_module_by_name",
+    "make_quant",
+    "pack_model",
+    "check_and_get_model_type"
+]
