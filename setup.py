@@ -10,7 +10,7 @@ except ImportError:
 version = "v0.1.0-dev"
 
 requirements = [
-    "accelerate",
+    "accelerate>=0.18.0",
     "datasets",
     "numpy",
     "rouge",
