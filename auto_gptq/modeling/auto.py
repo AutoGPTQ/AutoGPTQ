@@ -56,7 +56,8 @@ class AutoGPTQForCausalLM:
         max_memory: Optional[dict] = None,
         device_map: Optional[str] = None,
         quantize_config: BaseQuantizeConfig | None = None,
-        model_basename: str | None = None
+        model_basename: str | None = None,
+        trust_remote_code: bool = False
     ) -> BaseGPTQForCausalLM:
         model_type = check_and_get_model_type(save_dir)
         return GPTQ_CAUSAL_LM_MODEL_MAP[model_type].from_quantized(
@@ -67,7 +68,8 @@ class AutoGPTQForCausalLM:
             max_memory=max_memory,
             device_map=device_map,
             quantize_config=quantize_config,
-            model_basename=model_basename
+            model_basename=model_basename,
+            trust_remote_code=trust_remote_code
         )
 
 

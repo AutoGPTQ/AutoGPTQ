@@ -482,7 +482,8 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         max_memory: Optional[dict] = None,
         device_map: Optional[str] = None,
         quantize_config: BaseQuantizeConfig | None = None,
-        model_basename: str | None = None
+        model_basename: str | None = None,
+        trust_remote_code: bool = False
     ):
         """load quantized model from local disk"""
         if use_triton:
@@ -491,7 +492,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             logger.warning("use_triton will force moving the hole model to GPU, make sure you have enough VRAM.")
             device = "cuda:0"
 
-        config = AutoConfig.from_pretrained(save_dir, trust_remote_code=True)
+        config = AutoConfig.from_pretrained(save_dir, trust_remote_code=trust_remote_code)
         if config.model_type not in SUPPORTED_MODELS:
             raise TypeError(f"{config.model_type} isn't supported yet.")
 
@@ -517,9 +518,8 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         transformers.modeling_utils._init_weights = False
         with accelerate.init_empty_weights():
             torch.set_default_dtype(torch.half)
-            model = AutoModelForCausalLM.from_config(config, trust_remote_code=True)
+            model = AutoModelForCausalLM.from_config(config, trust_remote_code=trust_remote_code)
             torch.set_default_dtype(torch.float)
-
         layers = find_layers(model)
         ignore_layers = [cls.lm_head_name] + cls.outside_layer_modules
         for name in list(layers.keys()):
