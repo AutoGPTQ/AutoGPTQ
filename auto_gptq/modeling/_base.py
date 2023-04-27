@@ -10,7 +10,7 @@ import torch
 import torch.nn as nn
 import transformers
 from accelerate.hooks import remove_hook_from_module, remove_hook_from_submodules
-from safetensors.torch import load_file as safe_load, save_file as safe_save
+from safetensors.torch import save_file as safe_save
 from transformers import AutoConfig, AutoModelForCausalLM, PreTrainedModel
 from transformers.utils.hub import PushToHubMixin
 
@@ -375,7 +375,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             if "disk" in max_memory:
                 raise NotImplementedError("disk offload not support yet.")
             with accelerate.init_empty_weights():
-                model = AutoModelForCausalLM.from_config(config)
+                model = AutoModelForCausalLM.from_config(config, trust_remote_code=True)
             model.tie_weights()
 
             max_memory = accelerate.utils.get_balanced_memory(
@@ -421,7 +421,9 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         save_dir: str,
         device: str = "cpu",
         use_safetensors: bool = False,
-        use_triton: bool = False
+        use_triton: bool = False,
+        max_memory: Optional[dict] = None,
+        device_map: Optional[str] = None
     ):
         """load quantized model from local disk"""
         if use_triton:
@@ -450,10 +452,12 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         torch.nn.init.normal_ = skip
 
         transformers.modeling_utils._init_weights = False
-        torch.set_default_dtype(torch.half)
-        model = AutoModelForCausalLM.from_config(config, trust_remote_code=True)
-        torch.set_default_dtype(torch.float)
-        model = model.eval()
+        with accelerate.init_empty_weights():
+            torch.set_default_dtype(torch.half)
+            model = AutoModelForCausalLM.from_config(config, trust_remote_code=True)
+            torch.set_default_dtype(torch.float)
+            model.tie_weights()
+
         layers = find_layers(model)
         ignore_layers = [cls.lm_head_name] + cls.outside_layer_modules
         for name in list(layers.keys()):
@@ -462,10 +466,14 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                 del layers[name]
         make_quant(model, layers, quantize_config.bits, quantize_config.group_size, use_triton=use_triton)
 
-        if model_save_name.endswith('.safetensors'):
-            model.load_state_dict(safe_load(model_save_name, "cpu"))
-        else:
-            model.load_state_dict(torch.load(model_save_name))
+        if max_memory and not device_map:
+            device_map = "auto"
+        if not max_memory and not device_map:
+            device_map = {"": device}
+        model = accelerate.load_checkpoint_and_dispatch(
+            model, model_save_name, device_map, max_memory, no_split_module_classes=[cls.layer_type]
+        )
+
         model_config = model.config.to_dict()
         seq_len_keys = ["max_position_embeddings", "seq_length", "n_positions"]
         if any([k in model_config for k in seq_len_keys]):
@@ -478,7 +486,6 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             model.seqlen = 4096
 
         model.eval()
-        model.to(device)
 
         if use_triton:
             autotune_warmup_linear(model, seqlen=model.seqlen)
