@@ -167,15 +167,16 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         attention_masks = self._resize_attention_mask(attention_masks)
         position_ids = self._resize_position_ids(position_ids)
 
-        if not(self.quantize_config.true_sequential):
-            self.inside_layer_modules = [sum(self.inside_layer_modules, [])]
+        inside_layer_modules = self.inside_layer_modules
+        if not self.quantize_config.true_sequential:
+            inside_layer_modules = [sum(inside_layer_modules, [])]
         quantizers = {}
         for i in range(len(layers)):
             logger.info(f"Start quantizing layer {i + 1}/{len(layers)}")
             layer = layers[i].to(CUDA)
 
             full = find_layers(layer)
-            for names in self.inside_layer_modules:
+            for names in inside_layer_modules:
                 subset = {n: full[n] for n in names}
                 gptq = {}
                 for name in subset:
