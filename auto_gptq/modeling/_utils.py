@@ -19,7 +19,7 @@ def get_device(obj: Union[torch.Tensor, nn.Module]):
 
 def move_to_device(obj: Union[torch.Tensor, nn.Module], device: torch.device):
     if get_device(obj) != device:
-        obj.to(device)
+        obj = obj.to(device)
     return obj
 
 
