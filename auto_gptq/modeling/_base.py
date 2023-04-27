@@ -9,7 +9,7 @@ import accelerate
 import torch
 import torch.nn as nn
 import transformers
-from accelerate.hooks import remove_hook_from_submodules
+from accelerate.hooks import remove_hook_from_module, remove_hook_from_submodules
 from safetensors.torch import load_file as safe_load, save_file as safe_save
 from transformers import AutoConfig, AutoModelForCausalLM, PreTrainedModel
 from transformers.utils.hub import PushToHubMixin
@@ -76,6 +76,10 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
     def quantized(self):
         return self._quantized
 
+    @property
+    def hf_device_map(self):
+        return getattr(self.model, "hf_device_map", None)
+
     @staticmethod
     def _resize_attention_mask(attention_mask: List[torch.LongTensor]):
         return attention_mask
@@ -94,6 +98,13 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
     ):
         if self.quantized:
             raise EnvironmentError("can't execute quantize because the model is quantized.")
+
+        if self.hf_device_map:
+            for name, device in self.hf_device_map.items():
+                if device == "cpu":
+                    module = get_module_by_name(self.model, name)
+                    remove_hook_from_module(module, recurse=True)
+                    accelerate.cpu_offload_with_hook(module, CUDA_0)
 
         layer_inputs = []
         attention_masks = []
@@ -281,7 +292,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             force_layer_back_to_cpu=force_layer_back_to_cpu
         )
 
-        if getattr(self.model, "hf_device_map", None) is not None:
+        if self.hf_device_map:
             remove_hook_from_submodules(self.model)
         self.model.config.use_cache = forward_pass_use_cache
 
