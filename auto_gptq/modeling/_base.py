@@ -481,7 +481,8 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         use_triton: bool = False,
         max_memory: Optional[dict] = None,
         device_map: Optional[str] = None,
-        quantize_config: BaseQuantizeConfig | None = None
+        quantize_config: BaseQuantizeConfig | None = None,
+        model_basename: str | None = None
     ):
         """load quantized model from local disk"""
         if use_triton:
@@ -497,7 +498,10 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         if quantize_config is None:
             quantize_config = BaseQuantizeConfig.from_pretrained(save_dir)
 
-        model_save_name = join(save_dir, f"gptq_model-{quantize_config.bits}bit")
+        if model_basename is None:
+            model_basename = f"gptq_model-{quantize_config.bits}bit"
+
+        model_save_name = join(save_dir, model_basename)
         if use_safetensors:
             model_save_name += ".safetensors"
         else:

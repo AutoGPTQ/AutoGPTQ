@@ -55,7 +55,8 @@ class AutoGPTQForCausalLM:
         use_triton: bool = False,
         max_memory: Optional[dict] = None,
         device_map: Optional[str] = None,
-        quantize_config: BaseQuantizeConfig | None = None
+        quantize_config: BaseQuantizeConfig | None = None,
+        model_basename: str | None = None
     ) -> BaseGPTQForCausalLM:
         model_type = check_and_get_model_type(save_dir)
         return GPTQ_CAUSAL_LM_MODEL_MAP[model_type].from_quantized(
@@ -65,7 +66,8 @@ class AutoGPTQForCausalLM:
             use_triton=use_triton,
             max_memory=max_memory,
             device_map=device_map,
-            quantize_config=quantize_config
+            quantize_config=quantize_config,
+            model_basename=model_basename
         )
 
 
