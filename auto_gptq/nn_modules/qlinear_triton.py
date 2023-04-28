@@ -348,8 +348,8 @@ class QuantLinear(nn.Module):
         super().__init__()
         if bits not in [2, 4, 8]:
             raise NotImplementedError("Only 2,4,8 bits are supported.")
-        if infeatures % 128 != 0 or outfeatures % 128 != 0:
-            raise NotImplementedError("in_feature or out_feature must be divisible by 128.")
+        if infeatures % 256 != 0 or outfeatures % 256 != 0:
+            raise NotImplementedError("in_feature or out_feature must be divisible by 256.")
         self.infeatures = infeatures
         self.outfeatures = outfeatures
         self.bits = bits
