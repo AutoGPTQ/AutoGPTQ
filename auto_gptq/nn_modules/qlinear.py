@@ -71,7 +71,9 @@ class QuantLinear(nn.Module):
 
         self.kernel_switch_threshold = kernel_switch_threshold
         self.quant_cuda_available = _quant_cuda_available
-
+        if infeatures % 256 != 0 or outfeatures % 256 != 0:
+            self.quant_cuda_available = False
+            
     def pack(self, linear, scales, zeros, g_idx=None):
         W = linear.weight.data.clone()
         if isinstance(linear, nn.Conv2d):
