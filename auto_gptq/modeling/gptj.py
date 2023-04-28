@@ -2,6 +2,7 @@ from ._base import *
 
 
 class GPTJGPTQForCausalLM(BaseGPTQForCausalLM):
+    layer_type = "GPTJBlock"
     layers_block_name = "transformer.h"
     outside_layer_modules = ["transformer.wte", "transformer.ln_f"]
     inside_layer_modules = [

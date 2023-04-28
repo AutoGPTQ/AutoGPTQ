@@ -2,7 +2,7 @@
 An easy-to-use model quantization package with user-friendly apis, based on GPTQ algorithm.
 
 ## News or Update
-- (In Progress) - (Update) - Support multiple devices quantization and inference, and model offloading.
+- 2023-04-28 - (Update) - Support CPU offload and quantize/inference on multiple devices, support `gpt2` type models.
 - 2023-04-26 - (Update) - Using `triton` to speed up inference is now supported.
 - 2023-04-25 - (News&Update) - [MOSS](https://github.com/OpenLMLab/MOSS) is an open-source tool-augmented conversational language model from Fudan University, quantization is now supported in AutoGPTQ.
 - 2023-04-23 - (Update) - Support evaluation on multiple (down-stream) tasks such as: language-modeling, text-classification, text-summarization.
@@ -49,7 +49,7 @@ Use `.[triton]` if you want to integrate with triton and it's available on your 
 
 
 ## Supported Models
-Currently, `auto_gptq` supports: `bloom`, `gpt_neox`, `gptj`, `llama`, `moss` and `opt`; more CausalLMs will come soon!
+Currently, `auto_gptq` supports: `bloom`, `gpt2`, `gpt_neox`, `gptj`, `llama`, `moss` and `opt`; more Transformer models will come soon!
 
 ## Supported Evaluation Tasks
 Currently, `auto_gptq` supports: `LanguageModelingTask`, `SequenceClassificationTask` and `TextSummarizationTask`; more Tasks will come soon!
@@ -103,6 +103,8 @@ print(tokenizer.decode(model.generate(**tokenizer("auto_gptq is", return_tensors
 pipeline = TextGenerationPipeline(model=model, tokenizer=tokenizer)
 print(pipeline("auto_gptq is")[0]["generated_text"])
 ```
+
+For more advanced features of model quantization, please reference to [this script](examples/quantization/quant_with_alpaca.py)
 
 ### Customize Model
 Below is an example to extend `auto_gptq` to support `OPT` model, as you will see, it's very easy:
