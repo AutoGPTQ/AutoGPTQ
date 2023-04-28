@@ -310,7 +310,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         return self.model.device
 
     def to(self, device: Union[str, torch.device]):
-        self.model.to(device)
+        return self.model.to(device)
 
     def forward(self, **kwargs):
         return self.model(**kwargs)
