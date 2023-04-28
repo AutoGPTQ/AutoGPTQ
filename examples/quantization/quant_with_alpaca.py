@@ -129,6 +129,8 @@ def main():
             use_triton=args.use_triton,
             max_memory=max_memory
         )
+    elif not max_memory:
+        model = model.to("cuda:0")
 
     pipeline = TextGenerationPipeline(model=model, tokenizer=tokenizer)
     for example in random.sample(examples, k=min(4, len(examples))):
