@@ -20,8 +20,10 @@ python basic_usage_with_wikitext2.py
 ### Quantize with Alpaca
 To Execute `quant_with_alpaca.py`, using command like this:
 ```shell
-CUDA_VISIBLE_DEVICES=0 python quant_with_alpaca.py --pretrained_model_dir "facebook/opt-125m"
+python quant_with_alpaca.py --pretrained_model_dir "facebook/opt-125m" --per_gpu_max_memory 4 --quant_batch_size 16
 ```
+
+Use `--help` flag to see detailed descriptions for more command arguments.
 
 The alpaca dataset used in here is a cleaned version provided by **gururise** in [AlpacaDataCleaned](https://github.com/gururise/AlpacaDataCleaned)
 
