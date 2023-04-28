@@ -129,10 +129,11 @@ def main():
             use_triton=args.use_triton,
             max_memory=max_memory
         )
-    elif not max_memory:
-        model = model.to("cuda:0")
 
-    pipeline = TextGenerationPipeline(model=model, tokenizer=tokenizer)
+    pipeline_init_kwargs = {"model": model, "tokenizer": tokenizer}
+    if not max_memory:
+        pipeline_init_kwargs["device"] = "cuda:0"
+    pipeline = TextGenerationPipeline(**pipeline_init_kwargs)
     for example in random.sample(examples, k=min(4, len(examples))):
         print(f"prompt: {example['prompt']}")
         print("-" * 42)
