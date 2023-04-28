@@ -99,8 +99,9 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         if self.quantized:
             raise EnvironmentError("can't execute quantize because the model is quantized.")
 
-        if self.hf_device_map:
-            for name, device in self.hf_device_map.items():
+        device_map = self.hf_device_map
+        if device_map:
+            for name, device in device_map.items():
                 if device == "cpu":
                     module = get_module_by_name(self.model, name)
                     remove_hook_from_module(module, recurse=True)
@@ -295,12 +296,14 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             autotune_warmup=autotune_warmup_after_quantized,
             force_layer_back_to_cpu=force_layer_back_to_cpu
         )
-
-        if self.hf_device_map:
-            remove_hook_from_submodules(self.model)
+        if device_map:
+            self.model = remove_hook_from_module(self.model, recurse=True)
+            self.model = accelerate.dispatch_model(self.model, device_map, offload_buffers=True)
         self.model.config.use_cache = forward_pass_use_cache
 
         self._quantized = True
+
+        torch.cuda.empty_cache()
 
     @property
     def device(self):
