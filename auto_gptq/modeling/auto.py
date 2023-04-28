@@ -5,6 +5,7 @@ from ._utils import check_and_get_model_type
 from .bloom import BloomGPTQForCausalLM
 from .gpt_neox import GPTNeoXGPTQForCausalLM
 from .gptj import GPTJGPTQForCausalLM
+from .gpt2 import GPT2GPTQForCausalLM
 from .llama import LlamaGPTQForCausalLM
 from .moss import MOSSGPTQForCausalLM
 from .opt import OPTGPTQForCausalLM
@@ -14,6 +15,7 @@ GPTQ_CAUSAL_LM_MODEL_MAP = {
     "bloom": BloomGPTQForCausalLM,
     "gpt_neox": GPTNeoXGPTQForCausalLM,
     "gptj": GPTJGPTQForCausalLM,
+    "gpt2": GPT2GPTQForCausalLM,
     "llama": LlamaGPTQForCausalLM,
     "opt": OPTGPTQForCausalLM,
     "moss": MOSSGPTQForCausalLM

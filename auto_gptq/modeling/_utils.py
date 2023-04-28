@@ -4,6 +4,7 @@ from typing import Union
 import torch
 import torch.nn as nn
 from transformers import AutoConfig
+import transformers
 
 from ._const import SUPPORTED_MODELS, CPU, CUDA_0
 
@@ -25,7 +26,7 @@ def move_to_device(obj: Union[torch.Tensor, nn.Module], device: torch.device):
 
 def find_layers(module, layers=None, name=''):
     if not layers:
-        layers = [nn.Conv2d, nn.Linear]
+        layers = [transformers.pytorch_utils.Conv1D, nn.Conv2d, nn.Linear]
 
     if type(module) in layers:
         return {name: module}
@@ -55,7 +56,16 @@ def make_quant(module, names, bits, groupsize, name='', use_triton=False):
         if name1 in names:
             ori_layer_device = get_device(getattr(module, attr))
             delattr(module, attr)
-            new_layer = QuantLinear(bits, groupsize, tmp.in_features, tmp.out_features, tmp.bias is not None)
+            if type(tmp) == nn.Linear:
+                in_features = tmp.in_features
+                out_features = tmp.out_features
+            elif type(tmp) == nn.Conv2d:
+                in_features = tmp.in_channels
+                out_features = tmp.out_channels
+            elif type(tmp) == transformers.pytorch_utils.Conv1D:            
+                in_features = tmp.weight.shape[0]
+                out_features = tmp.weight.shape[1]
+            new_layer = QuantLinear(bits, groupsize, in_features, out_features, tmp.bias is not None)
             new_layer.device = ori_layer_device
             setattr(module, attr, new_layer.to(ori_layer_device))
     for name1, child in module.named_children():
