@@ -68,6 +68,8 @@ class QuantLinear(nn.Module):
                                         [0, 2, 5, 8, 11, 14, 17, 20, 23, 26, 29, 0],
                                    ], 
                                    dtype=torch.int32).reshape(1, 3, 12)
+        if infeatures % 256 != 0 or outfeatures % 256 != 0:
+            _quant_cuda_available = False
 
         self.kernel_switch_threshold = kernel_switch_threshold
         self.quant_cuda_available = _quant_cuda_available
