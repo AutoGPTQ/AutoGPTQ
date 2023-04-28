@@ -77,11 +77,24 @@ def main():
     parser.add_argument("--quantized_model_dir", type=str, default=None)
     parser.add_argument("--bits", type=int, default=4, choices=[2, 3, 4, 8])
     parser.add_argument("--group_size", type=int, default=128)
-    parser.add_argument("--num_samples", type=int, default=128)
-    parser.add_argument("--save_and_reload", action="store_true")
-    parser.add_argument("--fast_tokenizer", action="store_true")
-    parser.add_argument("--use_triton", action="store_true")
+    parser.add_argument("--num_samples", type=int, default=128, help="how many samples will be used to quantize model")
+    parser.add_argument("--save_and_reload", action="store_true", help="whether save quantized model to disk and reload back")
+    parser.add_argument("--fast_tokenizer", action="store_true", help="whether use fast tokenizer")
+    parser.add_argument("--use_triton", action="store_true", help="whether use triton to speedup at inference")
+    parser.add_argument("--per_gpu_max_memory", type=int, default=None, help="max memory used to load model per gpu")
+    parser.add_argument("--cpu_max_memory", type=int, default=None, help="max memory used to offload model to cpu")
     args = parser.parse_args()
+
+    max_memory = dict()
+    if args.per_gpu_max_memory is not None and args.per_gpu_max_memory > 0:
+        if torch.cuda.is_available():
+            max_memory.update(
+                {i: f"{args.per_gpu_max_memory}GIB" for i in range(torch.cuda.device_count())}
+            )
+    if args.cpu_max_memory is not None and args.cpu_max_memory > 0 and max_memory:
+        max_memory["cpu"] = f"{args.cpu_max_memory}GIB"
+    if not max_memory:
+        max_memory = None
 
     tokenizer = AutoTokenizer.from_pretrained(
         args.pretrained_model_dir,
@@ -90,7 +103,8 @@ def main():
     )
     model = AutoGPTQForCausalLM.from_pretrained(
         args.pretrained_model_dir,
-        quantize_config=BaseQuantizeConfig(bits=args.bits, group_size=args.group_size)
+        quantize_config=BaseQuantizeConfig(bits=args.bits, group_size=args.group_size),
+        max_memory=max_memory
     )
 
     examples = load_data("dataset/alpaca_data_cleaned.json", tokenizer, args.num_samples)
@@ -106,16 +120,22 @@ def main():
 
     if args.save_and_reload:
         model.save_quantized(args.quantized_model_dir)
+        del model
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
         model = AutoGPTQForCausalLM.from_quantized(
             args.quantized_model_dir,
             device="cuda:0",
-            use_triton=args.use_triton
+            use_triton=args.use_triton,
+            max_memory=max_memory
         )
 
-    pipeline = TextGenerationPipeline(model=model, tokenizer=tokenizer, device="cuda:0")
+    pipeline = TextGenerationPipeline(model=model, tokenizer=tokenizer)
     for example in random.sample(examples, k=min(4, len(examples))):
         print(f"prompt: {example['prompt']}")
-        print(f"origin: {example['output']}")
+        print("-" * 42)
+        print(f"golden: {example['output']}")
+        print("-" * 42)
         start = time.time()
         generated_text = pipeline(
             example['prompt'],
