@@ -130,12 +130,6 @@ class OPTGPTQForCausalLM(BaseGPTQForCausalLM):
         ["fc1"],
         ["fc2"]
     ]
-
-    @staticmethod
-    # the overriding of this method may not necessary for most other models
-    def _resize_attention_mask(attention_mask):
-        attention_mask = [each.unsqueeze(1) for each in attention_mask]
-        return attention_mask
 ```
 After this, you can use `OPTGPTQForCausalLM.from_pretrained` and other functions
 
