@@ -157,6 +157,10 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         ori_outside_layer_module_devices = {}
         for module_name in self.outside_layer_modules:
             module = get_module_by_name(self.model, module_name)
+            
+            if module is None:
+                continue
+                
             ori_outside_layer_module_devices[module_name] = get_device(module)
             if module is not None:
                 move_to_device(module, cur_layer_device)
@@ -456,7 +460,6 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             torch.set_default_dtype(torch.half)
             model = AutoModelForCausalLM.from_config(config, trust_remote_code=True)
             torch.set_default_dtype(torch.float)
-            model.tie_weights()
 
         layers = find_layers(model)
         ignore_layers = [cls.lm_head_name] + cls.outside_layer_modules
@@ -464,12 +467,16 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             if any([name.startswith(ignore_layer) for ignore_layer in ignore_layers]):
                 logger.info(f"{name} not been quantized, will be ignored when make_quant.")
                 del layers[name]
-        make_quant(model, layers, quantize_config.bits, quantize_config.group_size, use_triton=use_triton)
-
+                
+        with accelerate.init_empty_weights():
+            make_quant(model, layers, quantize_config.bits, quantize_config.group_size, use_triton=use_triton)
+        model.tie_weights()
+                        
         if max_memory and not device_map:
             device_map = "auto"
         if not max_memory and not device_map:
             device_map = {"": device}
+            
         model = accelerate.load_checkpoint_and_dispatch(
             model, model_save_name, device_map, max_memory, no_split_module_classes=[cls.layer_type]
         )

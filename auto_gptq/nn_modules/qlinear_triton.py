@@ -2,6 +2,7 @@ import math
 import numpy as np
 import torch
 import torch.nn as nn
+import transformers
 from torch.cuda.amp import custom_bwd, custom_fwd
 from logging import getLogger
 
@@ -376,6 +377,12 @@ class QuantLinear(nn.Module):
             self.bias = None
 
     def pack(self, linear, scales, zeros, g_idx=None):
+        W = linear.weight.data.clone()
+        if isinstance(linear, nn.Conv2d):
+            W = W.flatten(1)
+        if isinstance(linear, transformers.pytorch_utils.Conv1D):
+            W = W.t()
+    
         self.g_idx = g_idx.clone() if g_idx is not None else self.g_idx
 
         scales = scales.t().contiguous()
@@ -390,7 +397,7 @@ class QuantLinear(nn.Module):
             intweight.append(
                 torch.round(
                     (
-                        linear.weight.data[:, idx] + scale_zeros[self.g_idx[idx]]) / self.scales[self.g_idx[idx]]
+                        W[:, idx] + scale_zeros[self.g_idx[idx]]) / self.scales[self.g_idx[idx]]
                 ).to(torch.int)[:, None]
             )
         intweight = torch.cat(intweight, dim=1)
