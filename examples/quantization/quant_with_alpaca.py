@@ -83,6 +83,7 @@ def main():
     parser.add_argument("--use_triton", action="store_true", help="whether use triton to speedup at inference")
     parser.add_argument("--per_gpu_max_memory", type=int, default=None, help="max memory used to load model per gpu")
     parser.add_argument("--cpu_max_memory", type=int, default=None, help="max memory used to offload model to cpu")
+    parser.add_argument("--quant_batch_size", type=int, default=1, help="examples batch size for quantization")
     args = parser.parse_args()
 
     max_memory = dict()
@@ -113,7 +114,15 @@ def main():
         for example in examples
     ]
 
-    model.quantize(examples_for_quant, use_triton=args.use_triton, autotune_warmup_after_quantized=args.use_triton)
+    start = time.time()
+    model.quantize(
+        examples_for_quant,
+        batch_size=args.quant_batch_size,
+        use_triton=args.use_triton,
+        autotune_warmup_after_quantized=args.use_triton
+    )
+    end = time.time()
+    print(f"quantization took: {end - start: .4f}s")
 
     if not args.quantized_model_dir:
         args.quantized_model_dir = args.pretrained_model_dir
