@@ -4,8 +4,8 @@ from typing import Any, Dict, List, Optional, Union
 import torch
 from transformers import PreTrainedTokenizer, PreTrainedModel
 
-from ._utils.data_utils import get_dataloader
 from ..modeling import BaseGPTQForCausalLM
+from ..utils.data_utils import get_dataloader
 
 
 class BaseTask:
