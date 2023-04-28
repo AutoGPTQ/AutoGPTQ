@@ -12,10 +12,5 @@ class LlamaGPTQForCausalLM(BaseGPTQForCausalLM):
         ["mlp.down_proj"]
     ]
 
-    @staticmethod
-    def _resize_attention_mask(attention_mask):
-        attention_mask = [each.unsqueeze(1) for each in attention_mask]
-        return attention_mask
-
 
 __all__ = ["LlamaGPTQForCausalLM"]

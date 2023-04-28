@@ -15,10 +15,5 @@ class OPTGPTQForCausalLM(BaseGPTQForCausalLM):
         ["fc2"]
     ]
 
-    @staticmethod
-    def _resize_attention_mask(attention_mask):
-        attention_mask = [each.unsqueeze(1) for each in attention_mask]
-        return attention_mask
-
 
 __all__ = ["OPTGPTQForCausalLM"]
