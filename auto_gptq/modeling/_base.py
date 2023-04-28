@@ -1,3 +1,4 @@
+import copy
 import json
 import os
 from dataclasses import dataclass, field, fields
@@ -9,7 +10,7 @@ import accelerate
 import torch
 import torch.nn as nn
 import transformers
-from accelerate.hooks import remove_hook_from_module, remove_hook_from_submodules
+from accelerate.hooks import remove_hook_from_module
 from safetensors.torch import save_file as safe_save
 from transformers import AutoConfig, AutoModelForCausalLM, PreTrainedModel
 from transformers.utils.hub import PushToHubMixin
@@ -17,6 +18,7 @@ from transformers.utils.hub import PushToHubMixin
 from ._const import *
 from ._utils import *
 from ..quantization import GPTQ
+from ..utils.data_utils import collate_data
 
 logger = getLogger(__name__)
 
@@ -88,10 +90,52 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
     def _resize_position_ids(position_ids: List[torch.LongTensor]):
         return position_ids
 
-    @torch.no_grad()
+    def _prepare_examples_for_quantization(
+        self,
+        examples: List[Dict[str, Union[List[int], torch.LongTensor]]],
+        batch_size: int = 1,
+    ):
+        def _convert_tensor_to_list(tensor):
+            if isinstance(tensor, torch.Tensor):
+                if len(tensor.shape) == 1:
+                    tensor = tensor.unsqueeze(0)
+                tensor = tensor.long()
+                return tensor.cpu().numpy().tolist()
+            return [tensor]
+
+        new_examples = []
+        for example in examples:
+            input_ids = _convert_tensor_to_list(example["input_ids"])
+            attention_mask = _convert_tensor_to_list(example["attention_mask"])
+            if "labels" in example:
+                labels = _convert_tensor_to_list(example["labels"])
+            elif "label" in example:
+                labels = _convert_tensor_to_list(example["label"])
+            elif "label_ids" in example:
+                labels = _convert_tensor_to_list(example["label_ids"])
+            else:
+                labels = copy.deepcopy(input_ids)
+            new_examples.append(
+                {"input_ids": input_ids, "attention_mask": attention_mask, "labels": labels}
+            )
+        pad_token_id = self.config.pad_token_id
+        if not pad_token_id:
+            pad_token_id = self.config.eos_token_id
+
+        new_examples = [
+            collate_data(new_examples[start: start + batch_size], pad_token_id)
+            for start in range(0, len(new_examples), batch_size)
+        ]
+        for new_example in new_examples:
+            del new_example["labels"]
+
+        return new_examples
+
+    @torch.inference_mode()
     def quantize(
         self,
-        examples: List[Dict[str, torch.LongTensor]],
+        examples: List[Dict[str, Union[List[int], torch.LongTensor]]],
+        batch_size: int = 1,
         use_triton: bool = False,
         autotune_warmup_after_quantized: bool = False,
         cache_examples_on_gpu: bool = True
@@ -113,6 +157,8 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         layer_input_kwargs = []
         layer_outputs = []
 
+        examples = self._prepare_examples_for_quantization(examples, batch_size)
+
         class LayerHijacker(nn.Module):
             """hijack layer's forward pass to cache data"""
 
@@ -127,26 +173,24 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                         if kwarg_name in kwargs:
                             inp = kwargs[kwarg_name]
                             break
-                bsz = inp.size(0)
-                for i in range(bsz):
-                    layer_inputs.append(move_to_device(inp[i].unsqueeze(0), self.data_device))
-                    attention_masks.append(kwargs["attention_mask"][i].to(self.data_device))
-                    if (pos_ids := kwargs.get("position_ids", None)) is not None:
-                        position_ids.append(move_to_device(pos_ids[i].unsqueeze(0), self.data_device))
-                    one_kwargs = dict()
-                    for k, v in kwargs.items():  # make sure other arguments also be captured
-                        if k not in ["hidden_states", "attention_mask", "position_ids"]:
-                            if isinstance(v, torch.Tensor):
-                                one_kwargs[k] = move_to_device(v[i].unsqueeze(0), self.data_device)
-                            else:
-                                one_kwargs[k] = v
-                    layer_input_kwargs.append(one_kwargs)
+                layer_inputs.append(move_to_device(inp, self.data_device))
+                attention_masks.append(kwargs["attention_mask"].to(self.data_device))
+                if (pos_ids := kwargs.get("position_ids", None)) is not None:
+                    position_ids.append(move_to_device(pos_ids, self.data_device))
+                one_kwargs = dict()
+                for k, v in kwargs.items():  # make sure other arguments also be captured
+                    if k not in ["hidden_states", "attention_mask", "position_ids"]:
+                        if isinstance(v, torch.Tensor):
+                            one_kwargs[k] = move_to_device(v, self.data_device)
+                        else:
+                            one_kwargs[k] = v
+                layer_input_kwargs.append(one_kwargs)
                 raise ValueError
 
         forward_pass_use_cache = self.model.config.use_cache
         self.model.config.use_cache = False
 
-        num_examples = len(examples)
+        num_batches = len(examples)
         layers = get_module_by_name(self.model, self.layers_block_name)
 
         force_layer_back_to_cpu = False
@@ -223,7 +267,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                 handles = []
                 for name in subset:
                     handles.append(subset[name].register_forward_hook(add_batch(name)))
-                for j in range(num_examples):
+                for j in range(num_batches):
                     layer_input = move_to_device(layer_inputs[j], cur_layer_device)
                     layer_attention_mask = move_to_device(attention_masks[j], cur_layer_device)
                     additional_layer_inputs = {
@@ -258,7 +302,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                     )
                     gptq[name].free()
 
-            for j in range(num_examples):
+            for j in range(num_batches):
                 layer_input = move_to_device(layer_inputs[j], cur_layer_device)
                 layer_attention_mask = move_to_device(attention_masks[j], cur_layer_device)
                 additional_layer_inputs = {
