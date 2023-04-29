@@ -26,9 +26,9 @@ logger = getLogger(__name__)
 @dataclass
 class BaseQuantizeConfig(PushToHubMixin):
     bits: int = field(default=4, metadata={"choices": [2, 3, 4, 8]})
+    group_size: int = field(default=-1)
     damp_percent: float = field(default=0.01)
     desc_act: bool = field(default=True)
-    group_size: int = field(default=-1)
     sym: bool = field(default=True)
     true_sequential: bool = field(default=True)
     
@@ -37,10 +37,10 @@ class BaseQuantizeConfig(PushToHubMixin):
 
         if self.bits not in fields_info[0].metadata["choices"]:
             raise ValueError(f"only support quantize to {fields_info[0].metadata['choices']} bits.")
-        if not (0 < self.damp_percent < 1):
-            raise ValueError("damp_percent must between 0 and 1.")
         if self.group_size != -1 and self.group_size <= 0:
             raise ValueError("unless equal to -1, group_size must greater then 0.")
+        if not (0 < self.damp_percent < 1):
+            raise ValueError("damp_percent must between 0 and 1.")
 
     def save_pretrained(self, save_dir: str, **kwargs):
         with open(join(save_dir, "quantize_config.json"), "w", encoding="utf-8") as f:
@@ -54,9 +54,9 @@ class BaseQuantizeConfig(PushToHubMixin):
     def to_dict(self):
         return {
             "bits": self.bits,
+            "group_size": self.group_size,
             "damp_percent": self.damp_percent,
             "desc_act": self.desc_act,
-            "group_size": self.group_size,
             "sym": self.sym,
             "true_sequential": self.true_sequential,
         }
@@ -383,7 +383,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
 
         self.model.to(CPU)
 
-        model_save_name = f"gptq_model-{self.quantize_config.bits}bit"
+        model_save_name = f"gptq_model_{self.quantize_config.bits}bit_{self.quantize_config.group_size}g"
         if use_safetensors:
             model_save_name += ".safetensors"
             state_dict = self.model.state_dict()
@@ -495,7 +495,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
 
         quantize_config = BaseQuantizeConfig.from_pretrained(save_dir)
 
-        model_save_name = join(save_dir, f"gptq_model-{quantize_config.bits}bit")
+        model_save_name = join(save_dir, f"gptq_model_{self.quantize_config.bits}bit_{self.quantize_config.group_size}g")
         if use_safetensors:
             model_save_name += ".safetensors"
         else:
