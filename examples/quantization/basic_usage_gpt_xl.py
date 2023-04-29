@@ -8,7 +8,7 @@ from auto_gptq import AutoGPTQForCausalLM, BaseQuantizeConfig
 
 
 pretrained_model_dir = "gpt2-xl"
-quantized_model_dir = "gpt2-large-4bit"
+quantized_model_dir = "gpt2-large-4bit-128g"
 
 # os.makedirs(quantized_model_dir, exist_ok=True)
 def get_wikitext2(nsamples, seed, seqlen, tokenizer):
