@@ -383,7 +383,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
 
         self.model.to(CPU)
 
-        model_save_name = f"gptq_model_{self.quantize_config.bits}bit_{self.quantize_config.group_size}g"
+        model_save_name = f"gptq_model-{self.quantize_config.bits}bit-{self.quantize_config.group_size}g"
         if use_safetensors:
             model_save_name += ".safetensors"
             state_dict = self.model.state_dict()
@@ -495,7 +495,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
 
         quantize_config = BaseQuantizeConfig.from_pretrained(save_dir)
 
-        model_save_name = join(save_dir, f"gptq_model_{self.quantize_config.bits}bit_{self.quantize_config.group_size}g")
+        model_save_name = join(save_dir, f"gptq_model-{self.quantize_config.bits}bit-{self.quantize_config.group_size}g")
         if use_safetensors:
             model_save_name += ".safetensors"
         else:
