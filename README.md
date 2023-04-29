@@ -70,10 +70,11 @@ quantized_model_dir = "opt-125m-4bit"
 
 
 tokenizer = AutoTokenizer.from_pretrained(pretrained_model_dir, use_fast=True)
-example = tokenizer(
-    "auto_gptq is a useful tool that can automatically compress model into 4-bit or even higher rate by using GPTQ algorithm.",
-    return_tensors="pt"
-)
+examples = [
+    tokenizer(
+        "auto-gptq is an easy-to-use model quantization library with user-friendly apis, based on GPTQ algorithm."
+    )
+]
 
 quantize_config = BaseQuantizeConfig(
     bits=4,  # quantize model to 4-bit
@@ -85,7 +86,7 @@ model = AutoGPTQForCausalLM.from_pretrained(pretrained_model_dir, quantize_confi
 
 # quantize model, the examples should be list of dict whose keys can only be "input_ids" and "attention_mask" 
 # with value under torch.LongTensor type.
-model.quantize([example], use_triton=False)
+model.quantize(examples, use_triton=False)
 
 # save quantized model
 model.save_quantized(quantized_model_dir)
@@ -101,7 +102,7 @@ print(tokenizer.decode(model.generate(**tokenizer("auto_gptq is", return_tensors
 
 # or you can also use pipeline
 pipeline = TextGenerationPipeline(model=model, tokenizer=tokenizer)
-print(pipeline("auto_gptq is")[0]["generated_text"])
+print(pipeline("auto-gptq is")[0]["generated_text"])
 ```
 
 For more advanced features of model quantization, please reference to [this script](examples/quantization/quant_with_alpaca.py)

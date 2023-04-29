@@ -12,10 +12,11 @@ quantized_model_dir = "opt-125m-4bit-128g"
 
 def main():
     tokenizer = AutoTokenizer.from_pretrained(pretrained_model_dir, use_fast=True)
-    example = tokenizer(
-        "auto_gptq is a useful tool that can automatically compress model into 4-bit or even higher rate by using GPTQ algorithm.",
-        return_tensors="pt"
-    )
+    examples = [
+        tokenizer(
+            "auto-gptq is an easy-to-use model quantization library with user-friendly apis, based on GPTQ algorithm."
+        )
+    ]
 
     quantize_config = BaseQuantizeConfig(
         bits=4,  # quantize model to 4-bit
@@ -27,7 +28,7 @@ def main():
 
     # quantize model, the examples should be list of dict whose keys contains "input_ids" and "attention_mask"
     # with value under torch.LongTensor type.
-    model.quantize([example], use_triton=False)
+    model.quantize(examples, use_triton=False)
 
     # save quantized model
     model.save_quantized(quantized_model_dir)
@@ -43,7 +44,7 @@ def main():
 
     # or you can also use pipeline
     pipeline = TextGenerationPipeline(model=model, tokenizer=tokenizer, device="cuda:0")
-    print(pipeline("auto_gptq is")[0]["generated_text"])
+    print(pipeline("auto-gptq is")[0]["generated_text"])
 
 
 if __name__ == "__main__":
