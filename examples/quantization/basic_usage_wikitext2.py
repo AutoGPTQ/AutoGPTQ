@@ -7,7 +7,7 @@ import torch
 import torch.nn as nn
 
 pretrained_model_dir = "facebook/opt-125m"
-quantized_model_dir = "opt-125m-4bit"
+quantized_model_dir = "opt-125m_4bit_128g"
 
 # os.makedirs(quantized_model_dir, exist_ok=True)
 def get_wikitext2(nsamples, seed, seqlen, model):
