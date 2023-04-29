@@ -2,6 +2,7 @@
 An easy-to-use model quantization package with user-friendly apis, based on GPTQ algorithm.
 
 ## News or Update
+- 2023-04-29 - (update) - Support loading quantized model from arbitrary quantize_config and model_basename.
 - 2023-04-28 - (Update) - Support CPU offload and quantize/inference on multiple devices, support `gpt2` type models.
 - 2023-04-26 - (Update) - Using `triton` to speed up inference is now supported.
 - 2023-04-25 - (News&Update) - [MOSS](https://github.com/OpenLMLab/MOSS) is an open-source tool-augmented conversational language model from Fudan University, quantization is now supported in AutoGPTQ.
