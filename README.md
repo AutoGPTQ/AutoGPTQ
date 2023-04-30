@@ -57,6 +57,8 @@ Currently, `auto_gptq` supports: `LanguageModelingTask`, `SequenceClassification
 
 ## Usage
 
+**Here are [tutorials](docs/tutorial)(continue updating...) for using `auto-gptq`, it's highly recommended for newcomers to read them first before trying example scripts.** 
+
 ### Basic
 > warning: this is just a show case of the usage of basic apis in AutoGPTQ, which uses only one sample to quantize a much small model, thus may not performs as well as expected in LLMs.
 
