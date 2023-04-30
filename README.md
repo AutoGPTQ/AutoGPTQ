@@ -221,10 +221,6 @@ print(
 ### More Examples
 For more examples, please turn to [examples](examples/README.md)
 
-## Side Notes
-### VRAM
-Currently, I put everything (data, model, etc.) into CPU util one is required to be used or executed on GPU (and will back to CPU once the execution finished). Though I didn't run any benchmark to this date, but the maximum VRAM usage for GPTJ is about 6GB, which may be considered as a reference.
-
 ## Acknowledgement
 - Specially thanks **Elias Frantar**, **Saleh Ashkboos**, **Torsten Hoefler** and **Dan Alistarh** for proposing **GPTQ** algorithm and open source the [code](https://github.com/IST-DASLab/gptq).
 - Specially thanks **qwopqwop200**, for code in this project that relevant to quantization are mainly referenced from [GPTQ-for-LLaMa](https://github.com/qwopqwop200/GPTQ-for-LLaMa/tree/cuda).
