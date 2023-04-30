@@ -1,5 +1,5 @@
 # AutoGPTQ
-An easy-to-use model quantization package with user-friendly apis, based on GPTQ algorithm.
+An easy-to-use LLMs quantization package with user-friendly apis, based on GPTQ algorithm.
 
 ## News or Update
 - 2023-04-29 - (Update) - Support loading quantized model from arbitrary quantize_config and model_basename.
