@@ -3,7 +3,7 @@ import json
 import os
 from dataclasses import dataclass, field, fields
 from logging import getLogger
-from os.path import join
+from os.path import join, isfile
 from typing import Dict, List, Optional, Union
 
 import accelerate
@@ -508,6 +508,9 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             model_save_name += ".safetensors"
         else:
             model_save_name += ".bin"
+
+        if not isfile(model_save_name):
+           raise FileNotFoundError(f"Could not find model at {model_save_name}")
 
         def skip(*args, **kwargs):
             pass
