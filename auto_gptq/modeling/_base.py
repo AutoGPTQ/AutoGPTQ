@@ -489,7 +489,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         if use_triton:
             from ..nn_modules.qlinear_triton import autotune_warmup_linear
 
-            logger.warning("use_triton will force moving the hole model to GPU, make sure you have enough VRAM.")
+            logger.warning("use_triton will force moving the whole model to GPU, make sure you have enough VRAM.")
             device = "cuda:0"
 
         config = AutoConfig.from_pretrained(save_dir, trust_remote_code=trust_remote_code)
