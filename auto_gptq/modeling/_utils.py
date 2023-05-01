@@ -42,11 +42,14 @@ def get_module_by_name(model, module_name: str):
             return module
 
 
-def make_quant(module, names, bits, groupsize, name='', use_triton=False):
+def make_quant(module, names, bits, groupsize, name='', use_triton=False, desc_act=False):
     if use_triton:
         from ..nn_modules.qlinear_triton import QuantLinear
     else:
-        from ..nn_modules.qlinear import QuantLinear
+        if not(desc_act) or groupsize == -1:
+            from ..nn_modules.qlinear_old import QuantLinear
+        else:
+            from ..nn_modules.qlinear import QuantLinear
 
     if isinstance(module, QuantLinear):
         return
@@ -78,14 +81,17 @@ def pack_model(
     bits,
     group_size,
     use_triton=False,
+    desc_act=False,
     autotune_warmup: bool = False,
     force_layer_back_to_cpu: bool = False
 ):
     if use_triton:
         from ..nn_modules.qlinear_triton import QuantLinear, autotune_warmup_linear
     else:
-        from ..nn_modules.qlinear import QuantLinear
-
+        if not(desc_act) or groupsize == -1:
+            from ..nn_modules.qlinear_old import QuantLinear
+        else:
+            from ..nn_modules.qlinear import QuantLinear
     if force_layer_back_to_cpu:
         model.to(CPU)
 
