@@ -343,6 +343,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             bits=self.quantize_config.bits,
             group_size=self.quantize_config.group_size,
             use_triton=use_triton,
+            desc_act=self.quantize_config.desc_act,
             autotune_warmup=autotune_warmup_after_quantized,
             force_layer_back_to_cpu=force_layer_back_to_cpu
         )
@@ -529,7 +530,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                 del layers[name]
 
         with accelerate.init_empty_weights():
-            make_quant(model, layers, quantize_config.bits, quantize_config.group_size, use_triton=use_triton)
+            make_quant(model, layers, quantize_config.bits, quantize_config.group_size, use_triton=use_triton, desc_act=quantize_config.desc_act)
         model.tie_weights()
 
         if max_memory and not device_map:
