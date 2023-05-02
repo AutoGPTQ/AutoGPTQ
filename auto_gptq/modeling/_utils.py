@@ -113,7 +113,7 @@ def pack_model(
 
     if use_triton and autotune_warmup:
         logger.warning(
-            "using autotune_warmup will move model to GPU, make sure you have enough VRAM to load the hole model."
+            "using autotune_warmup will move model to GPU, make sure you have enough VRAM to load the whole model."
         )
         autotune_warmup_linear(model.to(CUDA_0), seqlen=model.seqlen)
 
