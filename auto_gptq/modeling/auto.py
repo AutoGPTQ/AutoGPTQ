@@ -9,7 +9,7 @@ from .gpt2 import GPT2GPTQForCausalLM
 from .llama import LlamaGPTQForCausalLM
 from .moss import MOSSGPTQForCausalLM
 from .opt import OPTGPTQForCausalLM
-
+from inspect import signature
 
 GPTQ_CAUSAL_LM_MODEL_MAP = {
     "bloom": BloomGPTQForCausalLM,
@@ -61,7 +61,9 @@ class AutoGPTQForCausalLM:
         **kwargs
     ) -> BaseGPTQForCausalLM:
         model_type = check_and_get_model_type(save_dir)
-        return GPTQ_CAUSAL_LM_MODEL_MAP[model_type].from_quantized(
+        quant_func = GPTQ_CAUSAL_LM_MODEL_MAP[model_type].from_quantized
+        keywords = {key: kwargs[key] for key in signature(quant_func).parameters if key in kwargs}
+        return quant_func(
             save_dir=save_dir,
             device=device,
             use_safetensors=use_safetensors,
@@ -70,9 +72,8 @@ class AutoGPTQForCausalLM:
             device_map=device_map,
             quantize_config=quantize_config,
             model_basename=model_basename,
-            trust_remote_code=trust_remote_code, 
-            **kwargs
+            trust_remote_code=trust_remote_code,
+            **keywords
         )
-
 
 __all__ = ["AutoGPTQForCausalLM"]
