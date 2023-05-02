@@ -484,7 +484,8 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         device_map: Optional[str] = None,
         quantize_config: Optional[BaseQuantizeConfig] = None,
         model_basename: Optional[str] = None,
-        trust_remote_code: bool = False
+        trust_remote_code: bool = False, 
+        **kwargs
     ):
         """load quantized model from local disk"""
         if use_triton:
