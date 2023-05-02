@@ -79,7 +79,7 @@ class QuantLlamaAttention(nn.Module):
 
         return attn_output, attn_weights, past_key_value
         
-def make_quant_attn(model, use_triton=False, desc_act=False):
+def make_quant_attn(model, use_triton=False, groupsize=-1, desc_act=False):
     """
     Replace all LlamaAttention modules with QuantLlamaAttention modules, fusing the q, k, v projections.
     """
