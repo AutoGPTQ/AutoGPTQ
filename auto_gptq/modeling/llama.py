@@ -109,7 +109,7 @@ class LlamaGPTQForCausalLM(BaseGPTQForCausalLM):
         )
         
         if fused_attn:
-            make_quant_attn(model, use_triton=use_triton, group_size = quantize_config.group_size, desc_act=quantize_config.desc_act,)
+            make_quant_attn(model, use_triton=use_triton, groupsize = quantize_config.group_size, desc_act=quantize_config.desc_act,)
         if use_triton and fused_mlp:
             make_fused_mlp(model)
         model_config = model.config.to_dict()
