@@ -108,7 +108,7 @@ class LlamaGPTQForCausalLM(BaseGPTQForCausalLM):
             model, model_save_name, device_map, max_memory, no_split_module_classes=[cls.layer_type]
         )
         
-        if fused_attn:
+        if use_triton and fused_attn:
             make_quant_attn(model, use_triton=use_triton, groupsize = quantize_config.group_size, desc_act=quantize_config.desc_act,)
         if use_triton and fused_mlp:
             make_fused_mlp(model)
