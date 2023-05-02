@@ -72,7 +72,7 @@ def make_quant(module, names, bits, groupsize, name='', use_triton=False, desc_a
             new_layer.device = ori_layer_device
             setattr(module, attr, new_layer.to(ori_layer_device))
     for name1, child in module.named_children():
-        make_quant(child, names, bits, groupsize, name + '.' + name1 if name != '' else name1, use_triton=use_triton)
+        make_quant(child, names, bits, groupsize, name + '.' + name1 if name != '' else name1, use_triton=use_triton, desc_act=desc_act)
 
 
 def pack_model(
