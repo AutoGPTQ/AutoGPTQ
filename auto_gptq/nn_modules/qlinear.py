@@ -236,7 +236,7 @@ class QuantLinear(nn.Module):
                 raise NotImplementedError("Only 2,3,4,8 bits are supported.")
 
             weight = weight.reshape(weight.shape[0] * weight.shape[1], weight.shape[2])
-
+            num_itr = self.g_idx.shape[0]//x.shape[-1]
             if num_itr == 1:
                 weights = (self.scales[self.g_idx.long()] * (weight - zeros[self.g_idx.long()]))
             else:
