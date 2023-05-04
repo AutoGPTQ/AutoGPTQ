@@ -46,7 +46,7 @@ def make_quant(module, names, bits, groupsize, name='', use_triton=False, desc_a
     if use_triton:
         from ..nn_modules.qlinear_triton import QuantLinear
     else:
-        if not(desc_act) or groupsize == -1:
+        if not desc_act or groupsize == -1:
             from ..nn_modules.qlinear_old import QuantLinear
         else:
             from ..nn_modules.qlinear import QuantLinear
@@ -88,7 +88,7 @@ def pack_model(
     if use_triton:
         from ..nn_modules.qlinear_triton import QuantLinear, autotune_warmup_linear
     else:
-        if not(desc_act) or groupsize == -1:
+        if not desc_act or group_size == -1:
             from ..nn_modules.qlinear_old import QuantLinear
         else:
             from ..nn_modules.qlinear import QuantLinear
