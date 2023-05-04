@@ -2,6 +2,7 @@
 An easy-to-use LLMs quantization package with user-friendly apis, based on GPTQ algorithm.
 
 ## News or Update
+- 2023-05-04 - (Update) - Support using faster cuda kernel when `not desc_act or group_size == -1`
 - 2023-04-29 - (Update) - Support loading quantized model from arbitrary quantize_config and model_basename.
 - 2023-04-28 - (Update) - Support CPU offload and quantize/inference on multiple devices, support `gpt2` type models.
 - 2023-04-26 - (Update) - Using `triton` to speed up inference is now supported.
