@@ -291,6 +291,7 @@ __global__ void VecQuant2MatMulKernel(
 	  res += weight[k] * blockvec[k];
     }
     atomicAdd(&mul[b * width + w], res);
+    __syncthreads();
   }
 }
 
@@ -435,6 +436,7 @@ __global__ void VecQuant3MatMulKernel(
 	  res += weight[k] * blockvec[k];
     }
     atomicAdd(&mul[b * width + w], res);
+    __syncthreads();
   }
 }
 
@@ -522,6 +524,7 @@ __global__ void VecQuant4MatMulKernel(
 	  res += weight[k] * blockvec[k];
     }
     atomicAdd(&mul[b * width + w], res);
+    __syncthreads();
   }
 }
 
@@ -608,6 +611,7 @@ __global__ void VecQuant8MatMulKernel(
 	  res += weight[k] * blockvec[k];
     }
     atomicAdd(&mul[b * width + w], res);
+    __syncthreads();
   }
 }
 
