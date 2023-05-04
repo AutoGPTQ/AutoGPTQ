@@ -18,7 +18,7 @@ except ImportError:
 
 
 class QuantLinear(nn.Module): 
-    def __init__(self, bits, groupsize, infeatures, outfeatures, bias, faster=True, kernel_switch_threshold=128, is_cuda=_quant_cuda_available):
+    def __init__(self, bits, groupsize, infeatures, outfeatures, bias, use_cuda_fp16=True, kernel_switch_threshold=128, is_cuda=_quant_cuda_available):
         super().__init__()
         if bits not in [2,3,4,8]:
             raise NotImplementedError("Only 2,3,4,8 bits are supported.")
@@ -37,7 +37,7 @@ class QuantLinear(nn.Module):
         else:
             self.bias = None
         self.half_indim = self.infeatures // 2
-        self.faster = faster if bits != 8 else False
+        self.use_cuda_fp16 = use_cuda_fp16 if bits != 8 else False
         
         # is performed by unpacking the weights and using torch.matmul
         if self.bits in [2,4,8]: 
@@ -145,7 +145,7 @@ class QuantLinear(nn.Module):
         if  self.is_cuda is True and (self.kernel_switch_threshold is False or x.shape[0] < self.kernel_switch_threshold):
             out = torch.zeros(x.shape[0], out_shape[-1], dtype=torch.float, device=x.device)
             
-            if self.faster:
+            if self.use_cuda_fp16:
                 x = x.half()
                 if self.bits == 2:
                     quant_cuda.vecquant2matmul_faster_old(x, self.qweight, out, self.scales.float(), self.qzeros, self.groupsize, self.half_indim)
