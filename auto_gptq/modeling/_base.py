@@ -141,6 +141,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         examples: List[Dict[str, Union[List[int], torch.LongTensor]]],
         batch_size: int = 1,
         use_triton: bool = False,
+        use_cuda_fp16: bool = True,
         autotune_warmup_after_quantized: bool = False,
         cache_examples_on_gpu: bool = True
     ):
@@ -343,6 +344,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             bits=self.quantize_config.bits,
             group_size=self.quantize_config.group_size,
             use_triton=use_triton,
+            use_cuda_fp16=use_cuda_fp16,
             desc_act=self.quantize_config.desc_act,
             autotune_warmup=autotune_warmup_after_quantized,
             force_layer_back_to_cpu=force_layer_back_to_cpu
@@ -478,8 +480,10 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         cls,
         save_dir: str,
         device: str = "cpu",
+        strict: bool = True,
         use_safetensors: bool = False,
         use_triton: bool = False,
+        use_cuda_fp16: bool = True,
         max_memory: Optional[dict] = None,
         device_map: Optional[str] = None,
         quantize_config: Optional[BaseQuantizeConfig] = None,
@@ -522,7 +526,12 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         torch.nn.init.normal_ = skip
 
         transformers.modeling_utils._init_weights = False
-        with accelerate.init_empty_weights():
+        if strict:
+            with accelerate.init_empty_weights():
+                torch.set_default_dtype(torch.half)
+                model = AutoModelForCausalLM.from_config(config, trust_remote_code=trust_remote_code)
+                torch.set_default_dtype(torch.float)
+        else:
             torch.set_default_dtype(torch.half)
             model = AutoModelForCausalLM.from_config(config, trust_remote_code=trust_remote_code)
             torch.set_default_dtype(torch.float)
@@ -532,19 +541,30 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             if any([name.startswith(ignore_layer) for ignore_layer in ignore_layers]):
                 logger.info(f"{name} not been quantized, will be ignored when make_quant.")
                 del layers[name]
-
-        with accelerate.init_empty_weights():
-            make_quant(model, layers, quantize_config.bits, quantize_config.group_size, use_triton=use_triton, desc_act=quantize_config.desc_act)
-        model.tie_weights()
+        if strict:
+            with accelerate.init_empty_weights():
+                make_quant(model, layers, quantize_config.bits, quantize_config.group_size, use_triton=use_triton,use_cuda_fp16=use_cuda_fp16, desc_act=quantize_config.desc_act)
+            model.tie_weights()
+        else:
+            make_quant(model, layers, quantize_config.bits, quantize_config.group_size, use_triton=use_triton,use_cuda_fp16=use_cuda_fp16, desc_act=quantize_config.desc_act)
 
         if max_memory and not device_map:
             device_map = "auto"
         if not max_memory and not device_map:
             device_map = {"": device}
 
-        model = accelerate.load_checkpoint_and_dispatch(
-            model, model_save_name, device_map, max_memory, no_split_module_classes=[cls.layer_type]
-        )
+        if strict:
+            model = accelerate.load_checkpoint_and_dispatch(model, model_save_name, device_map, max_memory, no_split_module_classes=[cls.layer_type])
+        else:
+            if use_safetensors:
+                from safetensors.torch import load_file as safe_load
+                model.load_state_dict(safe_load(model_save_name), strict=False)
+            else:
+                model.load_state_dict(torch.load(model_save_name), strict=False)
+            if device_map == "auto":
+                device_map = accelerate.infer_auto_device_map(model,max_memory=max_memory, no_split_module_classes=[cls.layer_type])
+            model = accelerate.dispatch_model(model, device_map)
+
 
         model_config = model.config.to_dict()
         seq_len_keys = ["max_position_embeddings", "seq_length", "n_positions"]
