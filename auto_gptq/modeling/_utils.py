@@ -42,7 +42,7 @@ def get_module_by_name(model, module_name: str):
             return module
 
 
-def make_quant(module, names, bits, groupsize, name='', use_triton=False, desc_act=False):
+def make_quant(module, names, bits, groupsize, name='', use_triton=False, use_cuda_fp16=True, desc_act=False):
     if use_triton:
         from ..nn_modules.qlinear_triton import QuantLinear
     else:
@@ -68,11 +68,14 @@ def make_quant(module, names, bits, groupsize, name='', use_triton=False, desc_a
             elif type(tmp) == transformers.pytorch_utils.Conv1D:            
                 in_features = tmp.weight.shape[0]
                 out_features = tmp.weight.shape[1]
-            new_layer = QuantLinear(bits, groupsize, in_features, out_features, tmp.bias is not None)
+            if not(desc_act) or groupsize == -1:
+                new_layer = QuantLinear(bits, groupsize, in_features, out_features, tmp.bias is not None, use_cuda_fp16=use_cuda_fp16)
+            else:
+                new_layer = QuantLinear(bits, groupsize, in_features, out_features, tmp.bias is not None)
             new_layer.device = ori_layer_device
             setattr(module, attr, new_layer.to(ori_layer_device))
     for name1, child in module.named_children():
-        make_quant(child, names, bits, groupsize, name + '.' + name1 if name != '' else name1, use_triton=use_triton, desc_act=desc_act)
+        make_quant(child, names, bits, groupsize, name + '.' + name1 if name != '' else name1, use_triton=use_triton, use_cuda_fp16=use_cuda_fp16,desc_act=desc_act)
 
 
 def pack_model(
@@ -81,6 +84,7 @@ def pack_model(
     bits,
     group_size,
     use_triton=False,
+    use_cuda_fp16=True,
     desc_act=False,
     autotune_warmup: bool = False,
     force_layer_back_to_cpu: bool = False
@@ -92,13 +96,14 @@ def pack_model(
             from ..nn_modules.qlinear_old import QuantLinear
         else:
             from ..nn_modules.qlinear import QuantLinear
+
     if force_layer_back_to_cpu:
         model.to(CPU)
 
     logger.info('Packing model...')
     layers = find_layers(model)
     layers = {n: layers[n] for n in quantizers}
-    make_quant(model, quantizers, bits, group_size, use_triton=use_triton)
+    make_quant(model, quantizers, bits, group_size, use_triton=use_triton, use_cuda_fp16=use_cuda_fp16, desc_act=desc_act)
     qlayers = find_layers(model, [QuantLinear])
     for name in qlayers:
         logger.info(name)
