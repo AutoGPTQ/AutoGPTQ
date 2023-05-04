@@ -42,21 +42,24 @@ class LlamaGPTQForCausalLM(BaseGPTQForCausalLM):
         cls,
         save_dir: str,
         device: str = "cpu",
+        strict: bool = True,
         use_safetensors: bool = False,
         use_triton: bool = False,
+        use_cuda_fp16: bool = True,
         fused_attn: bool = False,
         fused_mlp: bool = False,
         max_memory: Optional[dict] = None,
         device_map: Optional[str] = None,
         quantize_config: Optional[BaseQuantizeConfig] = None,
         model_basename: Optional[str] = None,
-        trust_remote_code: bool = False
+        trust_remote_code: bool = False, 
+        **kwargs
     ):
         """load quantized model from local disk"""
         if use_triton:
             from ..nn_modules.qlinear_triton import autotune_warmup_linear
 
-            logger.warning("use_triton will force moving the hole model to GPU, make sure you have enough VRAM.")
+            logger.warning("use_triton will force moving the whole model to GPU, make sure you have enough VRAM.")
             device = "cuda:0"
 
         config = AutoConfig.from_pretrained(save_dir, trust_remote_code=trust_remote_code)
@@ -76,6 +79,9 @@ class LlamaGPTQForCausalLM(BaseGPTQForCausalLM):
         else:
             model_save_name += ".bin"
 
+        if not isfile(model_save_name):
+           raise FileNotFoundError(f"Could not find model at {model_save_name}")
+
         def skip(*args, **kwargs):
             pass
 
@@ -84,7 +90,12 @@ class LlamaGPTQForCausalLM(BaseGPTQForCausalLM):
         torch.nn.init.normal_ = skip
 
         transformers.modeling_utils._init_weights = False
-        with accelerate.init_empty_weights():
+        if strict:
+            with accelerate.init_empty_weights():
+                torch.set_default_dtype(torch.half)
+                model = AutoModelForCausalLM.from_config(config, trust_remote_code=trust_remote_code)
+                torch.set_default_dtype(torch.float)
+        else:
             torch.set_default_dtype(torch.half)
             model = AutoModelForCausalLM.from_config(config, trust_remote_code=trust_remote_code)
             torch.set_default_dtype(torch.float)
@@ -94,22 +105,32 @@ class LlamaGPTQForCausalLM(BaseGPTQForCausalLM):
             if any([name.startswith(ignore_layer) for ignore_layer in ignore_layers]):
                 logger.info(f"{name} not been quantized, will be ignored when make_quant.")
                 del layers[name]
-
-        with accelerate.init_empty_weights():
-            make_quant(model, layers, quantize_config.bits, quantize_config.group_size, use_triton=use_triton, desc_act=quantize_config.desc_act)
-        model.tie_weights()
+        if strict:
+            with accelerate.init_empty_weights():
+                make_quant(model, layers, quantize_config.bits, quantize_config.group_size, use_triton=use_triton,use_cuda_fp16=use_cuda_fp16, desc_act=quantize_config.desc_act)
+            model.tie_weights()
+        else:
+            make_quant(model, layers, quantize_config.bits, quantize_config.group_size, use_triton=use_triton,use_cuda_fp16=use_cuda_fp16, desc_act=quantize_config.desc_act)
 
         if max_memory and not device_map:
             device_map = "auto"
         if not max_memory and not device_map:
             device_map = {"": device}
 
-        model = accelerate.load_checkpoint_and_dispatch(
-            model, model_save_name, device_map, max_memory, no_split_module_classes=[cls.layer_type]
-        )
+        if strict:
+            model = accelerate.load_checkpoint_and_dispatch(model, model_save_name, device_map, max_memory, no_split_module_classes=[cls.layer_type])
+        else:
+            if use_safetensors:
+                from safetensors.torch import load_file as safe_load
+                model.load_state_dict(safe_load(model_save_name), strict=False)
+            else:
+                model.load_state_dict(torch.load(model_save_name), strict=False)
+            if device_map == "auto":
+                device_map = accelerate.infer_auto_device_map(model,max_memory=max_memory, no_split_module_classes=[cls.layer_type])
+            model = accelerate.dispatch_model(model, device_map)
         
         if fused_attn:
-            make_quant_attn(model, use_triton=use_triton, groupsize = quantize_config.group_size, desc_act=quantize_config.desc_act,)
+            make_quant_attn(model, use_triton=use_triton, groupsize = quantize_config.group_size, use_cuda_fp16=use_cuda_fp16, desc_act=quantize_config.desc_act,)
         if use_triton and fused_mlp:
             make_fused_mlp(model)
         model_config = model.config.to_dict()
