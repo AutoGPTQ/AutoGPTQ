@@ -75,7 +75,8 @@ quantized_model_dir = "opt-125m-4bit"
 tokenizer = AutoTokenizer.from_pretrained(pretrained_model_dir, use_fast=True)
 examples = [
     tokenizer(
-        "auto-gptq is an easy-to-use model quantization library with user-friendly apis, based on GPTQ algorithm."
+        "auto-gptq is an easy-to-use model quantization library with user-friendly apis, based on GPTQ algorithm.",
+        return_tensors="pt"
     )
 ]
 
@@ -147,7 +148,11 @@ Below is an example to evaluate `EleutherAI/gpt-j-6b` on sequence-classification
 from functools import partial
 
 import datasets
-from transformers import AutoTokenizer, AutoModelForCausalLM, GenerationConfig
+from transformers import Auto
+
+
+
+, AutoModelForCausalLM, GenerationConfig
 
 from auto_gptq import AutoGPTQForCausalLM, BaseQuantizeConfig
 from auto_gptq.eval_tasks import SequenceClassificationTask
