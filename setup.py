@@ -7,7 +7,7 @@ try:
 except ImportError:
     TORCH_AVAILABLE = False
 
-version = "v0.1.0-dev"
+version = "v0.1.0"
 
 requirements = [
     "accelerate>=0.18.0",
