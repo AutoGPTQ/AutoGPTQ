@@ -77,7 +77,6 @@ def make_quant(module, names, bits, groupsize, name='', use_triton=False, use_cu
     for name1, child in module.named_children():
         make_quant(child, names, bits, groupsize, name + '.' + name1 if name != '' else name1, use_triton=use_triton, use_cuda_fp16=use_cuda_fp16,desc_act=desc_act)
 
-
 def pack_model(
     model,
     quantizers,
