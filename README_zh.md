@@ -1,5 +1,5 @@
 <h1 align="center">AutoGPTQ</h1>
-<p align="center">An easy-to-use LLMs quantization package with user-friendly apis, based on GPTQ algorithm.</p>
+<p align="center">一个基于 GPTQ 算法，简单易用且拥有用户友好型接口的大语言模型量化工具包。</p>
 <p align="center">
     <a href="https://github.com/PanQiWei/AutoGPTQ/releases">
         <img alt="GitHub release" src="https://img.shields.io/github/release/PanQiWei/AutoGPTQ.svg">
@@ -10,77 +10,77 @@
 </p>
 <h4 align="center">
     <p>
-        <b>English</b> |
-        <a href="https://github.com/PanQiWei/AutoGPTQ/blob/main/README_zh.md">中文</a>
+        <a href="https://github.com/PanQiWei/AutoGPTQ/blob/main/README.md">English</a> |
+        <b>中文</b>
     <p>
 </h4>
 
-## News or Update
-- 2023-05-04 - (Update) - Support using faster cuda kernel when `not desc_act or group_size == -1`.
-- 2023-04-29 - (Update) - Support loading quantized model from arbitrary quantize_config and model_basename.
-- 2023-04-28 - (Update) - Support CPU offload and quantize/inference on multiple devices, support `gpt2` type models.
+## 新闻或更新
+- 2023-05-04 - (更新) - 支持在 `not desc_act or group_size == -1` 的情况下使用更快的 cuda 算子。
+- 2023-04-29 - (更新) - 支持从指定的模型权重文件名或量化配置(quantize_config)加载量化过的模型。
+- 2023-04-28 - (更新) - 支持 CPU 分载权重和在多设备上执行模型量化或推理, 支持 `gpt2` 类型的模型。
 
-*For more histories please turn to [here](docs/NEWS_OR_UPDATE.md)*
+*获取更多的历史信息，请转至[这里](docs/NEWS_OR_UPDATE.md)*
 
-## Installation
+## 安装
 
-### Quick Installation
-You can install the latest stable release of AutoGPTQ from pip:
+### 快速安装
+你可以通过 pip 来安装 AutoGPTQ 当前最新的稳定版本：
 ```shell
 pip install auto-gptq
 ```
-#### disable cuda extensions
-By default, cuda extensions will be installed when `torch` and `cuda` is already installed in your machine, if you don't want to use them, using:
+#### 取消 cuda 拓展的安装
+默认情况下，在 `torch` 和 `cuda` 已经于你的机器上被安装时，cuda 拓展将被自动安装，如果你不想要这些拓展的话，采用以下安装命令：
 ```shell
 BUILD_CUDA_EXT=0 pip install auto-gptq
 ```
-And to make sure `quant_cuda` is not ever in your virtual environment, run:
+同时为确保该拓展——`quant_cuda` 不再存在于你的虚拟环境，执行以下命令：
 ```shell
 pip uninstall quant_cuda -y
 ```
-#### to support LLaMa model
-For some people want to try LLaMa and whose `transformers` version not meet the newest one that supports it, using:
+#### 支持使用 LLaMa 模型
+若想要尝试 LLaMa 模型，但 `transformers` 版本不为支持该模型的最新版本，使用以下命令：
 ```shell
 pip install auto-gptq[llama]
 ```
-#### to support triton speedup
-To integrate with `triton`, using:
-> warning: currently triton only supports linux; 3-bit quantization is not supported when using triton
+#### 支持使用 triton 加速
+若想使用 `triton` 加速模型推理，使用以下命令：
+> 警告：目前 triton 仅支持 linux 操作系统；当使用 triton 时 3-bit 数值类型的量化将不被支持
 
 ```shell
 pip install auto-gptq[triton]
 ```
 
-### Install from source
-Clone the source code:
+### 从源码安装
+克隆源码:
 ```shell
 git clone https://github.com/PanQiWei/AutoGPTQ.git && cd AutoGPTQ
 ```
-Then, install from source:
+然后，从项目目录安装:
 ```shell
 pip install .
 ```
-Like quick installation, you can also set `BUILD_CUDA_EXT=0` to disable pytorch extension building.
+正如在快速安装一节，你可以使用 `BUILD_CUDA_EXT=0` 来取消构建 cuda 拓展。
 
-Use `.[llama]` if you want to try LLaMa model.
+如果你想要使用 LLaMa 模型，请使用 `.[llama]`。
 
-Use `.[triton]` if you want to integrate with triton and it's available on your operating system.
+如果你想要使用 triton 加速且其能够被你的操作系统所支持，请使用 `.[triton]`。
 
 
-## Supported Models
-Currently, `auto_gptq` supports: `bloom`, `gpt2`, `gpt_neox`, `gptj`, `llama`, `moss` and `opt`; more Transformer models will come soon!
+## 支持的模型
+目前， `auto_gptq` 支持以下模型： `bloom`, `gpt2`, `gpt_neox`, `gptj`, `llama`, `moss` 和 `opt`；更多的 Transformer 模型即将到来！
 
-## Supported Evaluation Tasks
-Currently, `auto_gptq` supports: `LanguageModelingTask`, `SequenceClassificationTask` and `TextSummarizationTask`; more Tasks will come soon!
+## 支持的评估任务
+目前， `auto_gptq` 支持以下评估任务： `LanguageModelingTask`, `SequenceClassificationTask` 和 `TextSummarizationTask`；更多的评估任务即将到来！
 
-## Usage
+## 用法
 
-**Here are [tutorials](docs/tutorial)(continue updating...) for using `auto-gptq`, it's highly recommended for newcomers to read them first before trying example scripts.** 
+**对于初次使用者，强烈建议在运行示例脚本前先阅读[教程](docs/tutorial)(持续更新中……)**
 
-### Basic
-> warning: this is just a show case of the usage of basic apis in AutoGPTQ, which uses only one sample to quantize a much small model, thus may not performs as well as expected in LLMs.
+### 基本用法
+> 警告：这里仅是对 AutoGPTQ 中基本接口的用法展示，只使用了一条文本来量化一个特别小的模型，因此其结果的表现可能不如在大模型上执行量化后预期的那样好。
 
-Below is an example for the simplest use of `auto_gptq`: 
+以下是 `auto_gptq` 的最简单用法示例：
 ```python
 from transformers import AutoTokenizer, TextGenerationPipeline
 from auto_gptq import AutoGPTQForCausalLM, BaseQuantizeConfig
@@ -98,37 +98,37 @@ examples = [
 ]
 
 quantize_config = BaseQuantizeConfig(
-    bits=4,  # quantize model to 4-bit
-    group_size=128,  # it is recommended to set the value to 128
+    bits=4,  # 将模型量化为 4-bit 数值类型
+    group_size=128,  # 一般推荐将此参数的值设置为 128
 )
 
-# load un-quantized model, by default, the model will always be loaded into CPU memory
+# 加载未量化的模型，默认情况下，模型总是会被加载到 CPU 内存中
 model = AutoGPTQForCausalLM.from_pretrained(pretrained_model_dir, quantize_config)
 
-# quantize model, the examples should be list of dict whose keys can only be "input_ids" and "attention_mask"
+# 量化模型, 样本的数据类型应该为 List[Dict]，其中字典的键有且仅有 input_ids 和 attention_mask
 model.quantize(examples, use_triton=False)
 
-# save quantized model
+# 保存量化好的模型
 model.save_quantized(quantized_model_dir)
 
-# save quantized model using safetensors
+# 使用 safetensors 保存量化好的模型
 model.save_quantized(quantized_model_dir, use_safetensors=True)
 
-# load quantized model to the first GPU
+# 加载量化好的模型到能被识别到的第一块显卡中
 model = AutoGPTQForCausalLM.from_quantized(quantized_model_dir, device="cuda:0", use_triton=False)
 
-# inference with model.generate
+# 使用 model.generate 执行推理
 print(tokenizer.decode(model.generate(**tokenizer("auto_gptq is", return_tensors="pt").to("cuda:0"))[0]))
 
-# or you can also use pipeline
+# 或者使用 TextGenerationPipeline
 pipeline = TextGenerationPipeline(model=model, tokenizer=tokenizer)
 print(pipeline("auto-gptq is")[0]["generated_text"])
 ```
 
-For more advanced features of model quantization, please reference to [this script](examples/quantization/quant_with_alpaca.py)
+参考 [此样例脚本](examples/quantization/quant_with_alpaca.py) 以了解进阶的用法。
 
-### Customize Model
-Below is an example to extend `auto_gptq` to support `OPT` model, as you will see, it's very easy:
+### 自定义模型
+以下展示了如何拓展 `auto_gptq` 以支持 `OPT` 模型，如你所见，这非常简单：
 ```python
 from auto_gptq.modeling import BaseGPTQForCausalLM
 
@@ -152,14 +152,14 @@ class OPTGPTQForCausalLM(BaseGPTQForCausalLM):
         ["fc2"]
     ]
 ```
-After this, you can use `OPTGPTQForCausalLM.from_pretrained` and other methods as shown in Basic.
+然后, 你就可以像在基本用法一节中展示的那样使用 `OPTGPTQForCausalLM.from_pretrained` 和其他方法。
 
-### Evaluation on Downstream Tasks
-You can use tasks defined in `auto_gptq.eval_tasks` to evaluate model's performance on specific down-stream task before and after quantization.
+### 在下游任务上执行评估
+你可以使用在 `auto_gptq.eval_tasks` 中定义的任务来评估量化前后的模型在某个特定下游任务上的表现。
 
-The predefined tasks support all causal-language-models implemented in [🤗 transformers](https://github.com/huggingface/transformers) and in this project.
+这些预定义的模型支持所有在 [🤗 transformers](https://github.com/huggingface/transformers)和本项目中被实现了的 causal-language-models。
 
-Below is an example to evaluate `EleutherAI/gpt-j-6b` on sequence-classification task using `cardiffnlp/tweet_sentiment_multilingual` dataset:
+以下是使用 `cardiffnlp/tweet_sentiment_multilingual` 数据集在序列分类（文本分类）任务上评估 `EleutherAI/gpt-j-6b` 模型的示例:
 ```python
 from functools import partial
 
@@ -235,9 +235,9 @@ print(
 )
 ```
 
-### More Examples
-For more examples, please turn to [examples](examples/README.md)
+### 更多示例
+请转至 [examples](examples/README.md)以获取更多的示例。
 
-## Acknowledgement
-- Specially thanks **Elias Frantar**, **Saleh Ashkboos**, **Torsten Hoefler** and **Dan Alistarh** for proposing **GPTQ** algorithm and open source the [code](https://github.com/IST-DASLab/gptq).
-- Specially thanks **qwopqwop200**, for code in this project that relevant to quantization are mainly referenced from [GPTQ-for-LLaMa](https://github.com/qwopqwop200/GPTQ-for-LLaMa/tree/cuda).
+## 致谢
+- 特别感谢 **Elias Frantar**， **Saleh Ashkboos**， **Torsten Hoefler** 和 **Dan Alistarh** 提出 **GPTQ** 算法并开源[代码](https://github.com/IST-DASLab/gptq)。
+- 特别感谢 **qwopqwop200**， 本项目中涉及到模型量化的代码主要参考自 [GPTQ-for-LLaMa](https://github.com/qwopqwop200/GPTQ-for-LLaMa/tree/cuda)。
