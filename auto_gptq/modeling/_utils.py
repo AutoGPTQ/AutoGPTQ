@@ -68,7 +68,7 @@ def make_quant(module, names, bits, groupsize, name='', use_triton=False, use_cu
             elif type(tmp) == transformers.pytorch_utils.Conv1D:            
                 in_features = tmp.weight.shape[0]
                 out_features = tmp.weight.shape[1]
-            if not(desc_act) or groupsize == -1 and not use_triton:
+            if (not(desc_act) or groupsize == -1) and not use_triton:
                 new_layer = QuantLinear(bits, groupsize, in_features, out_features, tmp.bias is not None, use_cuda_fp16=use_cuda_fp16)
             else:
                 new_layer = QuantLinear(bits, groupsize, in_features, out_features, tmp.bias is not None)
