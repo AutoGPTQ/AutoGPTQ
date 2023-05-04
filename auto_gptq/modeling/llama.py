@@ -3,7 +3,7 @@ import json
 import os
 from dataclasses import dataclass, field, fields
 from logging import getLogger
-from os.path import join
+from os.path import join, isfile
 from typing import Dict, List, Optional, Union
 
 import accelerate
