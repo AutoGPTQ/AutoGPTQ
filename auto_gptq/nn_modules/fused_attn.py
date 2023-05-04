@@ -104,7 +104,7 @@ def make_quant_attn(model, use_triton=False, groupsize=-1, use_cuda_fp16=True, d
         scales = torch.cat([q_proj.scales, k_proj.scales, v_proj.scales], dim=1)
         g_idx = torch.cat([q_proj.g_idx, k_proj.g_idx, v_proj.g_idx], dim=0)
         bias = torch.cat([q_proj.bias, k_proj.bias, v_proj.bias], dim=0) if q_proj.bias is not None else None
-        if not(desc_act) or groupsize == -1:
+        if not(desc_act) or groupsize == -1 and not use_triton:
             qkv_layer = QuantLinear(q_proj.bits, q_proj.groupsize, q_proj.infeatures, q_proj.outfeatures + k_proj.outfeatures + v_proj.outfeatures, True if q_proj.bias is not None else False, use_cuda_fp16 = use_cuda_fp16)
         else:
             qkv_layer = QuantLinear(q_proj.bits, q_proj.groupsize, q_proj.infeatures, q_proj.outfeatures + k_proj.outfeatures + v_proj.outfeatures, True if q_proj.bias is not None else False)
