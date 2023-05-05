@@ -16,11 +16,20 @@ except ImportError:
     logger.warning('CUDA extension not installed.')
     _quant_cuda_available = False
 
+class QuantLinear(nn.Module):
+    def __init__(
+        self,
+        bits,
+        groupsize,
+        infeatures,
+        outfeatures,
+        bias,
+        use_cuda_fp16=True,
+        kernel_switch_threshold=128
+    ):
 
-class QuantLinear(nn.Module): 
-    def __init__(self, bits, group_size, infeatures, outfeatures, bias, use_cuda_fp16=True, kernel_switch_threshold=128, is_cuda=_quant_cuda_available):
         super().__init__()
-        if bits not in [2,3,4,8]:
+        if bits not in [2, 3, 4, 8]:
             raise NotImplementedError("Only 2,3,4,8 bits are supported.")
         self.infeatures = infeatures
         self.outfeatures = outfeatures
@@ -28,30 +37,49 @@ class QuantLinear(nn.Module):
         self.group_size = group_size if group_size != -1 else infeatures
         self.maxq = 2 ** self.bits - 1
 
-        self.register_buffer('qweight', torch.zeros((infeatures // 32 * self.bits, outfeatures), dtype=torch.int32))
-        self.register_buffer('qzeros', torch.zeros((math.ceil(infeatures / self.group_size), outfeatures // 32 * self.bits), dtype=torch.int32))
-        self.register_buffer('scales', torch.zeros((math.ceil(infeatures / self.group_size), outfeatures), dtype=torch.float16))
-        self.register_buffer('g_idx',torch.tensor([i // self.group_size for i in range(infeatures)], dtype=torch.int32))
+        self.register_buffer(
+            'qweight',
+            torch.zeros((infeatures // 32 * self.bits, outfeatures), dtype=torch.int32)
+        )
+        self.register_buffer(
+            'qzeros',
+            torch.zeros((math.ceil(infeatures / self.groupsize), outfeatures // 32 * self.bits), dtype=torch.int32)
+        )
+        self.register_buffer(
+            'scales',
+            torch.zeros((math.ceil(infeatures / self.groupsize), outfeatures), dtype=torch.float16)
+        )
+        self.register_buffer(
+            'g_idx',
+            torch.tensor([i // self.groupsize for i in range(infeatures)], dtype=torch.int32)
+        )
+
         if bias:
-            self.register_buffer('bias', torch.zeros((outfeatures),dtype=torch.float16))
+            self.register_buffer('bias', torch.zeros((outfeatures), dtype=torch.float16))
         else:
             self.bias = None
         self.half_indim = self.infeatures // 2
+
         self.use_cuda_fp16 = use_cuda_fp16 if bits != 8 else False
         
         # is performed by unpacking the weights and using torch.matmul
-        if self.bits in [2,4,8]: 
-            self.wf = torch.tensor(list(range(0,32,self.bits)), dtype=torch.int32).unsqueeze(0)
+        if self.bits in [2, 4, 8]:
+            self.wf = torch.tensor(list(range(0, 32, self.bits)), dtype=torch.int32).unsqueeze(0)
         elif self.bits == 3:
-            self.wf = torch.tensor([[0, 3, 6, 9, 12, 15, 18, 21, 24, 27, 30, 0],
-                                    [0, 1, 4, 7, 10, 13, 16, 19, 22, 25, 28, 31],
-                                    [0, 2, 5, 8, 11, 14, 17, 20, 23, 26, 29, 0],], dtype=torch.int32).reshape(1,3,12)
-            
+            self.wf = torch.tensor(
+                [
+                    [0, 3, 6, 9, 12, 15, 18, 21, 24, 27, 30, 0],
+                    [0, 1, 4, 7, 10, 13, 16, 19, 22, 25, 28, 31],
+                    [0, 2, 5, 8, 11, 14, 17, 20, 23, 26, 29, 0],
+                ],
+                dtype=torch.int32
+            ).reshape(1, 3, 12)
+
         self.kernel_switch_threshold = kernel_switch_threshold
-        self.is_cuda = is_cuda
+        self.quant_cuda_available = _quant_cuda_available
         if infeatures % 256 != 0 or outfeatures % 256 != 0:
             self.quant_cuda_available = False
-            
+
     def pack(self, linear, scales, zeros, g_idx):
         scales = scales.t().contiguous()
         zeros = zeros.t().contiguous()
@@ -59,24 +87,29 @@ class QuantLinear(nn.Module):
         self.scales = scales.clone().half()
         if linear.bias is not None:
             self.bias = linear.bias.clone().half()
-            
+
         intweight = []
         for idx in range(self.infeatures):
-            g_idx = idx // self.group_size
-            intweight.append(torch.round((linear.weight.data[:,idx] + scale_zeros[g_idx]) / self.scales[g_idx]).to(torch.int)[:,None])
-        intweight = torch.cat(intweight,dim=1)
+            g_idx = idx // self.groupsize
+            intweight.append(
+                torch.round(
+                    (linear.weight.data[:, idx] + scale_zeros[g_idx]) / self.scales[g_idx]
+                ).to(torch.int)[:, None]
+            )
+        intweight = torch.cat(intweight, dim=1)
         intweight = intweight.t().contiguous()
         intweight = intweight.numpy().astype(np.uint32)
+
+        i = 0
+        row = 0
         qweight = np.zeros(
             (intweight.shape[0] // 32 * self.bits, intweight.shape[1]), dtype=np.uint32
         )
-        i = 0
-        row = 0
         while row < qweight.shape[0]:
-            if self.bits in [2,4,8]:
-                for j in range(i, i + (32//self.bits)):
+            if self.bits in [2, 4, 8]:
+                for j in range(i, i + (32 // self.bits)):
                     qweight[row] |= intweight[j] << (self.bits * (j - i))
-                i += 32//self.bits
+                i += 32 // self.bits
                 row += 1
             elif self.bits == 3:
                 for j in range(i, i + 10):
@@ -99,20 +132,20 @@ class QuantLinear(nn.Module):
                 row += 1
             else:
                 raise NotImplementedError("Only 2,3,4,8 bits are supported.")
-                
+
         qweight = qweight.astype(np.int32)
-        self.qweight = torch.from_numpy(qweight) 
-        
-        zeros -= 1;
+        self.qweight = torch.from_numpy(qweight)
+
+        zeros -= 1
         zeros = zeros.numpy().astype(np.uint32)
         qzeros = np.zeros((zeros.shape[0], zeros.shape[1] // 32 * self.bits), dtype=np.uint32)
         i = 0
         col = 0
         while col < qzeros.shape[1]:
-            if self.bits in [2,4,8]:
-                for j in range(i, i + (32//self.bits)):
+            if self.bits in [2, 4, 8]:
+                for j in range(i, i + (32 // self.bits)):
                     qzeros[:, col] |= zeros[:, j] << (self.bits * (j - i))
-                i += 32//self.bits
+                i += 32 // self.bits
                 col += 1
             elif self.bits == 3:
                 for j in range(i, i + 10):
@@ -135,16 +168,17 @@ class QuantLinear(nn.Module):
                 col += 1
             else:
                 raise NotImplementedError("Only 2,3,4,8 bits are supported.")
-                
+
         qzeros = qzeros.astype(np.int32)
-        self.qzeros = torch.from_numpy(qzeros) 
-        
+        self.qzeros = torch.from_numpy(qzeros)
+
     def forward(self, x):
-        out_shape = x.shape[:-1] + (self.outfeatures, )
-        x = x.reshape(-1,x.shape[-1])     
-        if  self.is_cuda is True and (self.kernel_switch_threshold is False or x.shape[0] < self.kernel_switch_threshold):
+        out_shape = x.shape[:-1] + (self.outfeatures,)
+        x = x.reshape(-1, x.shape[-1])
+        if self.quant_cuda_available is True and (
+            self.kernel_switch_threshold is False or x.shape[0] < self.kernel_switch_threshold
+        ):
             out = torch.zeros(x.shape[0], out_shape[-1], dtype=torch.float, device=x.device)
-            
             if self.use_cuda_fp16:
                 x = x.half()
                 if self.bits == 2:
@@ -153,6 +187,7 @@ class QuantLinear(nn.Module):
                     quant_cuda.vecquant3matmul_faster_old(x, self.qweight, out, self.scales.float(), self.qzeros, self.group_size, self.half_indim)
                 elif self.bits == 4:
                     quant_cuda.vecquant4matmul_faster_old(x, self.qweight, out, self.scales.float(), self.qzeros, self.group_size, self.half_indim)
+
                 else:
                     raise NotImplementedError("Only 2,3,4 bits are supported.")
             else:
@@ -205,14 +240,15 @@ class QuantLinear(nn.Module):
                weight = weight & 0x7
                weight = torch.cat([weight[:,0,:11], weight[:,1,1:12], weight[:,2,1:11]], dim=1)
                weight = weight.reshape(-1, self.group_size, weight.shape[2])
+            else:
+               raise NotImplementedError("Only 2,3,4,8 bits are supported.")
             weight = (scales * (weight - zeros))
             weight = weight.reshape(weight.shape[0] * weight.shape[1], weight.shape[2])
-                    
+
             out = torch.matmul(x.half(), weight)
         out = out.reshape(out_shape)
         out = out + self.bias if self.bias is not None else out
         return out
-
 
 
 __all__ = ["QuantLinear"]
