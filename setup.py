@@ -7,7 +7,7 @@ try:
 except ImportError:
     TORCH_AVAILABLE = False
 
-version = "v0.1.0"
+version = "0.1.0"
 
 requirements = [
     "accelerate>=0.18.0",
@@ -24,14 +24,20 @@ extras_require = {
     "triton": ["triton>=2.0.0"]
 }
 
+include_dirs=["quant_cuda"]
 
 if TORCH_AVAILABLE:
     BUILD_CUDA_EXT = int(os.environ.get('BUILD_CUDA_EXT', '1')) == 1
-
+    
     additional_setup_kwargs = dict()
     if BUILD_CUDA_EXT and torch.cuda.is_available():
         from torch.utils import cpp_extension
-
+        from distutils.sysconfig import get_python_lib
+        conda_cuda_include_dir=os.path.join(get_python_lib(),"nvidia/cuda_runtime/include")
+        print(f"checking conda cuda include dir {conda_cuda_include_dir}")
+        if os.path.isdir(conda_cuda_include_dir):
+            include_dirs.append(conda_cuda_include_dir)
+            print(f"appending conda cuda include dir {conda_cuda_include_dir}")
         extensions = [
             cpp_extension.CUDAExtension(
                 "quant_cuda",
@@ -52,7 +58,7 @@ if TORCH_AVAILABLE:
         version=version,
         install_requires=requirements,
         extras_require=extras_require,
-        include_dirs=["quant_cuda"],
+        include_dirs=include_dirs,
         **additional_setup_kwargs
     )
 else:
@@ -62,5 +68,5 @@ else:
         version=version,
         install_requires=requirements,
         extras_require=extras_require,
-        include_dirs=["quant_cuda"]
+        include_dirs=include_dirs
     )
