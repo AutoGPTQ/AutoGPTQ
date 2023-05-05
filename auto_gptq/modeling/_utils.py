@@ -42,11 +42,11 @@ def get_module_by_name(model, module_name: str):
             return module
 
 
-def make_quant(module, names, bits, groupsize, name='', use_triton=False, use_cuda_fp16=True, desc_act=False):
+def make_quant(module, names, bits, group_size, name='', use_triton=False, use_cuda_fp16=True, desc_act=False):
     if use_triton:
         from ..nn_modules.qlinear_triton import QuantLinear
     else:
-        if not(desc_act) or groupsize == -1:
+        if not(desc_act) or group_size == -1:
             from ..nn_modules.qlinear_old import QuantLinear
         else:
             from ..nn_modules.qlinear import QuantLinear
@@ -68,21 +68,21 @@ def make_quant(module, names, bits, groupsize, name='', use_triton=False, use_cu
             elif type(tmp) == transformers.pytorch_utils.Conv1D:            
                 in_features = tmp.weight.shape[0]
                 out_features = tmp.weight.shape[1]
-            if (not(desc_act) or groupsize == -1) and not use_triton:
-                new_layer = QuantLinear(bits, groupsize, in_features, out_features, tmp.bias is not None, use_cuda_fp16=use_cuda_fp16)
+            if (not(desc_act) or group_size == -1) and not use_triton:
+                new_layer = QuantLinear(bits, group_size, in_features, out_features, tmp.bias is not None, use_cuda_fp16=use_cuda_fp16)
             else:
-                new_layer = QuantLinear(bits, groupsize, in_features, out_features, tmp.bias is not None)
+                new_layer = QuantLinear(bits, group_size, in_features, out_features, tmp.bias is not None)
             new_layer.device = ori_layer_device
             setattr(module, attr, new_layer.to(ori_layer_device))
     for name1, child in module.named_children():
-        make_quant(child, names, bits, groupsize, name + '.' + name1 if name != '' else name1, use_triton=use_triton, use_cuda_fp16=use_cuda_fp16,desc_act=desc_act)
+        make_quant(child, names, bits, group_size, name + '.' + name1 if name != '' else name1, use_triton=use_triton, use_cuda_fp16=use_cuda_fp16,desc_act=desc_act)
 
 
 def pack_model(
     model,
     quantizers,
     bits,
-    groupsize,
+    group_size,
     use_triton=False,
     use_cuda_fp16=True,
     desc_act=False,
@@ -92,7 +92,7 @@ def pack_model(
     if use_triton:
         from ..nn_modules.qlinear_triton import QuantLinear, autotune_warmup_linear
     else:
-        if not(desc_act) or groupsize == -1:
+        if not(desc_act) or group_size == -1:
             from ..nn_modules.qlinear_old import QuantLinear
         else:
             from ..nn_modules.qlinear import QuantLinear
@@ -103,7 +103,7 @@ def pack_model(
     logger.info('Packing model...')
     layers = find_layers(model)
     layers = {n: layers[n] for n in quantizers}
-    make_quant(model, quantizers, bits, groupsize, use_triton=use_triton, use_cuda_fp16=use_cuda_fp16, desc_act=desc_act)
+    make_quant(model, quantizers, bits, group_size, use_triton=use_triton, use_cuda_fp16=use_cuda_fp16, desc_act=desc_act)
     qlayers = find_layers(model, [QuantLinear])
     for name in qlayers:
         logger.info(name)
