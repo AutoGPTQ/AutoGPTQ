@@ -298,7 +298,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                     logger.info(f'Quantizing {name} in layer {i + 1}/{len(layers)}...')
                     scale, zero, g_idx = gptq[name].fasterquant(
                         percdamp=self.quantize_config.damp_percent,
-                        groupsize=self.quantize_config.group_size,
+                        group_size=self.quantize_config.group_size,
                         actorder=self.quantize_config.desc_act
                     )
                     quantizers[f'{self.layers_block_name}.{i}.{name}'] = (

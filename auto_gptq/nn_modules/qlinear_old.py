@@ -18,20 +18,20 @@ except ImportError:
 
 
 class QuantLinear(nn.Module): 
-    def __init__(self, bits, groupsize, infeatures, outfeatures, bias, use_cuda_fp16=True, kernel_switch_threshold=128, is_cuda=_quant_cuda_available):
+    def __init__(self, bits, group_size, infeatures, outfeatures, bias, use_cuda_fp16=True, kernel_switch_threshold=128, is_cuda=_quant_cuda_available):
         super().__init__()
         if bits not in [2,3,4,8]:
             raise NotImplementedError("Only 2,3,4,8 bits are supported.")
         self.infeatures = infeatures
         self.outfeatures = outfeatures
         self.bits = bits
-        self.groupsize = groupsize if groupsize != -1 else infeatures
+        self.group_size = group_size if group_size != -1 else infeatures
         self.maxq = 2 ** self.bits - 1
 
         self.register_buffer('qweight', torch.zeros((infeatures // 32 * self.bits, outfeatures), dtype=torch.int32))
-        self.register_buffer('qzeros', torch.zeros((math.ceil(infeatures / self.groupsize), outfeatures // 32 * self.bits), dtype=torch.int32))
-        self.register_buffer('scales', torch.zeros((math.ceil(infeatures / self.groupsize), outfeatures), dtype=torch.float16))
-        self.register_buffer('g_idx',torch.tensor([i // self.groupsize for i in range(infeatures)], dtype=torch.int32))
+        self.register_buffer('qzeros', torch.zeros((math.ceil(infeatures / self.group_size), outfeatures // 32 * self.bits), dtype=torch.int32))
+        self.register_buffer('scales', torch.zeros((math.ceil(infeatures / self.group_size), outfeatures), dtype=torch.float16))
+        self.register_buffer('g_idx',torch.tensor([i // self.group_size for i in range(infeatures)], dtype=torch.int32))
         if bias:
             self.register_buffer('bias', torch.zeros((outfeatures),dtype=torch.float16))
         else:
@@ -62,7 +62,7 @@ class QuantLinear(nn.Module):
             
         intweight = []
         for idx in range(self.infeatures):
-            g_idx = idx // self.groupsize
+            g_idx = idx // self.group_size
             intweight.append(torch.round((linear.weight.data[:,idx] + scale_zeros[g_idx]) / self.scales[g_idx]).to(torch.int)[:,None])
         intweight = torch.cat(intweight,dim=1)
         intweight = intweight.t().contiguous()
@@ -148,23 +148,23 @@ class QuantLinear(nn.Module):
             if self.use_cuda_fp16:
                 x = x.half()
                 if self.bits == 2:
-                    quant_cuda.vecquant2matmul_faster_old(x, self.qweight, out, self.scales.float(), self.qzeros, self.groupsize, self.half_indim)
+                    quant_cuda.vecquant2matmul_faster_old(x, self.qweight, out, self.scales.float(), self.qzeros, self.group_size, self.half_indim)
                 elif self.bits == 3:
-                    quant_cuda.vecquant3matmul_faster_old(x, self.qweight, out, self.scales.float(), self.qzeros, self.groupsize, self.half_indim)
+                    quant_cuda.vecquant3matmul_faster_old(x, self.qweight, out, self.scales.float(), self.qzeros, self.group_size, self.half_indim)
                 elif self.bits == 4:
-                    quant_cuda.vecquant4matmul_faster_old(x, self.qweight, out, self.scales.float(), self.qzeros, self.groupsize, self.half_indim)
+                    quant_cuda.vecquant4matmul_faster_old(x, self.qweight, out, self.scales.float(), self.qzeros, self.group_size, self.half_indim)
                 else:
                     raise NotImplementedError("Only 2,3,4 bits are supported.")
             else:
                 x = x.float()
                 if self.bits == 2:
-                    quant_cuda.vecquant2matmul_old(x, self.qweight, out, self.scales.float(), self.qzeros, self.groupsize)
+                    quant_cuda.vecquant2matmul_old(x, self.qweight, out, self.scales.float(), self.qzeros, self.group_size)
                 elif self.bits == 3:
-                    quant_cuda.vecquant3matmul_old(x, self.qweight, out, self.scales.float(), self.qzeros, self.groupsize)
+                    quant_cuda.vecquant3matmul_old(x, self.qweight, out, self.scales.float(), self.qzeros, self.group_size)
                 elif self.bits == 4:
-                    quant_cuda.vecquant4matmul_old(x, self.qweight, out, self.scales.float(), self.qzeros, self.groupsize)
+                    quant_cuda.vecquant4matmul_old(x, self.qweight, out, self.scales.float(), self.qzeros, self.group_size)
                 elif self.bits == 8:
-                    quant_cuda.vecquant8matmul_old(x, self.qweight, out, self.scales.float(), self.qzeros, self.groupsize)
+                    quant_cuda.vecquant8matmul_old(x, self.qweight, out, self.scales.float(), self.qzeros, self.group_size)
                 else:
                     raise NotImplementedError("Only 2,3,4,8 bits are supported.")
         else:
@@ -183,7 +183,7 @@ class QuantLinear(nn.Module):
                 
                weight = torch.bitwise_right_shift(torch.unsqueeze(self.qweight, 1).expand(-1, 32 // self.bits, -1), self.wf.unsqueeze(-1)).to(torch.int16 if self.bits == 8 else torch.int8)
                torch.bitwise_and(weight,(2 ** self.bits) - 1, out=weight)
-               weight = weight.reshape(-1, self.groupsize, weight.shape[2])
+               weight = weight.reshape(-1, self.group_size, weight.shape[2])
             elif self.bits == 3:
                zeros = self.qzeros.reshape(self.qzeros.shape[0], self.qzeros.shape[1]//3, 3, 1).expand(-1, -1, -1, 12)
                zeros = (zeros >> self.wf.unsqueeze(0))
@@ -204,7 +204,7 @@ class QuantLinear(nn.Module):
                weight[:,1,11] = (weight[:,1,11]&0x1) | ((weight[:,2,0] << 1)&0x6)
                weight = weight & 0x7
                weight = torch.cat([weight[:,0,:11], weight[:,1,1:12], weight[:,2,1:11]], dim=1)
-               weight = weight.reshape(-1, self.groupsize, weight.shape[2])
+               weight = weight.reshape(-1, self.group_size, weight.shape[2])
             weight = (scales * (weight - zeros))
             weight = weight.reshape(weight.shape[0] * weight.shape[1], weight.shape[2])
                     
