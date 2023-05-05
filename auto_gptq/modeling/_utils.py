@@ -82,7 +82,7 @@ def pack_model(
     model,
     quantizers,
     bits,
-    group_size,
+    groupsize,
     use_triton=False,
     use_cuda_fp16=True,
     desc_act=False,
@@ -103,7 +103,7 @@ def pack_model(
     logger.info('Packing model...')
     layers = find_layers(model)
     layers = {n: layers[n] for n in quantizers}
-    make_quant(model, quantizers, bits, group_size, use_triton=use_triton, use_cuda_fp16=use_cuda_fp16, desc_act=desc_act)
+    make_quant(model, quantizers, bits, groupsize, use_triton=use_triton, use_cuda_fp16=use_cuda_fp16, desc_act=desc_act)
     qlayers = find_layers(model, [QuantLinear])
     for name in qlayers:
         logger.info(name)
