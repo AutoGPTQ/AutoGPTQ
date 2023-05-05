@@ -79,14 +79,14 @@ class QuantLlamaAttention(nn.Module):
 
         return attn_output, attn_weights, past_key_value
         
-def make_quant_attn(model, use_triton=False, groupsize=-1, use_cuda_fp16=True, desc_act=False):
+def make_quant_attn(model, use_triton=False, group_size=-1, use_cuda_fp16=True, desc_act=False):
     """
     Replace all LlamaAttention modules with QuantLlamaAttention modules, fusing the q, k, v projections.
     """
     if use_triton:
         from .qlinear_triton import QuantLinear
     else:
-        if not(desc_act) or groupsize == -1:
+        if not(desc_act) or group_size == -1:
             from .qlinear_old import QuantLinear
         else:
             from .qlinear import QuantLinear
@@ -104,10 +104,10 @@ def make_quant_attn(model, use_triton=False, groupsize=-1, use_cuda_fp16=True, d
         scales = torch.cat([q_proj.scales, k_proj.scales, v_proj.scales], dim=1)
         g_idx = torch.cat([q_proj.g_idx, k_proj.g_idx, v_proj.g_idx], dim=0)
         bias = torch.cat([q_proj.bias, k_proj.bias, v_proj.bias], dim=0) if q_proj.bias is not None else None
-        if (not(desc_act) or groupsize == -1) and not use_triton:
-            qkv_layer = QuantLinear(q_proj.bits, q_proj.groupsize, q_proj.infeatures, q_proj.outfeatures + k_proj.outfeatures + v_proj.outfeatures, True if q_proj.bias is not None else False, use_cuda_fp16 = use_cuda_fp16)
+        if (not(desc_act) or group_size == -1) and not use_triton:
+            qkv_layer = QuantLinear(q_proj.bits, q_proj.group_size, q_proj.infeatures, q_proj.outfeatures + k_proj.outfeatures + v_proj.outfeatures, True if q_proj.bias is not None else False, use_cuda_fp16 = use_cuda_fp16)
         else:
-            qkv_layer = QuantLinear(q_proj.bits, q_proj.groupsize, q_proj.infeatures, q_proj.outfeatures + k_proj.outfeatures + v_proj.outfeatures, True if q_proj.bias is not None else False)
+            qkv_layer = QuantLinear(q_proj.bits, q_proj.group_size, q_proj.infeatures, q_proj.outfeatures + k_proj.outfeatures + v_proj.outfeatures, True if q_proj.bias is not None else False)
         qkv_layer.qweight = qweights
         qkv_layer.qzeros = qzeros
         qkv_layer.scales = scales

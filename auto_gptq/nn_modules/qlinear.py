@@ -21,7 +21,7 @@ class QuantLinear(nn.Module):
     def __init__(
         self,
         bits,
-        groupsize,
+        group_size,
         infeatures,
         outfeatures,
         bias,
@@ -34,7 +34,7 @@ class QuantLinear(nn.Module):
         self.infeatures = infeatures
         self.outfeatures = outfeatures
         self.bits = bits
-        self.groupsize = groupsize if groupsize != -1 else infeatures
+        self.group_size = group_size if group_size != -1 else infeatures
         self.maxq = 2 ** self.bits - 1
 
         self.register_buffer(
@@ -43,15 +43,15 @@ class QuantLinear(nn.Module):
         )
         self.register_buffer(
             'qzeros',
-            torch.zeros((math.ceil(infeatures / self.groupsize), outfeatures // 32 * self.bits), dtype=torch.int32)
+            torch.zeros((math.ceil(infeatures / self.group_size), outfeatures // 32 * self.bits), dtype=torch.int32)
         )
         self.register_buffer(
             'scales',
-            torch.zeros((math.ceil(infeatures / self.groupsize), outfeatures), dtype=torch.float16)
+            torch.zeros((math.ceil(infeatures / self.group_size), outfeatures), dtype=torch.float16)
         )
         self.register_buffer(
             'g_idx',
-            torch.tensor([i // self.groupsize for i in range(infeatures)], dtype=torch.int32)
+            torch.tensor([i // self.group_size for i in range(infeatures)], dtype=torch.int32)
         )
         if bias:
             self.register_buffer('bias', torch.zeros((outfeatures), dtype=torch.float16))
