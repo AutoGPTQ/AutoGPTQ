@@ -34,7 +34,6 @@ if TORCH_AVAILABLE:
         from torch.utils import cpp_extension
         from distutils.sysconfig import get_python_lib
         conda_cuda_include_dir=os.path.join(get_python_lib(),"nvidia/cuda_runtime/include")
-        print(f"checking conda cuda include dir {conda_cuda_include_dir}")
         if os.path.isdir(conda_cuda_include_dir):
             include_dirs.append(conda_cuda_include_dir)
             print(f"appending conda cuda include dir {conda_cuda_include_dir}")
