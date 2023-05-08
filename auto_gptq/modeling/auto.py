@@ -9,6 +9,7 @@ from .gpt2 import GPT2GPTQForCausalLM
 from .llama import LlamaGPTQForCausalLM
 from .moss import MOSSGPTQForCausalLM
 from .opt import OPTGPTQForCausalLM
+from .codegen import CodeGenGPTQForCausalLM
 
 
 GPTQ_CAUSAL_LM_MODEL_MAP = {
@@ -18,7 +19,8 @@ GPTQ_CAUSAL_LM_MODEL_MAP = {
     "gpt2": GPT2GPTQForCausalLM,
     "llama": LlamaGPTQForCausalLM,
     "opt": OPTGPTQForCausalLM,
-    "moss": MOSSGPTQForCausalLM
+    "moss": MOSSGPTQForCausalLM,
+    "codegen": CodeGenGPTQForCausalLM
 }
 
 
