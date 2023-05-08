@@ -98,7 +98,7 @@ def pack_model(
     logger.info('Packing model...')
     layers = find_layers(model)
     layers = {n: layers[n] for n in quantizers}
-    make_quant(model, quantizers, bits, group_size, use_triton=use_triton)
+    make_quant(model, quantizers, bits, group_size, use_triton=use_triton, desc_act=desc_act)
     qlayers = find_layers(model, [QuantLinear])
     for name in qlayers:
         logger.info(name)
