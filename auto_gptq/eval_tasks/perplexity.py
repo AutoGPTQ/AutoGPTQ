@@ -99,6 +99,8 @@ class Perplexity:
                 count += 1
 
             ppl = np.exp(nll / count)
+            #TODO: this results string gives the result of each batch, and duplicates llama.cpp's output
+            #      but currently nothing is being done with it - optionally return or print it?
             results += f'[{i+1}]{ppl:.4f}, '
             progress.set_description(f"Perplexity: {ppl:.4f}")
 
