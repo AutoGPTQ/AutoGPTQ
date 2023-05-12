@@ -16,6 +16,7 @@
 </h4>
 
 ## News or Update
+- 2023-05-12 - (In Progress) - `peft` + `auto-gptq` + multi-modal data = easy fine tune LLMs to gain multi-modal instruction following ability with low resources, stay tune!
 - 2023-05-04 - (Update) - Support using faster cuda kernel when `not desc_act or group_size == -1`.
 - 2023-04-29 - (Update) - Support loading quantized model from arbitrary quantize_config and model_basename.
 - 2023-04-28 - (Update) - Support CPU offload and quantize/inference on multiple devices, support `gpt2` type models.
