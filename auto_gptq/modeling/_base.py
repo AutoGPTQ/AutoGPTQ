@@ -613,9 +613,24 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             model.seqlen = 4096
 
         if inject_fused_attention:
-            raise NotImplementedError()
+            if cls.fused_attn_module_type is None:
+                logger.warning(f"{cls.__name__} hasn't fused attention module yet, will skip inject fused attention.")
+            else:
+                cls.fused_attn_module_type.inject_to_model(
+                    model,
+                    use_triton=use_triton,
+                    group_size=quantize_config.group_size,
+                    use_cuda_fp16=use_cuda_fp16,
+                    desc_act=quantize_config.desc_act
+                )
         if inject_fused_mlp:
-            raise NotImplementedError()
+            if cls.fused_mlp_module_type is None:
+                logger.warning(f"{cls.__name__} hasn't fused mlp module yet, will skip inject fused mlp.")
+            else:
+                cls.fused_mlp_module_type.inject_to_model(
+                    model,
+                    use_triton=use_triton
+                )
 
         model.eval()
         # warmup triton
