@@ -7,6 +7,7 @@ from transformers import AutoConfig
 import transformers
 
 from ._const import SUPPORTED_MODELS, CPU, CUDA_0
+from ..utils.import_utils import dynamically_import_QuantLinear
 
 
 logger = getLogger(__name__)
@@ -89,13 +90,7 @@ def pack_model(
     autotune_warmup: bool = False,
     force_layer_back_to_cpu: bool = False
 ):
-    if use_triton:
-        from ..nn_modules.qlinear_triton import QuantLinear, autotune_warmup_linear
-    else:
-        if not desc_act or group_size == -1:
-            from ..nn_modules.qlinear_old import QuantLinear
-        else:
-            from ..nn_modules.qlinear import QuantLinear
+    QuantLinear = dynamically_import_QuantLinear(use_triton=use_triton, desc_act=desc_act, group_size=group_size)
 
     if force_layer_back_to_cpu:
         model.to(CPU)
@@ -117,6 +112,7 @@ def pack_model(
     logger.info('Model packed.')
 
     if use_triton and autotune_warmup:
+        from ..nn_modules.qlinear_triton import autotune_warmup_linear
         logger.warning(
             "using autotune_warmup will move model to GPU, make sure you have enough VRAM to load the whole model."
         )
