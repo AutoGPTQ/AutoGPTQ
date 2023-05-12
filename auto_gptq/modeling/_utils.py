@@ -46,7 +46,7 @@ def make_quant(module, names, bits, group_size, name='', use_triton=False, use_c
     if use_triton:
         from ..nn_modules.qlinear_triton import QuantLinear
     else:
-        if not desc_act or groupsize == -1:
+        if not desc_act or group_size == -1:
             from ..nn_modules.qlinear_old import QuantLinear
         else:
             from ..nn_modules.qlinear import QuantLinear
