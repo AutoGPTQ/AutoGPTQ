@@ -500,8 +500,6 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         **kwargs
     ):
         """load quantized model from local disk"""
-        if use_triton and warmup_triton:
-            from ..nn_modules.qlinear_triton import autotune_warmup_linear
 
         if device is None and not device_map and not max_memory:
             device_map = "auto"
@@ -635,6 +633,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         model.eval()
         # warmup triton
         if use_triton and warmup_triton:
+            from ..nn_modules.qlinear_triton import autotune_warmup_linear
             autotune_warmup_linear(model, seqlen=model.seqlen)
 
         return cls(model, True, quantize_config)
