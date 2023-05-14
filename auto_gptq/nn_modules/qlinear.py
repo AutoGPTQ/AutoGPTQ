@@ -21,7 +21,7 @@ class QuantLinear(nn.Module):
     def __init__(
         self,
         bits,
-        groupsize,
+        group_size,
         infeatures,
         outfeatures,
         bias,
@@ -34,7 +34,7 @@ class QuantLinear(nn.Module):
         self.infeatures = infeatures
         self.outfeatures = outfeatures
         self.bits = bits
-        self.groupsize = groupsize if groupsize != -1 else infeatures
+        self.group_size = group_size if group_size != -1 else infeatures
         self.maxq = 2 ** self.bits - 1
 
         self.register_buffer(
@@ -43,15 +43,15 @@ class QuantLinear(nn.Module):
         )
         self.register_buffer(
             'qzeros',
-            torch.zeros((math.ceil(infeatures / self.groupsize), outfeatures // 32 * self.bits), dtype=torch.int32)
+            torch.zeros((math.ceil(infeatures / self.group_size), outfeatures // 32 * self.bits), dtype=torch.int32)
         )
         self.register_buffer(
             'scales',
-            torch.zeros((math.ceil(infeatures / self.groupsize), outfeatures), dtype=torch.float16)
+            torch.zeros((math.ceil(infeatures / self.group_size), outfeatures), dtype=torch.float16)
         )
         self.register_buffer(
             'g_idx',
-            torch.tensor([i // self.groupsize for i in range(infeatures)], dtype=torch.int32)
+            torch.tensor([i // self.group_size for i in range(infeatures)], dtype=torch.int32)
         )
         if bias:
             self.register_buffer('bias', torch.zeros((outfeatures), dtype=torch.float16))
@@ -238,8 +238,19 @@ class QuantLinear(nn.Module):
                 raise NotImplementedError("Only 2,3,4,8 bits are supported.")
 
             weight = weight.reshape(weight.shape[0] * weight.shape[1], weight.shape[2])
-
-            weights = (self.scales[self.g_idx.long()] * (weight - zeros[self.g_idx.long()]))
+            num_itr = self.g_idx.shape[0]//x.shape[-1]
+            if num_itr == 1:
+                weights = (self.scales[self.g_idx.long()] * (weight - zeros[self.g_idx.long()]))
+            else:
+                num_dim = self.g_idx.shape[0]//num_itr
+                weights = []
+                for i in range(num_itr):
+                    scale_i = self.scales[:,i*num_dim:(i+1)*num_dim]
+                    weight_i = weight[:,i*num_dim:(i+1)*num_dim]
+                    zeros_i = zeros[:,i*num_dim:(i+1)*num_dim]
+                    g_idx_i = self.g_idx[i*num_dim:(i+1)*num_dim]
+                    weights.append(scale_i[g_idx_i.long()] * (weight_i - zeros_i[g_idx_i.long()]))
+                weights = torch.cat(weights,dim=1)
             out = torch.matmul(x.half(), weights)
         out = out.reshape(out_shape)
         out = out + self.bias if self.bias is not None else out
