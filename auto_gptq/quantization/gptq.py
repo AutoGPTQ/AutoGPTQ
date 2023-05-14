@@ -60,7 +60,7 @@ class GPTQ:
         self.H += inp.matmul(inp.t())
 
     def fasterquant(
-        self, blocksize=128, percdamp=.01, groupsize=-1, actorder=False
+        self, blocksize=128, percdamp=.01, group_size=-1, actorder=False
     ):
         W = self.layer.weight.data.clone()
         if isinstance(self.layer, nn.Conv2d):
@@ -115,11 +115,11 @@ class GPTQ:
                 w = W1[:, i]
                 d = Hinv1[i, i]
 
-                if groupsize != -1:
-                    if (i1 + i) % groupsize == 0:
-                        self.quantizer.find_params(W[:, (i1 + i):(i1 + i + groupsize)], weight=True)
+                if group_size != -1:
+                    if (i1 + i) % group_size == 0:
+                        self.quantizer.find_params(W[:, (i1 + i):(i1 + i + group_size)], weight=True)
 
-                    if ((i1 + i) // groupsize) - now_idx == -1:
+                    if ((i1 + i) // group_size) - now_idx == -1:
                         scale.append(self.quantizer.scale)
                         zero.append(self.quantizer.zero)
                         now_idx += 1
@@ -147,8 +147,8 @@ class GPTQ:
         logger.info(f'duration: {(time.time() - tick)}')
         logger.info(f'avg loss: {torch.sum(Losses).item() / self.nsamples}')
 
-        groupsize = groupsize if groupsize != -1 else self.columns
-        g_idx = [i // groupsize for i in range(self.columns)]
+        group_size = group_size if group_size != -1 else self.columns
+        g_idx = [i // group_size for i in range(self.columns)]
         g_idx = torch.tensor(g_idx, dtype=torch.int32, device=Q.device)
         if actorder:
             invperm = torch.argsort(perm)

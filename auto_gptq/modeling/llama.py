@@ -1,4 +1,20 @@
+from logging import getLogger
+from os.path import join, isfile
+from typing import Optional, Union
+
+import accelerate
+import torch
+import transformers
+from transformers import AutoConfig, AutoModelForCausalLM
+
+from ._const import *
+from ._utils import *
+
 from ._base import *
+from ..nn_modules.fused_llama_attn import FusedLlamaAttentionForQuantizedModel
+from ..nn_modules.fused_llama_mlp import FusedLlamaMLPForQuantizedModel
+
+logger = getLogger(__name__)
 
 
 class LlamaGPTQForCausalLM(BaseGPTQForCausalLM):
@@ -11,6 +27,9 @@ class LlamaGPTQForCausalLM(BaseGPTQForCausalLM):
         ["mlp.up_proj", "mlp.gate_proj"],
         ["mlp.down_proj"]
     ]
+
+    fused_attn_module_type = FusedLlamaAttentionForQuantizedModel
+    fused_mlp_module_type = FusedLlamaMLPForQuantizedModel
 
 
 __all__ = ["LlamaGPTQForCausalLM"]
