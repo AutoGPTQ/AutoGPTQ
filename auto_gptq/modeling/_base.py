@@ -17,6 +17,7 @@ from transformers.utils.hub import PushToHubMixin
 
 from ._const import *
 from ._utils import *
+from ..nn_modules._fused_base import FusedBaseAttentionModule, FusedBaseMLPModule
 from ..quantization import GPTQ
 from ..utils.data_utils import collate_data
 
@@ -68,6 +69,9 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
     outside_layer_modules: List[str] = None
     inside_layer_modules: List[List[str]] = None
     lm_head_name: str = "lm_head"
+
+    fused_attn_module_type: Optional[FusedBaseAttentionModule] = None
+    fused_mlp_module_type: Optional[FusedBaseMLPModule] = None
 
     def __init__(self, model: PreTrainedModel, quantized: bool, quantize_config: BaseQuantizeConfig):
         super().__init__()
@@ -141,6 +145,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         examples: List[Dict[str, Union[List[int], torch.LongTensor]]],
         batch_size: int = 1,
         use_triton: bool = False,
+        use_cuda_fp16: bool = True,
         autotune_warmup_after_quantized: bool = False,
         cache_examples_on_gpu: bool = True
     ):
@@ -264,6 +269,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                         sym=self.quantize_config.sym,
                         mse=False,
                     )
+
                 def add_batch(name):
                     def tmp(_, inp, out):
                         gptq[name].add_batch(inp[0].data, out.data)
@@ -297,7 +303,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                     logger.info(f'Quantizing {name} in layer {i + 1}/{len(layers)}...')
                     scale, zero, g_idx = gptq[name].fasterquant(
                         percdamp=self.quantize_config.damp_percent,
-                        groupsize=self.quantize_config.group_size,
+                        group_size=self.quantize_config.group_size,
                         actorder=self.quantize_config.desc_act
                     )
                     quantizers[f'{self.layers_block_name}.{i}.{name}'] = (
@@ -343,8 +349,9 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             bits=self.quantize_config.bits,
             group_size=self.quantize_config.group_size,
             use_triton=use_triton,
+            use_cuda_fp16=use_cuda_fp16,
             desc_act=self.quantize_config.desc_act,
-            autotune_warmup=autotune_warmup_after_quantized,
+            warmup_triton=autotune_warmup_after_quantized,
             force_layer_back_to_cpu=force_layer_back_to_cpu
         )
         if device_map:
@@ -477,22 +484,23 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
     def from_quantized(
         cls,
         save_dir: str,
-        device: str = "cpu",
-        use_safetensors: bool = False,
-        use_triton: bool = False,
-        max_memory: Optional[dict] = None,
         device_map: Optional[str] = None,
+        max_memory: Optional[dict] = None,
+        device: Optional[Union[str, int]] = None,
+        strict: bool = True,
+        use_triton: bool = False,
+        inject_fused_attention: bool = False,
+        inject_fused_mlp: bool = False,
+        use_cuda_fp16: bool = True,
         quantize_config: Optional[BaseQuantizeConfig] = None,
         model_basename: Optional[str] = None,
-        trust_remote_code: bool = False
+        use_safetensors: bool = False,
+        trust_remote_code: bool = False,
+        warmup_triton: bool = True,
+        **kwargs
     ):
         """load quantized model from local disk"""
-        if use_triton:
-            from ..nn_modules.qlinear_triton import autotune_warmup_linear
-
-            logger.warning("use_triton will force moving the whole model to GPU, make sure you have enough VRAM.")
-            device = "cuda:0"
-
+        # prepare configs and file names
         config = AutoConfig.from_pretrained(save_dir, trust_remote_code=trust_remote_code)
         if config.model_type not in SUPPORTED_MODELS:
             raise TypeError(f"{config.model_type} isn't supported yet.")
@@ -511,8 +519,9 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             model_save_name += ".bin"
 
         if not isfile(model_save_name):
-           raise FileNotFoundError(f"Could not find model at {model_save_name}")
+            raise FileNotFoundError(f"Could not find model at {model_save_name}")
 
+        # inject layers
         def skip(*args, **kwargs):
             pass
 
@@ -521,7 +530,12 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         torch.nn.init.normal_ = skip
 
         transformers.modeling_utils._init_weights = False
-        with accelerate.init_empty_weights():
+        if strict:
+            with accelerate.init_empty_weights():
+                torch.set_default_dtype(torch.half)
+                model = AutoModelForCausalLM.from_config(config, trust_remote_code=trust_remote_code)
+                torch.set_default_dtype(torch.float)
+        else:
             torch.set_default_dtype(torch.half)
             model = AutoModelForCausalLM.from_config(config, trust_remote_code=trust_remote_code)
             torch.set_default_dtype(torch.float)
@@ -531,20 +545,58 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             if any([name.startswith(ignore_layer) for ignore_layer in ignore_layers]):
                 logger.info(f"{name} not been quantized, will be ignored when make_quant.")
                 del layers[name]
+        if strict:
+            with accelerate.init_empty_weights():
+                make_quant(
+                    model,
+                    layers,
+                    quantize_config.bits,
+                    quantize_config.group_size,
+                    use_triton=use_triton,
+                    use_cuda_fp16=use_cuda_fp16,
+                    desc_act=quantize_config.desc_act
+                )
+            model.tie_weights()
+        else:
+            make_quant(
+                model,
+                layers,
+                quantize_config.bits,
+                quantize_config.group_size,
+                use_triton=use_triton,
+                use_cuda_fp16=use_cuda_fp16,
+                desc_act=quantize_config.desc_act
+            )
 
-        with accelerate.init_empty_weights():
-            make_quant(model, layers, quantize_config.bits, quantize_config.group_size, use_triton=use_triton, desc_act=quantize_config.desc_act)
-        model.tie_weights()
-
-        if max_memory and not device_map:
+        # load checkpoint and dispatch
+        if device is None and not device_map and not max_memory:
             device_map = "auto"
-        if not max_memory and not device_map:
-            device_map = {"": device}
+        if device is not None:
+            device = torch.device(device)
+            if not max_memory and not device_map:
+                device_map = {"": device.index if device.type == "cuda" else device.type}
+        if not device_map:
+            device_map = accelerate.infer_auto_device_map(
+                model, max_memory=max_memory,
+                no_split_module_classes=[cls.layer_type]
+            )
+        if strict:
+            model = accelerate.load_checkpoint_and_dispatch(
+                model,
+                model_save_name,
+                device_map,
+                max_memory,
+                no_split_module_classes=[cls.layer_type]
+            )
+        else:
+            if use_safetensors:
+                from safetensors.torch import load_file as safe_load
+                model.load_state_dict(safe_load(model_save_name), strict=False)
+            else:
+                model.load_state_dict(torch.load(model_save_name), strict=False)
+            model = accelerate.dispatch_model(model, device_map)
 
-        model = accelerate.load_checkpoint_and_dispatch(
-            model, model_save_name, device_map, max_memory, no_split_module_classes=[cls.layer_type]
-        )
-
+        # set seqlen
         model_config = model.config.to_dict()
         seq_len_keys = ["max_position_embeddings", "seq_length", "n_positions"]
         if any([k in model_config for k in seq_len_keys]):
@@ -556,10 +608,34 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             logger.warning("can't get model's sequence length from model config, will set to 4096.")
             model.seqlen = 4096
 
-        model.eval()
+        if inject_fused_attention:
+            if cls.fused_attn_module_type is None:
+                logger.warning(f"{cls.__name__} hasn't fused attention module yet, will skip inject fused attention.")
+            else:
+                cls.fused_attn_module_type.inject_to_model(
+                    model,
+                    use_triton=use_triton,
+                    group_size=quantize_config.group_size,
+                    use_cuda_fp16=use_cuda_fp16,
+                    desc_act=quantize_config.desc_act
+                )
+        if inject_fused_mlp:
+            if cls.fused_mlp_module_type is None:
+                logger.warning(f"{cls.__name__} hasn't fused mlp module yet, will skip inject fused mlp.")
+            else:
+                cls.fused_mlp_module_type.inject_to_model(
+                    model,
+                    use_triton=use_triton
+                )
 
-        if use_triton:
-            autotune_warmup_linear(model, seqlen=model.seqlen)
+        model.eval()
+        # warmup triton
+        if use_triton and warmup_triton:
+            from ..nn_modules.qlinear_triton import QuantLinear
+            QuantLinear.warmup(model, seqlen=model.seqlen)
+
+            if inject_fused_mlp and cls.fused_mlp_module_type is not None:
+                cls.fused_mlp_module_type.warmup(model, seqlen=model.seqlen)
 
         return cls(model, True, quantize_config)
 

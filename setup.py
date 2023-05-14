@@ -7,14 +7,14 @@ try:
 except ImportError:
     TORCH_AVAILABLE = False
 
-version = "0.1.0"
+version = "0.2.0-dev"
 
 requirements = [
     "accelerate>=0.18.0",
     "datasets",
     "numpy",
     "rouge",
-    "torch>=1.13.0",
+    "torch>=2.0.0",
     "safetensors",
     "transformers>=4.26.1"
 ]
@@ -24,7 +24,7 @@ extras_require = {
     "triton": ["triton>=2.0.0"]
 }
 
-include_dirs=["quant_cuda"]
+include_dirs = ["quant_cuda"]
 
 if TORCH_AVAILABLE:
     BUILD_CUDA_EXT = int(os.environ.get('BUILD_CUDA_EXT', '1')) == 1

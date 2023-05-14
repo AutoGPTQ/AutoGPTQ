@@ -1,15 +1,16 @@
-from typing import Optional
+from inspect import signature
+from typing import Optional, Union
 
 from ._base import BaseQuantizeConfig, BaseGPTQForCausalLM
 from ._utils import check_and_get_model_type
 from .bloom import BloomGPTQForCausalLM
+from .codegen import CodeGenGPTQForCausalLM
 from .gpt_neox import GPTNeoXGPTQForCausalLM
 from .gptj import GPTJGPTQForCausalLM
 from .gpt2 import GPT2GPTQForCausalLM
 from .llama import LlamaGPTQForCausalLM
 from .moss import MOSSGPTQForCausalLM
 from .opt import OPTGPTQForCausalLM
-from .codegen import CodeGenGPTQForCausalLM
 
 
 GPTQ_CAUSAL_LM_MODEL_MAP = {
@@ -52,26 +53,40 @@ class AutoGPTQForCausalLM:
     def from_quantized(
         cls,
         save_dir: str,
-        device: str = "cpu",
-        use_safetensors: bool = False,
-        use_triton: bool = False,
-        max_memory: Optional[dict] = None,
         device_map: Optional[str] = None,
+        max_memory: Optional[dict] = None,
+        device: Optional[Union[str, int]] = None,
+        strict: bool = True,
+        use_triton: bool = False,
+        inject_fused_attention: bool = False,
+        inject_fused_mlp: bool = False,
+        use_cuda_fp16: bool = True,
         quantize_config: Optional[BaseQuantizeConfig] = None,
         model_basename: Optional[str] = None,
-        trust_remote_code: bool = False
+        use_safetensors: bool = False,
+        trust_remote_code: bool = False,
+        warmup_triton: bool = True,
+        **kwargs
     ) -> BaseGPTQForCausalLM:
         model_type = check_and_get_model_type(save_dir)
-        return GPTQ_CAUSAL_LM_MODEL_MAP[model_type].from_quantized(
+        quant_func = GPTQ_CAUSAL_LM_MODEL_MAP[model_type].from_quantized
+        keywords = {key: kwargs[key] for key in signature(quant_func).parameters if key in kwargs}
+        return quant_func(
             save_dir=save_dir,
-            device=device,
-            use_safetensors=use_safetensors,
-            use_triton=use_triton,
-            max_memory=max_memory,
             device_map=device_map,
+            max_memory=max_memory,
+            device=device,
+            strict=strict,
+            use_triton=use_triton,
+            inject_fused_attention=inject_fused_attention,
+            inject_fused_mlp=inject_fused_mlp,
+            use_cuda_fp16=use_cuda_fp16,
             quantize_config=quantize_config,
             model_basename=model_basename,
-            trust_remote_code=trust_remote_code
+            use_safetensors=use_safetensors,
+            trust_remote_code=trust_remote_code,
+            warmup_triton=warmup_triton,
+            **keywords
         )
 
 
