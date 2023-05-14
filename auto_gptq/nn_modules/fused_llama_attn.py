@@ -1,12 +1,14 @@
+import math
 import torch
+import torch.nn as nn
 from torch.nn import functional as F
 from transformers.models.llama.modeling_llama import LlamaAttention, apply_rotary_pos_emb
 
-from ._fused_base import FusedBaseModule
-from ..utils.import_utils import dynamically_import_QuantLinear
+from ._fused_base import FusedBaseAttentionModule
+from ..utils.import_utils import compare_pytorch_version, dynamically_import_QuantLinear
 
 
-class FusedLlamaAttentionForQuantizedModel(FusedBaseModule):
+class FusedLlamaAttentionForQuantizedModel(FusedBaseAttentionModule):
     """Multi-headed attention from 'Attention Is All You Need' paper"""
 
     def __init__(
@@ -77,8 +79,41 @@ class FusedLlamaAttentionForQuantizedModel(FusedBaseModule):
 
         past_key_value = (key_states, value_states) if use_cache else None
 
-        with torch.backends.cuda.sdp_kernel(enable_math=False):
-            attn_output = F.scaled_dot_product_attention(query_states, key_states, value_states, is_causal=is_causal)
+        if compare_pytorch_version("v2.0.0", op="eq"):
+            attn_output = F.scaled_dot_product_attention(
+                query_states,
+                key_states,
+                value_states,
+                attn_mask=None if is_causal else attention_mask,
+                is_causal=is_causal
+            )
+            attn_weights = None
+        else:
+            attn_weights = torch.matmul(query_states, key_states.transpose(2, 3)) / math.sqrt(self.head_dim)
+
+            if attn_weights.size() != (bsz, self.num_heads, q_len, kv_seq_len):
+                raise ValueError(
+                    f"Attention weights should be of size {(bsz * self.num_heads, q_len, kv_seq_len)}, but is"
+                    f" {attn_weights.size()}"
+                )
+
+            if attention_mask is not None:
+                if attention_mask.size() != (bsz, 1, q_len, kv_seq_len):
+                    raise ValueError(
+                        f"Attention mask should be of size {(bsz, 1, q_len, kv_seq_len)}, but is {attention_mask.size()}"
+                    )
+                attn_weights = attn_weights + attention_mask
+                attn_weights = torch.max(attn_weights, torch.tensor(torch.finfo(attn_weights.dtype).min))
+
+            # upcast attention to fp32
+            attn_weights = nn.functional.softmax(attn_weights, dim=-1, dtype=torch.float32).to(query_states.dtype)
+            attn_output = torch.matmul(attn_weights, value_states)
+
+        if attn_output.size() != (bsz, self.num_heads, q_len, self.head_dim):
+            raise ValueError(
+                f"`attn_output` should be of size {(bsz, self.num_heads, q_len, self.head_dim)}, but is"
+                f" {attn_output.size()}"
+            )
 
         attn_output = attn_output.transpose(1, 2)
         attn_output = attn_output.reshape(bsz, q_len, self.hidden_size)
@@ -110,14 +145,18 @@ class FusedLlamaAttentionForQuantizedModel(FusedBaseModule):
             scales = torch.cat([q_proj.scales, k_proj.scales, v_proj.scales], dim=1)
             g_idx = torch.cat([q_proj.g_idx, k_proj.g_idx, v_proj.g_idx], dim=0)
             bias = torch.cat([q_proj.bias, k_proj.bias, v_proj.bias], dim=0) if q_proj.bias is not None else None
-            if (not (desc_act) or group_size == -1) and not use_triton:
-                qkv_layer = QuantLinear(q_proj.bits, q_proj.group_size, q_proj.infeatures,
-                                        q_proj.outfeatures + k_proj.outfeatures + v_proj.outfeatures,
-                                        True if q_proj.bias is not None else False, use_cuda_fp16=use_cuda_fp16)
-            else:
-                qkv_layer = QuantLinear(q_proj.bits, q_proj.group_size, q_proj.infeatures,
-                                        q_proj.outfeatures + k_proj.outfeatures + v_proj.outfeatures,
-                                        True if q_proj.bias is not None else False)
+
+            qlinear_args = (
+                q_proj.bits,
+                q_proj.group_size,
+                q_proj.infeatures,
+                q_proj.outfeatures + k_proj.outfeatures + v_proj.outfeatures,
+                True if q_proj.bias is not None else False,
+            )
+            qlinear_kwargs = dict()
+            if (not desc_act or group_size == -1) and not use_triton:
+                qlinear_kwargs["use_cuda_fp16"] = use_cuda_fp16
+            qkv_layer = QuantLinear(*qlinear_args, **qlinear_kwargs)
             qkv_layer.qweight = qweights
             qkv_layer.qzeros = qzeros
             qkv_layer.scales = scales

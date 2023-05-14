@@ -14,7 +14,7 @@ requirements = [
     "datasets",
     "numpy",
     "rouge",
-    "torch>=2.0.0",
+    "torch>=1.13.0",
     "safetensors",
     "transformers>=4.26.1"
 ]
