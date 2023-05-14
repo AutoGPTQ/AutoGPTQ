@@ -7,7 +7,7 @@ logger = getLogger(__name__)
 try:
     import triton
     import triton.language as tl
-    from .triton_utils import custom_autotune
+    from . import custom_autotune
 
 
     # code based https://github.com/fpgaminer/GPTQ-triton
@@ -357,11 +357,6 @@ try:
 except ImportError:
     logger.error('triton not installed.')
     raise
-
-
-ACT2FN = {
-    "silu": silu
-}
 
 
 def quant_matmul_248(input, qweight, scales, qzeros, g_idx, bits, maxq):

@@ -500,14 +500,6 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         **kwargs
     ):
         """load quantized model from local disk"""
-
-        if device is None and not device_map and not max_memory:
-            device_map = "auto"
-        if device is not None:
-            device = torch.device(device)
-            if not max_memory and not device_map:
-                device_map = {"": device.index if device.type == "cuda" else device.type}
-
         # prepare configs and file names
         config = AutoConfig.from_pretrained(save_dir, trust_remote_code=trust_remote_code)
         if config.model_type not in SUPPORTED_MODELS:
@@ -577,6 +569,17 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             )
 
         # load checkpoint and dispatch
+        if device is None and not device_map and not max_memory:
+            device_map = "auto"
+        if device is not None:
+            device = torch.device(device)
+            if not max_memory and not device_map:
+                device_map = {"": device.index if device.type == "cuda" else device.type}
+        if not device_map:
+            device_map = accelerate.infer_auto_device_map(
+                model, max_memory=max_memory,
+                no_split_module_classes=[cls.layer_type]
+            )
         if strict:
             model = accelerate.load_checkpoint_and_dispatch(
                 model,
@@ -591,11 +594,6 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                 model.load_state_dict(safe_load(model_save_name), strict=False)
             else:
                 model.load_state_dict(torch.load(model_save_name), strict=False)
-            if device_map == "auto":
-                device_map = accelerate.infer_auto_device_map(
-                    model, max_memory=max_memory,
-                    no_split_module_classes=[cls.layer_type]
-                )
             model = accelerate.dispatch_model(model, device_map)
 
         # set seqlen

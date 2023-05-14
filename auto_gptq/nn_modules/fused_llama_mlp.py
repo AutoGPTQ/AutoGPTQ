@@ -13,7 +13,7 @@ try:
     import triton
     import triton.language as tl
     from .triton_utils import custom_autotune
-    from .triton_utils.kernels import ACT2FN
+    from .triton_utils.kernels import silu
 
 
     @custom_autotune.autotune(
@@ -219,7 +219,7 @@ try:
             g1_ptrs += BLOCK_SIZE_K
             g2_ptrs += BLOCK_SIZE_K
 
-        accumulator1 = ACT2FN["silu"](accumulator1)
+        accumulator1 = silu(accumulator1)
         c = accumulator1 * accumulator2
         c = c.to(tl.float16)
         c_ptrs = c_ptr + stride_cm * offs_am[:, None] + stride_cn * offs_bn[None, :]
