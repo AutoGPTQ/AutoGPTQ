@@ -13,70 +13,111 @@ try:
     import triton
     import triton.language as tl
     from .triton_utils import custom_autotune
+    from .triton_utils.kernels import ACT2FN
 
-    # code based https://github.com/fpgaminer/GPTQ-triton
+
     @custom_autotune.autotune(
         configs=[
-            triton.Config({
-                'BLOCK_SIZE_M': 256,
-                'BLOCK_SIZE_N': 64,
-                'BLOCK_SIZE_K': 32,
-                'GROUP_SIZE_M': 8
-            }, num_stages=4, num_warps=4),
-            triton.Config({
-                'BLOCK_SIZE_M': 64,
-                'BLOCK_SIZE_N': 256,
-                'BLOCK_SIZE_K': 32,
-                'GROUP_SIZE_M': 8
-            }, num_stages=4, num_warps=4),
-            triton.Config({
-                'BLOCK_SIZE_M': 128,
-                'BLOCK_SIZE_N': 128,
-                'BLOCK_SIZE_K': 32,
-                'GROUP_SIZE_M': 8
-            }, num_stages=4, num_warps=4),
-            triton.Config({
-                'BLOCK_SIZE_M': 128,
-                'BLOCK_SIZE_N': 64,
-                'BLOCK_SIZE_K': 32,
-                'GROUP_SIZE_M': 8
-            }, num_stages=4, num_warps=4),
-            triton.Config({
-                'BLOCK_SIZE_M': 64,
-                'BLOCK_SIZE_N': 128,
-                'BLOCK_SIZE_K': 32,
-                'GROUP_SIZE_M': 8
-            }, num_stages=4, num_warps=4),
-            triton.Config({
-                'BLOCK_SIZE_M': 128,
-                'BLOCK_SIZE_N': 32,
-                'BLOCK_SIZE_K': 32,
-                'GROUP_SIZE_M': 8
-            }, num_stages=4, num_warps=4),  # 3090
-            triton.Config({
-                'BLOCK_SIZE_M': 128,
-                'BLOCK_SIZE_N': 16,
-                'BLOCK_SIZE_K': 32,
-                'GROUP_SIZE_M': 8
-            }, num_stages=4, num_warps=4),  # 3090
-            triton.Config({
-                'BLOCK_SIZE_M': 32,
-                'BLOCK_SIZE_N': 32,
-                'BLOCK_SIZE_K': 128,
-                'GROUP_SIZE_M': 8
-            }, num_stages=2, num_warps=4),  # 3090
-            triton.Config({
-                'BLOCK_SIZE_M': 64,
-                'BLOCK_SIZE_N': 16,
-                'BLOCK_SIZE_K': 64,
-                'GROUP_SIZE_M': 8
-            }, num_stages=4, num_warps=4),  # 3090
-            triton.Config({
-                'BLOCK_SIZE_M': 64,
-                'BLOCK_SIZE_N': 32,
-                'BLOCK_SIZE_K': 64,
-                'GROUP_SIZE_M': 8
-            }, num_stages=4, num_warps=4),  # 3090
+            triton.Config(
+                {
+                    'BLOCK_SIZE_M': 256,
+                    'BLOCK_SIZE_N': 64,
+                    'BLOCK_SIZE_K': 32,
+                    'GROUP_SIZE_M': 8
+                },
+                num_stages=4,
+                num_warps=4
+            ),
+            triton.Config(
+                {
+                    'BLOCK_SIZE_M': 64,
+                    'BLOCK_SIZE_N': 256,
+                    'BLOCK_SIZE_K': 32,
+                    'GROUP_SIZE_M': 8
+                },
+                num_stages=4,
+                num_warps=4
+            ),
+            triton.Config(
+                {
+                    'BLOCK_SIZE_M': 128,
+                    'BLOCK_SIZE_N': 128,
+                    'BLOCK_SIZE_K': 32,
+                    'GROUP_SIZE_M': 8
+                },
+                num_stages=4,
+                num_warps=4
+            ),
+            triton.Config(
+                {
+                    'BLOCK_SIZE_M': 128,
+                    'BLOCK_SIZE_N': 64,
+                    'BLOCK_SIZE_K': 32,
+                    'GROUP_SIZE_M': 8
+                },
+                num_stages=4,
+                num_warps=4
+            ),
+            triton.Config(
+                {
+                    'BLOCK_SIZE_M': 64,
+                    'BLOCK_SIZE_N': 128,
+                    'BLOCK_SIZE_K': 32,
+                    'GROUP_SIZE_M': 8
+                },
+                num_stages=4,
+                num_warps=4
+            ),
+            triton.Config(
+                {
+                    'BLOCK_SIZE_M': 128,
+                    'BLOCK_SIZE_N': 32,
+                    'BLOCK_SIZE_K': 32,
+                    'GROUP_SIZE_M': 8
+                },
+                num_stages=4,
+                num_warps=4
+            ),  # 3090
+            triton.Config(
+                {
+                    'BLOCK_SIZE_M': 128,
+                    'BLOCK_SIZE_N': 16,
+                    'BLOCK_SIZE_K': 32,
+                    'GROUP_SIZE_M': 8
+                },
+                num_stages=4,
+                num_warps=4
+            ),  # 3090
+            triton.Config(
+                {
+                    'BLOCK_SIZE_M': 32,
+                    'BLOCK_SIZE_N': 32,
+                    'BLOCK_SIZE_K': 128,
+                    'GROUP_SIZE_M': 8
+                },
+                num_stages=2,
+                num_warps=4
+            ),  # 3090
+            triton.Config(
+                {
+                    'BLOCK_SIZE_M': 64,
+                    'BLOCK_SIZE_N': 16,
+                    'BLOCK_SIZE_K': 64,
+                    'GROUP_SIZE_M': 8
+                },
+                num_stages=4,
+                num_warps=4
+            ),  # 3090
+            triton.Config(
+                {
+                    'BLOCK_SIZE_M': 64,
+                    'BLOCK_SIZE_N': 32,
+                    'BLOCK_SIZE_K': 64,
+                    'GROUP_SIZE_M': 8
+                },
+                num_stages=4,
+                num_warps=4
+            ),  # 3090
         ],
         key=['M', 'N', 'K'],
         nearest_power_of_two=True,
@@ -87,8 +128,21 @@ try:
         },
     )
     @triton.jit
-    def fusedmatmul_248_kernel(a_ptr, c_ptr, b1_ptr, scales1_ptr, zeros1_ptr, g1_ptr, b2_ptr, scales2_ptr, zeros2_ptr, g2_ptr, M, N, K, bits, maxq, stride_am, stride_ak, stride_bk, stride_bn,
-                               stride_cm, stride_cn, stride_scales, stride_zeros, BLOCK_SIZE_M: tl.constexpr, BLOCK_SIZE_N: tl.constexpr, BLOCK_SIZE_K: tl.constexpr, GROUP_SIZE_M: tl.constexpr):
+    def quant_fused_matmul_248_kernel(
+        a_ptr, c_ptr, b1_ptr,
+        scales1_ptr, zeros1_ptr,
+        g1_ptr, b2_ptr,
+        scales2_ptr, zeros2_ptr,
+        g2_ptr,
+        M, N, K,
+        bits, maxq,
+        stride_am, stride_ak,
+        stride_bk, stride_bn,
+        stride_cm, stride_cn,
+        stride_scales, stride_zeros,
+        BLOCK_SIZE_M: tl.constexpr, BLOCK_SIZE_N: tl.constexpr, BLOCK_SIZE_K: tl.constexpr,
+        GROUP_SIZE_M: tl.constexpr
+    ):
         """
         Computes: C = silu(A * B1) * (A * B2)
         A is of shape (M, K) float16
@@ -165,18 +219,15 @@ try:
             g1_ptrs += BLOCK_SIZE_K
             g2_ptrs += BLOCK_SIZE_K
 
-        accumulator1 = silu(accumulator1)
+        accumulator1 = ACT2FN["silu"](accumulator1)
         c = accumulator1 * accumulator2
         c = c.to(tl.float16)
         c_ptrs = c_ptr + stride_cm * offs_am[:, None] + stride_cn * offs_bn[None, :]
         c_mask = (offs_am[:, None] < M) & (offs_bn[None, :] < N)
         tl.store(c_ptrs, c, mask=c_mask)
-
-    @triton.jit
-    def silu(x):
-        return x * tl.sigmoid(x)
 except:
-    print('triton not installed.')
+    logger.error('triton not installed.')
+    raise
 
 
 class FusedLlamaMLPForQuantizedModel(FusedBaseMLPModule):
@@ -215,9 +266,18 @@ class FusedLlamaMLPForQuantizedModel(FusedBaseMLPModule):
             N = self.intermediate_size
             c = torch.empty((M, N), device=x.device, dtype=torch.float16)
             grid = lambda META: (triton.cdiv(M, META['BLOCK_SIZE_M']) * triton.cdiv(N, META['BLOCK_SIZE_N']), )
-            fusedmatmul_248_kernel[grid](x, c, self.gate_proj_qweight, self.gate_proj_scales, self.gate_proj_qzeros, self.gate_proj_g_idx, self.up_proj_qweight, self.up_proj_scales,
-                                         self.up_proj_qzeros, self.up_proj_g_idx, M, N, K, self.bits, self.maxq, x.stride(0), x.stride(1), self.gate_proj_qweight.stride(0),
-                                         self.gate_proj_qweight.stride(1), c.stride(0), c.stride(1), self.gate_proj_scales.stride(0), self.gate_proj_qzeros.stride(0))
+            quant_fused_matmul_248_kernel[grid](
+                x, c, self.gate_proj_qweight,
+                self.gate_proj_scales, self.gate_proj_qzeros, self.gate_proj_g_idx,
+                self.up_proj_qweight,
+                self.up_proj_scales, self.up_proj_qzeros, self.up_proj_g_idx,
+                M, N, K,
+                self.bits, self.maxq,
+                x.stride(0), x.stride(1),
+                self.gate_proj_qweight.stride(0), self.gate_proj_qweight.stride(1),
+                c.stride(0), c.stride(1),
+                self.gate_proj_scales.stride(0), self.gate_proj_qzeros.stride(0)
+            )
             c = c.reshape(out_shape)
             return c
 
@@ -251,7 +311,7 @@ class FusedLlamaMLPForQuantizedModel(FusedBaseMLPModule):
             if not isinstance(m, LlamaMLP):
                 continue
 
-            mlp = FusedLlamaMLPForQuantizedModel(m.gate_proj, m.down_proj, m.up_proj)
+            mlp = cls(m.gate_proj, m.down_proj, m.up_proj)
 
             if '.' in name:
                 parent_name = name.rsplit('.', 1)[0]
@@ -264,37 +324,31 @@ class FusedLlamaMLPForQuantizedModel(FusedBaseMLPModule):
 
             setattr(parent, child_name, mlp)
 
+    @classmethod
+    def warmup(cls, model, transpose=False, seqlen=2048):
+        from tqdm import tqdm
 
-def autotune_warmup_fused(model, seqlen=2048):
-    """
-    Pre-tunes the quantized kernel
-    """
-    from tqdm import tqdm
+        kn_values = {}
 
-    kn_values = {}
+        for _, m in model.named_modules():
+            if not isinstance(m, cls):
+                continue
 
-    for _, m in model.named_modules():
-        if not isinstance(m, FusedLlamaMLPForQuantizedModel):
-            continue
+            k = m.infeatures
+            n = m.intermediate_size
 
-        k = m.infeatures
-        n = m.intermediate_size
+            if (k, n) not in kn_values:
+                kn_values[(k, n)] = m
 
-        if (k, n) not in kn_values:
-            kn_values[(k, n)] = m
-
-    logger.info(f'Found {len(kn_values)} unique fused mlp KN values.')
-    logger.info('Warming up autotune cache ...')
-    with torch.no_grad():
-        for m in tqdm(range(0, math.ceil(math.log2(seqlen)) + 1)):
-            m = 2 ** m
-            for (k, n), (modules) in kn_values.items():
-                a = torch.randn(m, k, dtype=torch.float16, device='cuda')
-                modules.triton_llama_mlp(a)
-
-        for (k, n), (modules) in kn_values.items():
-            a = torch.randn(m, k, dtype=torch.float16, device='cuda')
-    del kn_values
+        logger.info(f'Found {len(kn_values)} unique fused mlp KN values.')
+        logger.info('Warming up autotune cache ...')
+        with torch.no_grad():
+            for m in tqdm(range(0, math.ceil(math.log2(seqlen)) + 1)):
+                m = 2 ** m
+                for (k, n), (modules) in kn_values.items():
+                    a = torch.randn(m, k, dtype=torch.float16, device=model.device)
+                    modules.triton_llama_mlp(a)
+        del kn_values
 
 
-__all__ = ["FusedLlamaMLPForQuantizedModel", "autotune_warmup_fused"]
+__all__ = ["FusedLlamaMLPForQuantizedModel"]

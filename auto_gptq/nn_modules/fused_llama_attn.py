@@ -124,7 +124,7 @@ class FusedLlamaAttentionForQuantizedModel(FusedBaseModule):
             qkv_layer.g_idx = g_idx
             qkv_layer.bias = bias
 
-            attn = FusedLlamaAttentionForQuantizedModel(m.hidden_size, m.num_heads, qkv_layer, m.o_proj, m.rotary_emb)
+            attn = cls(m.hidden_size, m.num_heads, qkv_layer, m.o_proj, m.rotary_emb)
 
             if '.' in name:
                 parent_name = name.rsplit('.', 1)[0]

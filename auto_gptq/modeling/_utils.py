@@ -87,7 +87,7 @@ def pack_model(
     use_triton=False,
     use_cuda_fp16=True,
     desc_act=False,
-    autotune_warmup: bool = False,
+    warmup_triton: bool = False,
     force_layer_back_to_cpu: bool = False
 ):
     QuantLinear = dynamically_import_QuantLinear(use_triton=use_triton, desc_act=desc_act, group_size=group_size)
@@ -111,12 +111,11 @@ def pack_model(
         qlayers[name].to(layer_device)
     logger.info('Model packed.')
 
-    if use_triton and autotune_warmup:
-        from ..nn_modules.qlinear_triton import autotune_warmup_linear
+    if use_triton and warmup_triton:
         logger.warning(
             "using autotune_warmup will move model to GPU, make sure you have enough VRAM to load the whole model."
         )
-        autotune_warmup_linear(model.to(CUDA_0), seqlen=model.seqlen)
+        QuantLinear.warmup(model.to(CUDA_0), seqlen=model.seqlen)
 
 
 def check_and_get_model_type(model_dir):

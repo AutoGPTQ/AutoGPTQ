@@ -351,7 +351,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             use_triton=use_triton,
             use_cuda_fp16=use_cuda_fp16,
             desc_act=self.quantize_config.desc_act,
-            autotune_warmup=autotune_warmup_after_quantized,
+            warmup_triton=autotune_warmup_after_quantized,
             force_layer_back_to_cpu=force_layer_back_to_cpu
         )
         if device_map:
@@ -633,8 +633,11 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         model.eval()
         # warmup triton
         if use_triton and warmup_triton:
-            from ..nn_modules.qlinear_triton import autotune_warmup_linear
-            autotune_warmup_linear(model, seqlen=model.seqlen)
+            from ..nn_modules.qlinear_triton import QuantLinear
+            QuantLinear.warmup(model, seqlen=model.seqlen)
+
+            if inject_fused_mlp and cls.fused_mlp_module_type is not None:
+                cls.fused_mlp_module_type.warmup(model, seqlen=model.seqlen)
 
         return cls(model, True, quantize_config)
 
