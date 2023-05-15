@@ -1,4 +1,4 @@
-from typing import Optional, Union
+from typing import Dict, Optional, Union
 
 from ._base import BaseQuantizeConfig, BaseGPTQForCausalLM
 from ._utils import check_and_get_model_type
@@ -50,7 +50,7 @@ class AutoGPTQForCausalLM:
     def from_quantized(
         cls,
         save_dir: str,
-        device_map: Optional[str] = None,
+        device_map: Optional[Union[str, Dict[str, Union[str, int]]]] = None,
         max_memory: Optional[dict] = None,
         device: Optional[Union[str, int]] = None,
         strict: bool = True,
