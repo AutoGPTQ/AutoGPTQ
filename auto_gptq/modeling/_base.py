@@ -513,12 +513,17 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
 
         model_save_name = join(save_dir, model_basename)
 
+        extensions = []
         if use_safetensors:
-            model_save_name += ".safetensors"
+            extensions.append(".safetensors")
         else:
-            model_save_name += ".bin"
+            extensions += [".bin", ".pt"]
 
-        if not isfile(model_save_name):
+        for ext in extensions:
+            if isfile(model_save_name + ext):
+                model_save_name += ext
+                break
+        else:
             raise FileNotFoundError(f"Could not find model at {model_save_name}")
 
         # inject layers
