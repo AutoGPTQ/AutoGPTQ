@@ -42,15 +42,14 @@ class LlamaGPTQForCausalLM(BaseGPTQForCausalLM):
 
     @classmethod
     def get_fused_attention_module(cls):
-        try:
-            if cls._fused_attention_module_type is None:
+        if cls._fused_attention_module_type is None:
+            try:
                 from ..nn_modules.fused_llama_attn import FusedLlamaAttentionForQuantizedModel
                 cls._fused_attention_module_type = FusedLlamaAttentionForQuantizedModel
-        except ImportError:
-            logger.error("Failed to import FusedLlamaAttentionForQuantizedModel")
-        except:
-            raise
-
+            except ImportError:
+                logger.error("Failed to import FusedLlamaAttentionForQuantizedModel")
+            except:
+                raise
         return cls._fused_attention_module_type
 
 __all__ = ["LlamaGPTQForCausalLM"]
