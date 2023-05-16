@@ -11,11 +11,8 @@ from ._const import *
 from ._utils import *
 
 from ._base import *
-from ..nn_modules.fused_llama_attn import FusedLlamaAttentionForQuantizedModel
-from ..nn_modules.fused_llama_mlp import FusedLlamaMLPForQuantizedModel
 
 logger = getLogger(__name__)
-
 
 class LlamaGPTQForCausalLM(BaseGPTQForCausalLM):
     layer_type = "LlamaDecoderLayer"
@@ -28,8 +25,32 @@ class LlamaGPTQForCausalLM(BaseGPTQForCausalLM):
         ["mlp.down_proj"]
     ]
 
-    fused_attn_module_type = FusedLlamaAttentionForQuantizedModel
-    fused_mlp_module_type = FusedLlamaMLPForQuantizedModel
+    _fused_attention_module_type = None
+    _fused_mlp_module_type = None
 
+    @classmethod
+    def get_fused_mlp_module(cls):
+        if cls._fused_mlp_module_type is None:
+            try:
+                from ..nn_modules.fused_llama_mlp import FusedLlamaMLPForQuantizedModel
+                cls._fused_mlp_module_type = FusedLlamaMLPForQuantizedModel
+            except ImportError:
+                logger.error("Triton required for Fused MLP but not found.")
+            except:
+                raise
+        return cls._fused_mlp_module_type
+
+    @classmethod
+    def get_fused_attention_module(cls):
+        try:
+            if cls._fused_attention_module_type is None:
+                from ..nn_modules.fused_llama_attn import FusedLlamaAttentionForQuantizedModel
+                cls._fused_attention_module_type = FusedLlamaAttentionForQuantizedModel
+        except ImportError:
+            logger.error("Failed to import FusedLlamaAttentionForQuantizedModel")
+        except:
+            raise
+
+        return cls._fused_attention_module_type
 
 __all__ = ["LlamaGPTQForCausalLM"]

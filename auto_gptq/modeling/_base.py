@@ -1,3 +1,4 @@
+import abc
 import copy
 import json
 import os
@@ -70,7 +71,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
     inside_layer_modules: List[List[str]] = None
     lm_head_name: str = "lm_head"
 
-    fused_attn_module_type: Optional[FusedBaseAttentionModule] = None
+    fused_attention_module_type: Optional[FusedBaseAttentionModule] = None
     fused_mlp_module_type: Optional[FusedBaseMLPModule] = None
 
     def __init__(self, model: PreTrainedModel, quantized: bool, quantize_config: BaseQuantizeConfig):
@@ -481,6 +482,16 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         return cls(model, False, quantize_config)
 
     @classmethod
+    def get_fused_mlp_module(cls):
+        logger.warning(f"{cls.__name__} doesn't support fused MLP at this time. Fused MLP not injected.")
+        return None
+
+    @classmethod
+    def get_fused_attention(cls):
+        logger.warning(f"{cls.__name__} doesn't support fused attention at this time. Fused Attention not injected..")
+        return None
+
+    @classmethod
     def from_quantized(
         cls,
         save_dir: str,
@@ -614,10 +625,9 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             model.seqlen = 4096
 
         if inject_fused_attention:
-            if cls.fused_attn_module_type is None:
-                logger.warning(f"{cls.__name__} hasn't fused attention module yet, will skip inject fused attention.")
-            else:
-                cls.fused_attn_module_type.inject_to_model(
+            cls.fused_attention_module_type = cls.get_fused_attention_module()
+            if cls.fused_attention_module_type is not None:
+                cls.fused_attention_module_type.inject_to_model(
                     model,
                     use_triton=use_triton,
                     group_size=quantize_config.group_size,
@@ -625,13 +635,15 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                     desc_act=quantize_config.desc_act
                 )
         if inject_fused_mlp:
-            if cls.fused_mlp_module_type is None:
-                logger.warning(f"{cls.__name__} hasn't fused mlp module yet, will skip inject fused mlp.")
+            if not use_triton:
+                logger.warning(f"Fused MLP is currently only supported with Triton. Skipping injecting fused MLP.")
             else:
-                cls.fused_mlp_module_type.inject_to_model(
-                    model,
-                    use_triton=use_triton
-                )
+                cls.fused_mlp_module_type = cls.get_fused_mlp_module()
+                if cls.fused_mlp_module_type is not None:
+                    cls.fused_mlp_module_type.inject_to_model(
+                        model,
+                        use_triton=use_triton
+                    )
 
         model.eval()
         # warmup triton
