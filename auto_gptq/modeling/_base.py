@@ -487,7 +487,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
 
     @classmethod
     def get_fused_attention(cls):
-        logger.warning(f"{cls.__name__} doesn't support fused attention at this time. Fused Attention not injected..")
+        logger.warning(f"{cls.__name__} doesn't support fused attention at this time. Fused attention not injected.")
         return None
 
     @classmethod
