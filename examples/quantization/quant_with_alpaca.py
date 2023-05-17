@@ -76,7 +76,7 @@ def main():
     parser.add_argument("--pretrained_model_dir", type=str)
     parser.add_argument("--quantized_model_dir", type=str, default=None)
     parser.add_argument("--bits", type=int, default=4, choices=[2, 3, 4, 8])
-    parser.add_argument("--group_size", type=int, default=128)
+    parser.add_argument("--group_size", type=int, default=128, help="group size, -1 means no grouping or full rank")
     parser.add_argument("--desc_act", action="store_true", help="whether to quantize with desc_act")
     parser.add_argument("--num_samples", type=int, default=128, help="how many samples will be used to quantize model")
     parser.add_argument("--save_and_reload", action="store_true", help="whether save quantized model to disk and reload back")
