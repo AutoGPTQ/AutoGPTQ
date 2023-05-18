@@ -34,9 +34,9 @@ pip install auto-gptq
 ```shell
 BUILD_CUDA_EXT=0 pip install auto-gptq
 ```
-同时为确保该拓展——`quant_cuda` 不再存在于你的虚拟环境，执行以下命令：
+同时为确保该拓展——`autogptq_cuda` 不再存在于你的虚拟环境，执行以下命令：
 ```shell
-pip uninstall quant_cuda -y
+pip uninstall autogptq_cuda -y
 ```
 #### 支持使用 LLaMa 模型
 若想要尝试 LLaMa 模型，但 `transformers` 版本不为支持该模型的最新版本，使用以下命令：
