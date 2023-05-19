@@ -69,7 +69,7 @@ class AutoGPTQForCausalLM:
         quant_func = GPTQ_CAUSAL_LM_MODEL_MAP[model_type].from_quantized
         keywords = {key: kwargs[key] for key in signature(quant_func).parameters if key in kwargs}
         return quant_func(
-            save_dir=save_dir,
+            model_name_or_path=save_dir,
             device_map=device_map,
             max_memory=max_memory,
             device=device,

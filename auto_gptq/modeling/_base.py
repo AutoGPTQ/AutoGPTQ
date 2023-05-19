@@ -516,7 +516,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
     @classmethod
     def from_quantized(
         cls,
-        save_dir: str,
+        model_name_or_path: str,
         device_map: Optional[str] = None,
         max_memory: Optional[dict] = None,
         device: Optional[Union[str, int]] = None,
@@ -533,18 +533,27 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         **kwargs
     ):
         """load quantized model from local disk"""
+        config = kwargs.pop("config", None)
+        cache_dir = kwargs.pop("cache_dir", None)
+        force_download = kwargs.pop("force_download", False)
+        resume_download = kwargs.pop("resume_download", False)
+        proxies = kwargs.pop("proxies", None)
+        local_files_only = kwargs.pop("local_files_only", False)
+        use_auth_token = kwargs.pop("use_auth_token", None)
+        revision = kwargs.pop("revision", None)
+        subfolder = kwargs.pop("subfolder", "")
+        commit_hash = kwargs.pop("_commit_hash", None)
+
         # prepare configs and file names
-        config = AutoConfig.from_pretrained(save_dir, trust_remote_code=trust_remote_code)
+        config = AutoConfig.from_pretrained(model_name_or_path, trust_remote_code=trust_remote_code)
         if config.model_type not in SUPPORTED_MODELS:
             raise TypeError(f"{config.model_type} isn't supported yet.")
 
         if quantize_config is None:
-            quantize_config = BaseQuantizeConfig.from_pretrained(save_dir, **kwargs)
+            quantize_config = BaseQuantizeConfig.from_pretrained(model_name_or_path, **kwargs)
 
         if model_basename is None:
             model_basename = f"gptq_model-{quantize_config.bits}bit-{quantize_config.group_size}g"
-
-        model_save_name = join(save_dir, model_basename)
 
         extensions = []
         if use_safetensors:
@@ -552,12 +561,40 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         else:
             extensions += [".bin", ".pt"]
 
-        for ext in extensions:
-            if isfile(model_save_name + ext):
-                model_save_name += ext
-                break
-        else:
-            raise FileNotFoundError(f"Could not find model at {model_save_name}")
+        model_name_or_path = str(model_name_or_path)
+        is_local = os.path.isdir(model_name_or_path)
+
+        resolved_archive_file = None
+        if is_local:
+            model_save_name = join(model_name_or_path, model_basename)
+
+            for ext in extensions:
+                if isfile(model_save_name + ext):
+                    resolved_archive_file = model_save_name + ext
+                    break
+        else: # remote
+            cached_file_kwargs = {
+                "cache_dir": cache_dir,
+                "force_download": force_download,
+                "proxies": proxies,
+                "resume_download": resume_download,
+                "local_files_only": local_files_only,
+                "use_auth_token": use_auth_token,
+                #"user_agent": user_agent,
+                "revision": revision,
+                "subfolder": subfolder,
+                "_raise_exceptions_for_missing_entries": False,
+                "_commit_hash": commit_hash,
+            }
+            
+            for ext in extensions:
+                resolved_archive_file = cached_file(model_name_or_path, model_basename + ext, **cached_file_kwargs)
+                if resolved_archive_file is not None: break
+        
+        if resolved_archive_file is None: # Could not find a model file to use
+            raise FileNotFoundError(f"Could not find model in {model_name_or_path}")
+                
+        model_save_name = resolved_archive_file
 
         # inject layers
         def skip(*args, **kwargs):
