@@ -13,7 +13,7 @@ import transformers
 from accelerate.hooks import remove_hook_from_module
 from safetensors.torch import save_file as safe_save
 from transformers import AutoConfig, AutoModelForCausalLM, PreTrainedModel
-from transformers.utils.hub import PushToHubMixin
+from transformers.utils.hub import PushToHubMixin, cached_file
 
 from ._const import *
 from ._utils import *
@@ -48,10 +48,43 @@ class BaseQuantizeConfig(PushToHubMixin):
             json.dump(self.to_dict(), f, indent=2)
 
     @classmethod
-    def from_pretrained(cls, save_dir: str):
-        with open(join(save_dir, "quantize_config.json"), "r", encoding="utf-8") as f:
-            return cls(**json.load(f))
+    def from_pretrained(cls, save_dir: str, **kwargs):
+        cache_dir = kwargs.pop("cache_dir", None)
+        force_download = kwargs.pop("force_download", False)
+        resume_download = kwargs.pop("resume_download", False)
+        proxies = kwargs.pop("proxies", None)
+        local_files_only = kwargs.pop("local_files_only", False)
+        use_auth_token = kwargs.pop("use_auth_token", None)
+        revision = kwargs.pop("revision", None)
+        subfolder = kwargs.pop("subfolder", None)
+        from_pipeline = kwargs.pop("_from_pipeline", None)
+        from_auto_class = kwargs.pop("_from_auto", False)
+        commit_hash = kwargs.pop("_commit_hash", None)
 
+        quantize_config_filename = "quantize_config.json"
+        if os.path.isdir(save_dir):  # Local
+            resolved_config_file = join(save_dir, quantize_config_filename)
+        else: # Remote
+               resolved_config_file = cached_file(
+                    save_dir,
+                    quantize_config_filename,
+                    cache_dir=cache_dir,
+                    force_download=force_download,
+                    resume_download=resume_download,
+                    proxies=proxies,
+                    use_auth_token=use_auth_token,
+                    revision=revision,
+                    local_files_only=local_files_only,
+                    subfolder=subfolder,
+                    #user_agent=user_agent,
+                    _raise_exceptions_for_missing_entries=False,
+                    _raise_exceptions_for_connection_errors=False,
+                    _commit_hash=commit_hash,
+               )
+
+        with open(resolved_config_file, "r", encoding="utf-8") as f:
+            return cls(**json.load(f))
+                
     def to_dict(self):
         return {
             "bits": self.bits,
@@ -506,7 +539,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             raise TypeError(f"{config.model_type} isn't supported yet.")
 
         if quantize_config is None:
-            quantize_config = BaseQuantizeConfig.from_pretrained(save_dir)
+            quantize_config = BaseQuantizeConfig.from_pretrained(save_dir, **kwargs)
 
         if model_basename is None:
             model_basename = f"gptq_model-{quantize_config.bits}bit-{quantize_config.group_size}g"
