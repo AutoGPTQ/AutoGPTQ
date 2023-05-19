@@ -664,7 +664,6 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                 resolved_archive_file = cached_file(model_name_or_path, model_basename + ext, **cached_file_kwargs)
                 if resolved_archive_file is not None:
                     cls._quantized_model_path = os.path.dirname(resolved_archive_file)
-                    print("quantized_model_path is", cls._quantized_model_path)
                     break
         
         if resolved_archive_file is None: # Could not find a model file to use
