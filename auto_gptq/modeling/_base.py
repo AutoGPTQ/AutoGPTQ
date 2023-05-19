@@ -13,7 +13,7 @@ import transformers
 from accelerate.hooks import remove_hook_from_module
 from safetensors.torch import save_file as safe_save
 from transformers import AutoConfig, AutoModelForCausalLM, PreTrainedModel
-from transformers.utils.hub import PushToHubMixin, cached_file
+from transformers.utils.hub import PushToHubMixin, cached_file, create_repo, create_commit, CommitOperationAdd
 
 from ._const import *
 from ._utils import *
@@ -102,6 +102,8 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
     outside_layer_modules: List[str] = None
     inside_layer_modules: List[List[str]] = None
     lm_head_name: str = "lm_head"
+    
+    _quantized_model_path: str = None
 
     fused_attn_module_type: Optional[FusedBaseAttentionModule] = None
     fused_mlp_module_type: Optional[FusedBaseMLPModule] = None
@@ -415,6 +417,73 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         """shortcut for model.prepare_inputs_for_generation"""
         return self.model.prepare_inputs_for_generation(*args, **kwargs)
 
+    def push_to_hub(
+        self,
+        repo_id: str,
+        save_dir: Optional[str] = None,
+        use_safetensors: Optional[bool] = True,
+        commit_message: str = "Push AutoGPTQ quantized model",
+        use_auth_token: Optional[Union[bool, str]] = None,
+        private: Optional[bool] = None,
+        token: Optional[Union[bool, str]] = None,
+        create_pr: bool = False,
+    ) -> str:
+        """
+        Upload the model to the Hugging Face Hub.
+
+        Parameters:
+            repo_id (`str`):
+                The name of the repository you want to push your tool to. It should contain your organization name when
+                pushing to a given organization.
+            save_dir (`str`, *optional*):
+                The name of the local folder to save the model to.
+                If the model has already been saved, this parameter can be omitted.
+            use_safetensors (`bool`, *optional*):
+                Save the model using `safetensors`.
+                If the model has already been saved, this parameter can be omitted.
+            commit_message (`str`, *optional*, defaults to `"Upload tool"`):
+                Message to commit while pushing.
+            use_auth_token (`bool` or `str`, *optional*):
+                The token to use as HTTP bearer authorization for remote files. If `True`, will use the token generated
+                when running `huggingface-cli login` (stored in `~/.huggingface`). Will default to `True` if `repo_url`
+                is not specified.
+            private (`bool`, *optional*):
+                Whether or not the repository created should be private.
+            token (`bool` or `str`, *optional*):
+                The token to use as HTTP bearer authorization for remote files. If unset, will use the token generated
+                when running `huggingface-cli login` (stored in `~/.huggingface`).
+            create_pr (`bool`, *optional*, defaults to `False`):
+                Whether or not to create a PR with the uploaded files or directly commit.
+        """
+        if self._quantized_model_path is None and save_dir is None:
+            raise ValueError("Quantized model is not saved and save_dir was not provided")
+        
+        if save_dir is not None:
+            logger.info(f"Saving model to {save_dir}")
+            self.save_quantized(save_dir, use_safetensors)
+
+        repo_url = create_repo(
+            repo_id=repo_id, token=token, private=private, exist_ok=True, repo_type="model"
+        )
+        repo_id = repo_url.repo_id
+
+        if self._quantized_model_path is not None:
+            work_dir = self._quantized_model_path
+            os.listdir(work_dir)
+            operations = [
+                CommitOperationAdd(path_or_fileobj=os.path.join(work_dir, f), path_in_repo=f)
+                for f in os.listdir(work_dir)
+            ]
+            logger.info(f"Uploading the following files to {repo_id}: {','.join(os.listdir(work_dir))}")
+            return create_commit(
+                repo_id=repo_id,
+                operations=operations,
+                commit_message=commit_message,
+                token=use_auth_token,
+                create_pr=create_pr,
+                repo_type="model",
+            )
+
     def save_quantized(self, save_dir: str, use_safetensors: bool = False):
         """save quantized model and configs to local disk"""
         os.makedirs(save_dir, exist_ok=True)
@@ -436,6 +505,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
 
         self.model.config.save_pretrained(save_dir)
         self.quantize_config.save_pretrained(save_dir)
+        self._quantized_model_path = save_dir
 
     def save_pretrained(self, save_dir: str, use_safetensors: bool = False, **kwargs):
         """alias of save_quantized"""
@@ -533,6 +603,8 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         **kwargs
     ):
         """load quantized model from local disk"""
+        
+        # Parameters related to loading from Hugging Face Hub
         config = kwargs.pop("config", None)
         cache_dir = kwargs.pop("cache_dir", None)
         force_download = kwargs.pop("force_download", False)
@@ -571,6 +643,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             for ext in extensions:
                 if isfile(model_save_name + ext):
                     resolved_archive_file = model_save_name + ext
+                    cls._quantized_model_path = model_name_or_path
                     break
         else: # remote
             cached_file_kwargs = {
@@ -589,7 +662,10 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             
             for ext in extensions:
                 resolved_archive_file = cached_file(model_name_or_path, model_basename + ext, **cached_file_kwargs)
-                if resolved_archive_file is not None: break
+                if resolved_archive_file is not None:
+                    cls._quantized_model_path = os.path.dirname(resolved_archive_file)
+                    print("quantized_model_path is", cls._quantized_model_path)
+                    break
         
         if resolved_archive_file is None: # Could not find a model file to use
             raise FileNotFoundError(f"Could not find model in {model_name_or_path}")
