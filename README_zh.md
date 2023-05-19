@@ -125,6 +125,59 @@ pipeline = TextGenerationPipeline(model=model, tokenizer=tokenizer)
 print(pipeline("auto-gptq is")[0]["generated_text"])
 ```
 
+以下示例演示了使用 Hugging Face Hub 进行模型下载和上传：
+```python
+from transformers import AutoTokenizer, TextGenerationPipeline
+from auto_gptq import AutoGPTQForCausalLM, BaseQuantizeConfig
+import logging
+
+logging.basicConfig(
+    format="%(asctime)s %(levelname)s [%(name)s] %(message)s", level=logging.INFO, datefmt="%Y-%m-%d %H:%M:%S"
+)
+
+pretrained_model = "facebook/opt-125m"
+quantized_model_dir = "opt-125m-4bit"
+
+tokenizer = AutoTokenizer.from_pretrained(pretrained_model, use_fast=True)
+examples = [
+    tokenizer(
+        "auto-gptq is an easy-to-use model quantization library with user-friendly apis, based on GPTQ algorithm."
+    )
+]
+
+quantize_config = BaseQuantizeConfig(
+    bits=4,  # quantize model to 4-bit
+    group_size=128,  # it is recommended to set the value to 128
+    desc_act=True # Use desc_act for higher inference quality from quantized model
+)
+
+# 加载未量化的模型，默认情况下，模型总是会被加载到 CPU 内存
+model = AutoGPTQForCausalLM.from_pretrained(pretrained_model, quantize_config)
+
+# 量化模型, 样本的数据类型应该为 List[Dict]，其中字典的键有且仅有 input_ids 和 attention_mask
+model.quantize(examples, use_triton=False)
+
+# 使用 safetensors 保存量化好的模型
+model.save_quantized(quantized_model_dir, use_safetensors=True)
+
+repo_id = f"YourUserName/{quantized_model_dir}"
+
+# 将量化模型推送到 Hugging Face Hub。
+# 要使用 use_auth_token=True，首先通过 huggingface-cli 登录。
+# 或者传递 explcit 令牌：use_auth_token="hf_xxxxxxx
+commit_message = f"AutoGPTQ model for {pretrained_model}: {quantize_config.bits}bits, gr{quantize_config.group_size}, desc_act={quantize_config.desc_act}"
+model.push_to_hub(repo_id, commit_message=commit_message, use_auth_token=True)
+
+# 或者你可以同时保存和推送 
+# model.push_to_hub(repo_id, quantized_model_dir, use_safetensors=True, commit_message=commit_message, use_auth_token=True)
+# load quantized model to the first GPU
+
+model = AutoGPTQForCausalLM.from_quantized(repo_id, device="cuda:0", use_safetensors=True, use_triton=False)
+
+# 使用 model.generate 执行推理
+print(tokenizer.decode(model.generate(**tokenizer("auto_gptq is", return_tensors="pt").to("cuda:0"))[0])
+```
+
 参考 [此样例脚本](examples/quantization/quant_with_alpaca.py) 以了解进阶的用法。
 
 ### 自定义模型
