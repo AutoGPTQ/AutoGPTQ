@@ -153,13 +153,13 @@ examples = [
 quantize_config = BaseQuantizeConfig(
     bits=4,  # quantize model to 4-bit
     group_size=128,  # it is recommended to set the value to 128
-    desc_act=True # Use desc_act for higher inference quality from quantized model
+    desc_act=True # use desc_act for higher inference quality from quantized model
 )
 
-# load un-quantized model, by default, the model will always be loaded into CPU memory
+# Load un-quantized model. By default, the model will always be loaded into CPU memory
 model = AutoGPTQForCausalLM.from_pretrained(pretrained_model, quantize_config)
 
-# quantize model, the examples should be list of dict whose keys can only be "input_ids" and "attention_mask"
+# Quantize model Examples should be list of dict whose keys can only be "input_ids" and "attention_mask"
 model.quantize(examples, use_triton=False)
 
 # save quantized model using safetensors
@@ -167,19 +167,19 @@ model.save_quantized(quantized_model_dir, use_safetensors=True)
 
 repo_id = f"YourUserName/{quantized_model_dir}"
 
-# push quantized model to Hugging Face Hub. 
+# Push quantized model to Hugging Face Hub. 
 # To use use_auth_token=True, Login first via huggingface-cli login.
 # Or pass explcit token with: use_auth_token="hf_xxxxxxx"
 commit_message = f"AutoGPTQ model for {pretrained_model}: {quantize_config.bits}bits, gr{quantize_config.group_size}, desc_act={quantize_config.desc_act}"
 model.push_to_hub(repo_id, commit_message=commit_message, use_auth_token=True)
 
-# Alternatively you can save and push at the same time:
-# model.push_to_hub(repo_id, quantized_model_dir, use_safetensors=True, commit_message=commit_message, use_auth_token=True)
-# load quantized model to the first GPU
+# Alternatively you can save and push at the same time with:
+# model.push_to_hub(repo_id, save_dir=quantized_model_dir, use_safetensors=True, commit_message=commit_message, use_auth_token=True)
 
+# Load quantized model to the first GPU
 model = AutoGPTQForCausalLM.from_quantized(repo_id, device="cuda:0", use_safetensors=True, use_triton=False)
 
-# inference with model.generate
+# Inference with model.generate
 print(tokenizer.decode(model.generate(**tokenizer("auto_gptq is", return_tensors="pt").to("cuda:0"))[0]))
 ```
 
