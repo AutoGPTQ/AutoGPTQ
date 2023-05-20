@@ -484,7 +484,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
     def from_quantized(
         cls,
         save_dir: str,
-        device_map: Optional[str] = None,
+        device_map: Optional[Union[str, Dict[str, Union[int, str]]]] = None,
         max_memory: Optional[dict] = None,
         device: Optional[Union[str, int]] = None,
         strict: bool = True,
@@ -574,12 +574,15 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             )
 
         # load checkpoint and dispatch
-        if device is None and not device_map and not max_memory:
-            device_map = "auto"
-        if device is not None:
-            device = torch.device(device)
-            if not max_memory and not device_map:
-                device_map = {"": device.index if device.type == "cuda" else device.type}
+        if isinstance(device_map, dict):
+            max_memory = None
+        else:
+            if device is None and not device_map and not max_memory:
+                device_map = "auto"
+            if device is not None:
+                device = torch.device(device)
+                if not max_memory and not device_map:
+                    device_map = {"": device.index if device.type == "cuda" else device.type}
         if not device_map:
             device_map = accelerate.infer_auto_device_map(
                 model, max_memory=max_memory,
