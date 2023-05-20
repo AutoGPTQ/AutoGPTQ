@@ -49,6 +49,7 @@ class BaseQuantizeConfig(PushToHubMixin):
 
     @classmethod
     def from_pretrained(cls, save_dir: str, **kwargs):
+        # Parameters related to loading from Hugging Face Hub
         cache_dir = kwargs.pop("cache_dir", None)
         force_download = kwargs.pop("force_download", False)
         resume_download = kwargs.pop("resume_download", False)
@@ -57,8 +58,6 @@ class BaseQuantizeConfig(PushToHubMixin):
         use_auth_token = kwargs.pop("use_auth_token", None)
         revision = kwargs.pop("revision", None)
         subfolder = kwargs.pop("subfolder", None)
-        from_pipeline = kwargs.pop("_from_pipeline", None)
-        from_auto_class = kwargs.pop("_from_auto", False)
         commit_hash = kwargs.pop("_commit_hash", None)
 
         quantize_config_filename = "quantize_config.json"
@@ -76,7 +75,6 @@ class BaseQuantizeConfig(PushToHubMixin):
                     revision=revision,
                     local_files_only=local_files_only,
                     subfolder=subfolder,
-                    #user_agent=user_agent,
                     _raise_exceptions_for_missing_entries=False,
                     _raise_exceptions_for_connection_errors=False,
                     _commit_hash=commit_hash,
@@ -422,11 +420,11 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         repo_id: str,
         save_dir: Optional[str] = None,
         use_safetensors: Optional[bool] = True,
-        commit_message: str = "Push AutoGPTQ quantized model",
+        commit_message: Optional[str] = "Upload of AutoGPTQ quantized model",
         use_auth_token: Optional[Union[bool, str]] = None,
         private: Optional[bool] = None,
         token: Optional[Union[bool, str]] = None,
-        create_pr: bool = False,
+        create_pr: Optional[bool] = False,
     ) -> str:
         """
         Upload the model to the Hugging Face Hub.
@@ -469,7 +467,6 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
 
         if self._quantized_model_path is not None:
             work_dir = self._quantized_model_path
-            os.listdir(work_dir)
             operations = [
                 CommitOperationAdd(path_or_fileobj=os.path.join(work_dir, f), path_in_repo=f)
                 for f in os.listdir(work_dir)
@@ -605,7 +602,6 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         """load quantized model from local disk"""
         
         # Parameters related to loading from Hugging Face Hub
-        config = kwargs.pop("config", None)
         cache_dir = kwargs.pop("cache_dir", None)
         force_download = kwargs.pop("force_download", False)
         resume_download = kwargs.pop("resume_download", False)
@@ -653,7 +649,6 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                 "resume_download": resume_download,
                 "local_files_only": local_files_only,
                 "use_auth_token": use_auth_token,
-                #"user_agent": user_agent,
                 "revision": revision,
                 "subfolder": subfolder,
                 "_raise_exceptions_for_missing_entries": False,
