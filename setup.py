@@ -24,7 +24,7 @@ extras_require = {
     "triton": ["triton>=2.0.0"]
 }
 
-include_dirs = ["quant_cuda"]
+include_dirs = ["autogptq_cuda"]
 
 if TORCH_AVAILABLE:
     BUILD_CUDA_EXT = int(os.environ.get('BUILD_CUDA_EXT', '1')) == 1
@@ -39,10 +39,10 @@ if TORCH_AVAILABLE:
             print(f"appending conda cuda include dir {conda_cuda_include_dir}")
         extensions = [
             cpp_extension.CUDAExtension(
-                "quant_cuda",
+                "autogptq_cuda",
                 [
-                    "quant_cuda/quant_cuda.cpp",
-                    "quant_cuda/quant_cuda_kernel.cu"
+                    "autogptq_cuda/autogptq_cuda.cpp",
+                    "autogptq_cuda/autogptq_cuda_kernel.cu"
                 ]
             )
         ]

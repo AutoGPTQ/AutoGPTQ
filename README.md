@@ -35,9 +35,9 @@ By default, cuda extensions will be installed when `torch` and `cuda` is already
 ```shell
 BUILD_CUDA_EXT=0 pip install auto-gptq
 ```
-And to make sure `quant_cuda` is not ever in your virtual environment, run:
+And to make sure `autogptq_cuda` is not ever in your virtual environment, run:
 ```shell
-pip uninstall quant_cuda -y
+pip uninstall autogptq_cuda -y
 ```
 #### to support LLaMa model
 For some people want to try LLaMa and whose `transformers` version not meet the newest one that supports it, using:
