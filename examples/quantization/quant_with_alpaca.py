@@ -103,41 +103,43 @@ def main():
         use_fast=args.fast_tokenizer,
         trust_remote_code=True
     )
-    model = AutoGPTQForCausalLM.from_pretrained(
-        args.pretrained_model_dir,
-        quantize_config=BaseQuantizeConfig(bits=args.bits, group_size=args.group_size, desc_act=args.desc_act),
-        max_memory=max_memory
-    )
-
+    # model = AutoGPTQForCausalLM.from_pretrained(
+    #     args.pretrained_model_dir,
+    #     quantize_config=BaseQuantizeConfig(bits=args.bits, group_size=args.group_size, desc_act=args.desc_act),
+    #     max_memory=max_memory
+    # )
+    #
     examples = load_data("dataset/alpaca_data_cleaned.json", tokenizer, args.num_samples)
     examples_for_quant = [
         {"input_ids": example["input_ids"], "attention_mask": example["attention_mask"]}
         for example in examples
     ]
-
-    start = time.time()
-    model.quantize(
-        examples_for_quant,
-        batch_size=args.quant_batch_size,
-        use_triton=args.use_triton,
-        autotune_warmup_after_quantized=args.use_triton
-    )
-    end = time.time()
-    print(f"quantization took: {end - start: .4f}s")
+    #
+    # start = time.time()
+    # model.quantize(
+    #     examples_for_quant,
+    #     batch_size=args.quant_batch_size,
+    #     use_triton=args.use_triton,
+    #     autotune_warmup_after_quantized=args.use_triton
+    # )
+    # end = time.time()
+    # print(f"quantization took: {end - start: .4f}s")
 
     if not args.quantized_model_dir:
         args.quantized_model_dir = args.pretrained_model_dir
 
     if args.save_and_reload:
-        model.save_quantized(args.quantized_model_dir)
-        del model
+        # model.save_quantized(args.quantized_model_dir)
+        # del model
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
         model = AutoGPTQForCausalLM.from_quantized(
             args.quantized_model_dir,
             device="cuda:0",
             use_triton=args.use_triton,
-            max_memory=max_memory
+            max_memory=max_memory,
+            inject_fused_mlp=True,
+            inject_fused_attention=True
         )
 
     pipeline_init_kwargs = {"model": model, "tokenizer": tokenizer}
@@ -159,7 +161,7 @@ def main():
         end = time.time()
         print(f"quant: {generated_text}")
         num_new_tokens = len(tokenizer(generated_text)["input_ids"])
-        print(f"generate {num_new_tokens} tokens using {end-start: .4f}s")
+        print(f"generate {num_new_tokens} tokens using {end-start: .4f}s, {num_new_tokens / (end - start)} tokens/s.")
         print("=" * 42)
 
 
