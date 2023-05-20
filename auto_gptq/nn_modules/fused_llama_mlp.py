@@ -305,8 +305,9 @@ class FusedLlamaMLPForQuantizedModel(FusedBaseMLPModule):
         if not use_triton:
             logger.warning(f"skip module injection for {cls.__name__} not support integrate without triton yet.")
             return
-        elif quant_fused_matmul_248_kernel is None:
+        elif not TRITON_AVAILABLE:
             logger.warning(f"skip module injection for triton is not installed.")
+            return
 
         for name, m in model.named_modules():
             if not isinstance(m, LlamaMLP):
