@@ -2,14 +2,10 @@ from abc import abstractmethod
 from logging import getLogger
 
 import torch.nn as nn
+from .triton_utils.mixin import TritonModuleMixin
+
 
 logger = getLogger(__name__)
-
-try:
-    from .triton_utils import TritonModuleMixin
-except ImportError:
-    logger.error('triton not installed.')
-    raise
 
 
 class FusedBaseModule(nn.Module, TritonModuleMixin):

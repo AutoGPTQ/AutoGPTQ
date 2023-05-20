@@ -137,7 +137,9 @@ def main():
             args.quantized_model_dir,
             device="cuda:0",
             use_triton=args.use_triton,
-            max_memory=max_memory
+            max_memory=max_memory,
+            inject_fused_mlp=True,
+            inject_fused_attention=True
         )
 
     pipeline_init_kwargs = {"model": model, "tokenizer": tokenizer}
@@ -159,7 +161,7 @@ def main():
         end = time.time()
         print(f"quant: {generated_text}")
         num_new_tokens = len(tokenizer(generated_text)["input_ids"])
-        print(f"generate {num_new_tokens} tokens using {end-start: .4f}s")
+        print(f"generate {num_new_tokens} tokens using {end-start: .4f}s, {num_new_tokens / (end - start)} tokens/s.")
         print("=" * 42)
 
 
