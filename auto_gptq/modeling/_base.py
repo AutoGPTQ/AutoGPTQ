@@ -20,6 +20,7 @@ from ._utils import *
 from ..nn_modules._fused_base import FusedBaseAttentionModule, FusedBaseMLPModule
 from ..quantization import GPTQ
 from ..utils.data_utils import collate_data
+from ..utils.import_utils import TRITON_AVAILABLE
 
 logger = getLogger(__name__)
 
@@ -151,6 +152,9 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
     ):
         if self.quantized:
             raise EnvironmentError("can't execute quantize because the model is quantized.")
+        if use_triton and not TRITON_AVAILABLE:
+            logger.warning("triton is not installed, reset use_triton to False")
+            use_triton = False
 
         device_map = self.hf_device_map
         if device_map:
@@ -500,6 +504,10 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         **kwargs
     ):
         """load quantized model from local disk"""
+        if use_triton and not TRITON_AVAILABLE:
+            logger.warning("triton is not installed, reset use_triton to False")
+            use_triton = False
+
         # prepare configs and file names
         config = AutoConfig.from_pretrained(save_dir, trust_remote_code=trust_remote_code)
         if config.model_type not in SUPPORTED_MODELS:

@@ -1,5 +1,12 @@
 from packaging.version import parse as parse_version
 
+try:
+    import triton
+
+    TRITON_AVAILABLE = True
+except ImportError:
+    TRITON_AVAILABLE = False
+
 
 def dynamically_import_QuantLinear(use_triton: bool, desc_act: bool, group_size: int):
     if use_triton:
