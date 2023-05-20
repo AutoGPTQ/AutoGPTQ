@@ -370,8 +370,8 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
     def to(self, device: Union[str, torch.device]):
         return self.model.to(device)
 
-    def forward(self, **kwargs):
-        return self.model(**kwargs)
+    def forward(self, *args, **kwargs):
+        return self.model(*args, **kwargs)
 
     def generate(self, **kwargs):
         """shortcut for model.generate"""
