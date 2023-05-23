@@ -1,3 +1,4 @@
+from contextlib import contextmanager
 from logging import getLogger
 from typing import Union
 
@@ -37,9 +38,15 @@ def find_layers(module, layers=None, name=''):
     return res
 
 
-def get_module_by_name(model, module_name: str):
+def get_module_by_name_prefix(model, module_name: str):
     for name, module in model.named_modules():
         if name.startswith(module_name):
+            return module
+
+
+def get_module_by_name_suffix(model, module_name: str):
+    for name, module in model.named_modules():
+        if name.endswith(module_name):
             return module
 
 
@@ -118,20 +125,27 @@ def pack_model(
         QuantLinear.warmup(model.to(CUDA_0), seqlen=model.seqlen)
 
 
-def check_and_get_model_type(model_dir):
-    config = AutoConfig.from_pretrained(model_dir, trust_remote_code=True)
+def check_and_get_model_type(model_dir, trust_remote_code=False):
+    config = AutoConfig.from_pretrained(model_dir, trust_remote_code=trust_remote_code)
     if config.model_type not in SUPPORTED_MODELS:
         raise TypeError(f"{config.model_type} isn't supported yet.")
     model_type = config.model_type
     return model_type
 
 
+@contextmanager
+def dummy_model_init_context_manager():
+    yield
+
+
 __all__ = [
     "get_device",
     "move_to_device",
     "find_layers",
-    "get_module_by_name",
+    "get_module_by_name_prefix",
+    "get_module_by_name_suffix",
     "make_quant",
     "pack_model",
-    "check_and_get_model_type"
+    "check_and_get_model_type",
+    "dummy_model_init_context_manager"
 ]
