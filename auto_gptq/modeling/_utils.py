@@ -1,6 +1,7 @@
 from logging import getLogger
 from typing import Union
 
+import accelerate
 import torch
 import torch.nn as nn
 from transformers import AutoConfig
@@ -132,6 +133,31 @@ def check_and_get_model_type(model_dir, trust_remote_code=False):
     return model_type
 
 
+def simple_dispatch_model(model, device_map):
+    tied_params = accelerate.utils.modeling.find_tied_parameters(model)
+    prev_hook = None
+    if set(device_map.values()) == {"cpu"} or set(device_map.values()) == {"cpu", "disk"}:
+        main_device = "cpu"
+    else:
+        main_device = [d for d in device_map.values() if d not in ["cpu", "disk"]][0]
+    for n, d in device_map.items():
+        m = get_module_by_name_suffix(model, n)
+        if d == "cpu":
+            _, prev_hook = accelerate.cpu_offload_with_hook(
+                m,
+                execution_device=main_device,
+                prev_module_hook=prev_hook
+            )
+        else:
+            d = torch.device(d)
+            accelerate.hooks.attach_align_device_hook(m, execution_device=d)
+            prev_hook = None
+    accelerate.utils.modeling.retie_parameters(model, tied_params)
+    model.hf_device_map = device_map
+
+    return model
+
+
 __all__ = [
     "get_device",
     "move_to_device",
@@ -141,4 +167,5 @@ __all__ = [
     "make_quant",
     "pack_model",
     "check_and_get_model_type",
+    "simple_dispatch_model"
 ]

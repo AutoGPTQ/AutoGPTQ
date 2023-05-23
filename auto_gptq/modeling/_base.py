@@ -363,7 +363,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         )
         if device_map:
             self.model = remove_hook_from_module(self.model, recurse=True)
-            self.model = accelerate.dispatch_model(self.model, device_map, offload_buffers=True)
+            self.model = simple_dispatch_model(self.model, device_map)
         self.model.config.use_cache = forward_pass_use_cache
 
         self._quantized = True
@@ -616,26 +616,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         if len(device_map) == 1:
             model = model.to(torch.device(list(device_map.values())[0]))
         elif full_cpu_offload and "cpu" in list(device_map.values()):
-            tied_params = accelerate.utils.modeling.find_tied_parameters(model)
-            prev_hook = None
-            if set(device_map.values()) == {"cpu"} or set(device_map.values()) == {"cpu", "disk"}:
-                main_device = "cpu"
-            else:
-                main_device = [d for d in device_map.values() if d not in ["cpu", "disk"]][0]
-            for n, d in device_map.items():
-                m = get_module_by_name_suffix(model, n)
-                if d == "cpu":
-                    _, prev_hook = accelerate.cpu_offload_with_hook(
-                        m,
-                        execution_device=main_device,
-                        prev_module_hook=prev_hook
-                    )
-                else:
-                    d = torch.device(d)
-                    accelerate.hooks.attach_align_device_hook(m, execution_device=d)
-                    prev_hook = None
-            accelerate.utils.modeling.retie_parameters(model, tied_params)
-            model.hf_device_map = device_map
+            model = simple_dispatch_model(model, device_map)
         else:
             model = accelerate.dispatch_model(model, device_map=device_map)
 
