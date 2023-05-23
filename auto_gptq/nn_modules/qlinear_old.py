@@ -202,6 +202,7 @@ class QuantLinear(nn.Module):
                     autogptq_cuda.vecquant8matmul_old(x, self.qweight, out, self.scales.float(), self.qzeros, self.group_size)
                 else:
                     raise NotImplementedError("Only 2,3,4,8 bits are supported.")
+            out = out.half()
         else:
             if self.wf.device != self.qzeros.device:
                self.wf = self.wf.to(self.qzeros.device)
