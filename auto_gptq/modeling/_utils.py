@@ -1,4 +1,3 @@
-from contextlib import contextmanager
 from logging import getLogger
 from typing import Union
 
@@ -133,11 +132,6 @@ def check_and_get_model_type(model_dir, trust_remote_code=False):
     return model_type
 
 
-@contextmanager
-def dummy_model_init_context_manager():
-    yield
-
-
 __all__ = [
     "get_device",
     "move_to_device",
@@ -147,5 +141,4 @@ __all__ = [
     "make_quant",
     "pack_model",
     "check_and_get_model_type",
-    "dummy_model_init_context_manager"
 ]
