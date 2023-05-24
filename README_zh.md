@@ -16,6 +16,7 @@
 </h4>
 
 ## 新闻或更新
+- 2023-05-12 - (进行中) - `peft` + `auto-gptq` + 多模态数据 = 低资源条件下轻松微调大语言模型以获得多模态指令遵循能力，敬请关注！
 - 2023-05-04 - (更新) - 支持在 `not desc_act or group_size == -1` 的情况下使用更快的 cuda 算子。
 - 2023-04-29 - (更新) - 支持从指定的模型权重文件名或量化配置(quantize_config)加载量化过的模型。
 - 2023-04-28 - (更新) - 支持 CPU 分载权重和在多设备上执行模型量化或推理, 支持 `gpt2` 类型的模型。
@@ -52,6 +53,9 @@ pip install auto-gptq[triton]
 ```
 
 ### 从源码安装
+<details>
+<summary>点击以查看详情</summary>
+
 克隆源码:
 ```shell
 git clone https://github.com/PanQiWei/AutoGPTQ.git && cd AutoGPTQ
@@ -66,21 +70,14 @@ pip install .
 
 如果你想要使用 triton 加速且其能够被你的操作系统所支持，请使用 `.[triton]`。
 
+</details>
 
-## 支持的模型
-目前， `auto_gptq` 支持以下模型： `bloom`, `gpt2`, `gpt_neox`, `gptj`, `llama`, `moss` 和 `opt`；更多的 Transformer 模型即将到来！
+## 快速开始
 
-## 支持的评估任务
-目前， `auto_gptq` 支持以下评估任务： `LanguageModelingTask`, `SequenceClassificationTask` 和 `TextSummarizationTask`；更多的评估任务即将到来！
-
-## 用法
-
-**对于初次使用者，强烈建议在运行示例脚本前先阅读[教程](docs/tutorial)(持续更新中……)**
-
-### 基本用法
+### 量化和推理
 > 警告：这里仅是对 AutoGPTQ 中基本接口的用法展示，只使用了一条文本来量化一个特别小的模型，因此其结果的表现可能不如在大模型上执行量化后预期的那样好。
 
-以下是 `auto_gptq` 的最简单用法示例：
+以下展示了使用 `auto_gptq` 进行量化和推理的最简单用法：
 ```python
 from transformers import AutoTokenizer, TextGenerationPipeline
 from auto_gptq import AutoGPTQForCausalLM, BaseQuantizeConfig
@@ -129,7 +126,11 @@ print(pipeline("auto-gptq is")[0]["generated_text"])
 参考 [此样例脚本](examples/quantization/quant_with_alpaca.py) 以了解进阶的用法。
 
 ### 自定义模型
-以下展示了如何拓展 `auto_gptq` 以支持 `OPT` 模型，如你所见，这非常简单：
+
+<details>
+
+<summary>以下展示了如何拓展 `auto_gptq` 以支持 `OPT` 模型，如你所见，这非常简单：</summary>
+
 ```python
 from auto_gptq.modeling import BaseGPTQForCausalLM
 
@@ -155,12 +156,18 @@ class OPTGPTQForCausalLM(BaseGPTQForCausalLM):
 ```
 然后, 你就可以像在基本用法一节中展示的那样使用 `OPTGPTQForCausalLM.from_pretrained` 和其他方法。
 
+</details>
+
+
 ### 在下游任务上执行评估
 你可以使用在 `auto_gptq.eval_tasks` 中定义的任务来评估量化前后的模型在某个特定下游任务上的表现。
 
 这些预定义的模型支持所有在 [🤗 transformers](https://github.com/huggingface/transformers)和本项目中被实现了的 causal-language-models。
 
-以下是使用 `cardiffnlp/tweet_sentiment_multilingual` 数据集在序列分类（文本分类）任务上评估 `EleutherAI/gpt-j-6b` 模型的示例:
+<details>
+
+<summary>以下是使用 `cardiffnlp/tweet_sentiment_multilingual` 数据集在序列分类（文本分类）任务上评估 `EleutherAI/gpt-j-6b` 模型的示例:</summary>
+
 ```python
 from functools import partial
 
@@ -236,8 +243,18 @@ print(
 )
 ```
 
-### 更多示例
-请转至 [examples](examples/README.md)以获取更多的示例。
+</details>
+
+## 了解更多
+[教程](docs/tutorial) 提供了将 `auto_gptq` 集成到你的项目中的手把手指导和最佳实践准则。
+
+[示例](examples/README.md) 提供了大量示例脚本以将 `auto_gptq` 用于不同领域。
+
+## 支持的模型
+目前， `auto_gptq` 支持以下模型： `bloom`, `gpt2`, `gpt_neox`, `gptj`, `llama`, `moss` 和 `opt`；更多的 Transformer 模型即将到来！
+
+## 支持的评估任务
+目前， `auto_gptq` 支持以下评估任务： `LanguageModelingTask`, `SequenceClassificationTask` 和 `TextSummarizationTask`；更多的评估任务即将到来！
 
 ## 致谢
 - 特别感谢 **Elias Frantar**， **Saleh Ashkboos**， **Torsten Hoefler** 和 **Dan Alistarh** 提出 **GPTQ** 算法并开源[代码](https://github.com/IST-DASLab/gptq)。
