@@ -496,7 +496,6 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         max_memory: Optional[dict] = None,
         device: Optional[Union[str, int]] = None,
         low_cpu_mem_usage: bool = False,
-        full_cpu_offload: bool = True,
         use_triton: bool = False,
         inject_fused_attention: bool = True,
         inject_fused_mlp: bool = True,
@@ -617,10 +616,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             offload_state_dict=True,
             offload_buffers=True
         )
-        if full_cpu_offload and "cpu" in list(device_map.values()):
-            model = simple_dispatch_model(model, device_map)
-        else:
-            model = accelerate.dispatch_model(model, device_map=device_map)
+        model = simple_dispatch_model(model, device_map)
 
         # == step4: set seqlen == #
         model_config = model.config.to_dict()
