@@ -607,7 +607,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             )
 
         if low_cpu_mem_usage:
-            make_sure_not_tensor_in_meta_device(model, use_triton, quantize_config.desc_act, quantize_config.group_size)
+            make_sure_no_tensor_in_meta_device(model, use_triton, quantize_config.desc_act, quantize_config.group_size)
 
         accelerate.utils.modeling.load_checkpoint_in_model(
             model,

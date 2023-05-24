@@ -163,7 +163,7 @@ def simple_dispatch_model(model, device_map):
     return model
 
 
-def make_sure_not_tensor_in_meta_device(model, use_triton, desc_act, group_size):
+def make_sure_no_tensor_in_meta_device(model, use_triton, desc_act, group_size):
     QuantLinear = dynamically_import_QuantLinear(use_triton, desc_act, group_size)
     for n, m in model.named_modules():
         if isinstance(m, QuantLinear) and m.bias.device == torch.device("meta"):
@@ -180,5 +180,5 @@ __all__ = [
     "pack_model",
     "check_and_get_model_type",
     "simple_dispatch_model",
-    "make_sure_not_tensor_in_meta_device"
+    "make_sure_no_tensor_in_meta_device"
 ]
