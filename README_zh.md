@@ -107,7 +107,7 @@ quantize_config = BaseQuantizeConfig(
 model = AutoGPTQForCausalLM.from_pretrained(pretrained_model_dir, quantize_config)
 
 # 量化模型, 样本的数据类型应该为 List[Dict]，其中字典的键有且仅有 input_ids 和 attention_mask
-model.quantize(examples, use_triton=False)
+model.quantize(examples)
 
 # 保存量化好的模型
 model.save_quantized(quantized_model_dir)
@@ -116,10 +116,10 @@ model.save_quantized(quantized_model_dir)
 model.save_quantized(quantized_model_dir, use_safetensors=True)
 
 # 加载量化好的模型到能被识别到的第一块显卡中
-model = AutoGPTQForCausalLM.from_quantized(quantized_model_dir, device="cuda:0", use_triton=False)
+model = AutoGPTQForCausalLM.from_quantized(quantized_model_dir)
 
 # 使用 model.generate 执行推理
-print(tokenizer.decode(model.generate(**tokenizer("auto_gptq is", return_tensors="pt").to("cuda:0"))[0]))
+print(tokenizer.decode(model.generate(**tokenizer("auto_gptq is", return_tensors="pt").to(model.device))[0]))
 
 # 或者使用 TextGenerationPipeline
 pipeline = TextGenerationPipeline(model=model, tokenizer=tokenizer)
