@@ -159,6 +159,73 @@ def make_sure_not_tensor_in_meta_device(model, use_triton, desc_act, group_size)
             m.register_buffer('bias', torch.zeros((m.outfeatures), dtype=torch.float16, device="cpu"))
 
 
+# this function is temporarily added, will be removed once the feature is added into accelerate
+def add_align_logits_hook_to_model(model, device_map: dict):
+    from accelerate.hooks import AlignDevicesHook, CpuOffload, add_hook_to_module
+    from accelerate.utils import find_device, send_to_device, named_module_tensors, set_module_tensor_to_device
+    from typing import Mapping
+
+    skip_keys = ("past_key_values", "layer_past", "attention_mask", "position_ids")
+
+    def send_to_device_except(data, device, non_blocking=False, skip_keys=()):
+        if isinstance(data, Mapping):
+            new_data = {
+                k: (v if k in skip_keys else send_to_device(v, device, non_blocking))
+                for k, v in data.items()
+            }
+            return type(data)(new_data)
+        else:
+            return send_to_device(data, device, non_blocking)
+
+    class AlignLogitsHook(AlignDevicesHook):
+
+        def pre_forward(self, module, *args, **kwargs):
+            if self.io_same_device:
+                self.input_device = find_device([args, kwargs])
+            if self.offload:
+                for name, _ in named_module_tensors(
+                    module, include_buffers=self.offload_buffers, recurse=self.place_submodules
+                ):
+                    set_module_tensor_to_device(module, name, self.execution_device, value=self.weights_map[name])
+
+            return (
+                send_to_device(args, self.execution_device),
+                send_to_device_except(kwargs, self.execution_device, skip_keys=skip_keys),
+            )
+
+        def post_forward(self, module, output):
+            if self.offload:
+                for name, _ in named_module_tensors(
+                    module, include_buffers=self.offload_buffers, recurse=self.place_submodules
+                ):
+                    set_module_tensor_to_device(module, name, "meta")
+            if self.io_same_device and self.input_device is not None:
+                output = send_to_device_except(output, self.input_device, skip_keys=skip_keys)
+            return output
+
+    for n, d in device_map.items():
+        if n == "":
+            continue
+        m = get_module_by_name_suffix(model, n)
+        if hasattr(m, "_hf_hook"):
+            old_hook = m._hf_hook
+            if isinstance(old_hook, AlignDevicesHook):
+                logger.debug(f"replace the original hook AlignDevicesHook with AlignLogitsHook at {n}")
+                hook = AlignLogitsHook(
+                    execution_device=old_hook.execution_device,
+                    offload=old_hook.offload,
+                    io_same_device=True,
+                    weights_map=old_hook.weights_map,
+                    offload_buffers=old_hook.offload,
+                    place_submodules=old_hook.place_submodules
+                )
+                add_hook_to_module(m, hook, append=False)
+            elif isinstance(old_hook, CpuOffload):
+                logger.debug(f"append AlignLogitsHook to {n} (prev hook is CpuOffload)")
+                hook = AlignLogitsHook(execution_device=old_hook.execution_device, io_same_device=True)
+                add_hook_to_module(m, hook, append=True)
+
+
 __all__ = [
     "get_device",
     "move_to_device",
@@ -169,5 +236,6 @@ __all__ = [
     "pack_model",
     "check_and_get_model_type",
     "simple_dispatch_model",
-    "make_sure_not_tensor_in_meta_device"
+    "make_sure_not_tensor_in_meta_device",
+    "add_align_logits_hook_to_model"
 ]

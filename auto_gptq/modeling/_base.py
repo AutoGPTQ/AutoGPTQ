@@ -622,8 +622,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         else:
             model = accelerate.dispatch_model(model, device_map=device_map)
 
-        if len(set(list(device_map.values())) - {"cpu", "disk"}) > 1:
-            pass  # TODO: add customized hook to speedup inference on multi GPUs
+        add_align_logits_hook_to_model(model, device_map)
 
         # == step4: set seqlen == #
         model_config = model.config.to_dict()
