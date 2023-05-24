@@ -622,8 +622,6 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         else:
             model = accelerate.dispatch_model(model, device_map=device_map)
 
-        # add_align_logits_hook_to_model(model, device_map)
-
         # == step4: set seqlen == #
         model_config = model.config.to_dict()
         seq_len_keys = ["max_position_embeddings", "seq_length", "n_positions"]
