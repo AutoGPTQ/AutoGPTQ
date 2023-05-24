@@ -372,7 +372,11 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
 
     @property
     def device(self):
-        return self.model.device
+        if not self.hf_device_map:
+            return self.model.device
+        else:
+            device = [d for d in self.hf_device_map.values() if d not in {'cpu', 'disk'}][0]
+            return torch.device(device)
 
     def to(self, device: Union[str, torch.device]):
         return self.model.to(device)

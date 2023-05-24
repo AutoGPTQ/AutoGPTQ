@@ -79,7 +79,7 @@ Currently, `auto_gptq` supports: `LanguageModelingTask`, `SequenceClassification
 **Here are [tutorials](docs/tutorial)(continue updating...) for using `auto-gptq`, it's highly recommended for newcomers to read them first before trying example scripts.** 
 
 ### Basic
-> warning: this is just a show case of the usage of basic apis in AutoGPTQ, which uses only one sample to quantize a much small model, thus may not performs as well as expected in LLMs.
+> warning: this is just a showcase of the usage of basic apis in AutoGPTQ, which uses only one sample to quantize a much small model, quality of quantized model using such little samples may not good.
 
 Below is an example for the simplest use of `auto_gptq`: 
 ```python
@@ -108,7 +108,7 @@ quantize_config = BaseQuantizeConfig(
 model = AutoGPTQForCausalLM.from_pretrained(pretrained_model_dir, quantize_config)
 
 # quantize model, the examples should be list of dict whose keys can only be "input_ids" and "attention_mask"
-model.quantize(examples, use_triton=False)
+model.quantize(examples)
 
 # save quantized model
 model.save_quantized(quantized_model_dir)
@@ -117,10 +117,10 @@ model.save_quantized(quantized_model_dir)
 model.save_quantized(quantized_model_dir, use_safetensors=True)
 
 # load quantized model to the first GPU
-model = AutoGPTQForCausalLM.from_quantized(quantized_model_dir, device="cuda:0", use_triton=False)
+model = AutoGPTQForCausalLM.from_quantized(quantized_model_dir)
 
 # inference with model.generate
-print(tokenizer.decode(model.generate(**tokenizer("auto_gptq is", return_tensors="pt").to("cuda:0"))[0]))
+print(tokenizer.decode(model.generate(**tokenizer("auto_gptq is", return_tensors="pt").to(model.device))[0]))
 
 # or you can also use pipeline
 pipeline = TextGenerationPipeline(model=model, tokenizer=tokenizer)
