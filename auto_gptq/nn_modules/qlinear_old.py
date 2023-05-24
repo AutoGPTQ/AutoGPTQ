@@ -202,7 +202,6 @@ class QuantLinear(nn.Module):
                     autogptq_cuda.vecquant8matmul_old(x, self.qweight, out, self.scales.float(), self.qzeros, self.group_size)
                 else:
                     raise NotImplementedError("Only 2,3,4,8 bits are supported.")
-            out = out.half()
         else:
             if self.wf.device != self.qzeros.device:
                self.wf = self.wf.to(self.qzeros.device)
@@ -247,7 +246,7 @@ class QuantLinear(nn.Module):
             weight = weight.reshape(weight.shape[0] * weight.shape[1], weight.shape[2])
 
             out = torch.matmul(x.half(), weight)
-        out = out.reshape(out_shape)
+        out = out.half().reshape(out_shape)
         out = out + self.bias if self.bias is not None else out
         return out
 
