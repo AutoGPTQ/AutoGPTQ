@@ -613,6 +613,9 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             offload_state_dict=True,
             offload_buffers=True
         )
+        # make sure no param or buffer is in meta device
+        if low_cpu_mem_usage:
+            make_sure_not_tensor_in_meta_device(model, use_triton, quantize_config.desc_act, quantize_config.group_size)
         if full_cpu_offload and "cpu" in list(device_map.values()):
             model = simple_dispatch_model(model, device_map)
         else:
