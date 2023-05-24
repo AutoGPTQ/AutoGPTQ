@@ -513,7 +513,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             logger.warning("triton is not installed, reset use_triton to False")
             use_triton = False
 
-        # prepare configs and file names
+        # == step1: prepare configs and file names == #
         config = AutoConfig.from_pretrained(save_dir, trust_remote_code=trust_remote_code)
         if config.model_type not in SUPPORTED_MODELS:
             raise TypeError(f"{config.model_type} isn't supported yet.")
@@ -539,7 +539,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         else:
             raise FileNotFoundError(f"Could not find model at {model_save_name}")
 
-        # inject layers
+        # == step2: convert model to gptq-model (replace Linear with QuantLinear) == #
         def skip(*args, **kwargs):
             pass
 
@@ -578,7 +578,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             )
             model.tie_weights()
 
-        # load checkpoint and dispatch
+        # == step3: load checkpoint and dispatch == #
         if isinstance(device_map, str) and device_map not in ["auto", "balanced", "balanced_low_0", "sequential"]:
             raise ValueError(
                 "If passing a string for `device_map`, please choose 'auto', 'balanced', 'balanced_low_0' or "
@@ -606,8 +606,10 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                 max_memory=max_memory,
                 no_split_module_classes=[cls.layer_type]
             )
+
         if low_cpu_mem_usage:
             make_sure_not_tensor_in_meta_device(model, use_triton, quantize_config.desc_act, quantize_config.group_size)
+
         accelerate.utils.modeling.load_checkpoint_in_model(
             model,
             checkpoint=model_save_name,
@@ -623,7 +625,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         if len(set(list(device_map.values())) - {"cpu", "disk"}) > 1:
             pass  # TODO: add customized hook to speedup inference on multi GPUs
 
-        # set seqlen
+        # == step4: set seqlen == #
         model_config = model.config.to_dict()
         seq_len_keys = ["max_position_embeddings", "seq_length", "n_positions"]
         if any([k in model_config for k in seq_len_keys]):
@@ -635,6 +637,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             logger.warning("can't get model's sequence length from model config, will set to 4096.")
             model.seqlen = 4096
 
+        # == step5: (optional) inject optimized module == #
         if inject_fused_attention:
             if cls.fused_attn_module_type is None:
                 logger.warning(f"{cls.__name__} hasn't fused attention module yet, will skip inject fused attention.")
@@ -656,7 +659,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                 )
 
         model.eval()
-        # warmup triton
+        # == step6: (optional) warmup triton == #
         if use_triton and warmup_triton:
             from ..nn_modules.qlinear_triton import QuantLinear
             QuantLinear.warmup(model, seqlen=model.seqlen)
