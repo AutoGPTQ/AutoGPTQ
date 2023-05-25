@@ -397,7 +397,7 @@ def transpose_quant_matmul_248(input, qweight, scales, qzeros, g_idx, bits, maxq
 
 class QuantLinearFunction(torch.autograd.Function):
     @staticmethod
-    @custom_fwd
+    @custom_fwd(cast_inputs = torch.float32)
     def forward(ctx, input, qweight, scales, qzeros, g_idx, bits, maxq):
         output = quant_matmul_248(input, qweight, scales, qzeros, g_idx, bits, maxq)
         ctx.save_for_backward(qweight, scales, qzeros, g_idx)
