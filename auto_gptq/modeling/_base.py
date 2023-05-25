@@ -666,7 +666,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
 
         return cls(model, True, quantize_config)
 
-    def warmup_triton(self, enabled: bool = True):
+    def warmup_triton(self, enabled: bool = True, transpose: bool = False):
         if not enabled:
             return
         if not TRITON_AVAILABLE:
@@ -674,7 +674,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             return
 
         from ..nn_modules.qlinear_triton import QuantLinear
-        QuantLinear.warmup(self.model, seqlen=self.model.seqlen)
+        QuantLinear.warmup(self.model, transpose=transpose, seqlen=self.model.seqlen)
 
         if self.fused_mlp_module_type is not None:
             self.fused_mlp_module_type.warmup(self.model, seqlen=self.model.seqlen)

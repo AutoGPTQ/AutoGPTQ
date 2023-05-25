@@ -12,7 +12,8 @@ logger = getLogger(__name__)
 
 try:
     from .triton_utils.kernels import (
-        quant_matmul_248, transpose_quant_matmul_248, QuantLinearFunction, QuantLinearInferenceOnlyFunction
+        quant_matmul_248, transpose_quant_matmul_248, quant_matmul_248_inference_only,
+        QuantLinearFunction, QuantLinearInferenceOnlyFunction
     )
 except ImportError:
     logger.error('triton not installed.')
@@ -164,11 +165,14 @@ class QuantLinear(nn.Module, TritonModuleMixin):
             for m in tqdm(range(0, math.ceil(math.log2(seqlen)) + 1)):
                 m = 2 ** m
                 for (k, n), (qweight, scales, qzeros, g_idx, bits, maxq) in kn_values.items():
-                    a = torch.randn(m, k, dtype=torch.float16, device=model.device)
-                    quant_matmul_248(a, qweight, scales, qzeros, g_idx, bits, maxq)
                     if transpose:
+                        a = torch.randn(m, k, dtype=torch.float16, device=model.device)
+                        quant_matmul_248(a, qweight, scales, qzeros, g_idx, bits, maxq)
                         a = torch.randn(m, n, dtype=torch.float16, device=model.device)
                         transpose_quant_matmul_248(a, qweight, scales, qzeros, g_idx, bits, maxq)
+                    else:
+                        a = torch.randn(m, k, dtype=torch.float16, device=model.device)
+                        quant_matmul_248_inference_only(a, qweight, scales, qzeros, g_idx, bits, maxq)
         del kn_values
 
 
