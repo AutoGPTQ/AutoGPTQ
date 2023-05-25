@@ -12,7 +12,7 @@
     <p>
         <b>English</b> |
         <a href="https://github.com/PanQiWei/AutoGPTQ/blob/main/README_zh.md">中文</a>
-    <p>
+    </p>
 </h4>
 
 ## News or Update
@@ -39,11 +39,7 @@ And to make sure `autogptq_cuda` is not ever in your virtual environment, run:
 ```shell
 pip uninstall autogptq_cuda -y
 ```
-#### to support LLaMa model
-For some people want to try LLaMa and whose `transformers` version not meet the newest one that supports it, using:
-```shell
-pip install auto-gptq[llama]
-```
+
 #### to support triton speedup
 To integrate with `triton`, using:
 > warning: currently triton only supports linux; 3-bit quantization is not supported when using triton
@@ -65,8 +61,6 @@ Then, install from source:
 pip install .
 ```
 Like quick installation, you can also set `BUILD_CUDA_EXT=0` to disable pytorch extension building.
-
-Use `.[llama]` if you want to try LLaMa model.
 
 Use `.[triton]` if you want to integrate with triton and it's available on your operating system.
 

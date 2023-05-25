@@ -12,7 +12,7 @@
     <p>
         <a href="https://github.com/PanQiWei/AutoGPTQ/blob/main/README.md">English</a> |
         <b>中文</b>
-    <p>
+    </p>
 </h4>
 
 ## 新闻或更新
@@ -39,11 +39,7 @@ BUILD_CUDA_EXT=0 pip install auto-gptq
 ```shell
 pip uninstall autogptq_cuda -y
 ```
-#### 支持使用 LLaMa 模型
-若想要尝试 LLaMa 模型，但 `transformers` 版本不为支持该模型的最新版本，使用以下命令：
-```shell
-pip install auto-gptq[llama]
-```
+
 #### 支持使用 triton 加速
 若想使用 `triton` 加速模型推理，使用以下命令：
 > 警告：目前 triton 仅支持 linux 操作系统；当使用 triton 时 3-bit 数值类型的量化将不被支持
@@ -65,8 +61,6 @@ git clone https://github.com/PanQiWei/AutoGPTQ.git && cd AutoGPTQ
 pip install .
 ```
 正如在快速安装一节，你可以使用 `BUILD_CUDA_EXT=0` 来取消构建 cuda 拓展。
-
-如果你想要使用 LLaMa 模型，请使用 `.[llama]`。
 
 如果你想要使用 triton 加速且其能够被你的操作系统所支持，请使用 `.[triton]`。
 
