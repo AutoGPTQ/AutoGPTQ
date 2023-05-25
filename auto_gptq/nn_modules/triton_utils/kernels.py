@@ -356,15 +356,16 @@ def silu(x):
     return x * tl.sigmoid(x)
 
 
+
 def quant_matmul_248(input, qweight, scales, qzeros, g_idx, bits, maxq):
     with torch.cuda.device(input.device):
-        output = torch.empty((input.shape[0], qweight.shape[1]), device=input.device, dtype=torch.float16)
+        output = torch.empty((input.shape[0], qweight.shape[1]), device=input.device, dtype=input.dtype)
         grid = lambda META: (
             triton.cdiv(input.shape[0], META['BLOCK_SIZE_M']) * triton.cdiv(qweight.shape[1], META['BLOCK_SIZE_N']),
         )
         quant_matmul_248_kernel[grid](
             input, qweight, output,
-            scales, qzeros, g_idx,
+            scales.to(input.dtype), qzeros, g_idx,
             input.shape[0], qweight.shape[1], input.shape[1],
             bits, maxq,
             input.stride(0), input.stride(1),
@@ -378,12 +379,12 @@ def quant_matmul_248(input, qweight, scales, qzeros, g_idx, bits, maxq):
 def transpose_quant_matmul_248(input, qweight, scales, qzeros, g_idx, bits, maxq):
     with torch.cuda.device(input.device):
         output_dim = (qweight.shape[0] * 32) // bits
-        output = torch.empty((input.shape[0], output_dim), device=input.device, dtype=torch.float16)
+        output = torch.empty((input.shape[0], output_dim), device=input.device, dtype=input.dtype)
         grid = lambda META: (
             triton.cdiv(input.shape[0], META['BLOCK_SIZE_M']) * triton.cdiv(output_dim, META['BLOCK_SIZE_K']),)
         transpose_quant_matmul_248_kernel[grid](
             input, qweight, output,
-            scales, qzeros, g_idx,
+            scales.to(input.dtype), qzeros, g_idx,
             input.shape[0], qweight.shape[1], output_dim,
             bits, maxq,
             input.stride(0), input.stride(1),
@@ -396,7 +397,7 @@ def transpose_quant_matmul_248(input, qweight, scales, qzeros, g_idx, bits, maxq
 
 class QuantLinearFunction(torch.autograd.Function):
     @staticmethod
-    @custom_fwd(cast_inputs=torch.float16)
+    @custom_fwd
     def forward(ctx, input, qweight, scales, qzeros, g_idx, bits, maxq):
         output = quant_matmul_248(input, qweight, scales, qzeros, g_idx, bits, maxq)
         ctx.save_for_backward(qweight, scales, qzeros, g_idx)
