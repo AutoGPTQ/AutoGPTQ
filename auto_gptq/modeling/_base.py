@@ -630,7 +630,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             use_triton = False
 
         # == step1: prepare configs and file names == #
-        config = AutoConfig.from_pretrained(save_dir, trust_remote_code=trust_remote_code)
+        config = AutoConfig.from_pretrained(model_name_or_path, trust_remote_code=trust_remote_code)
 
         if config.model_type not in SUPPORTED_MODELS:
             raise TypeError(f"{config.model_type} isn't supported yet.")
