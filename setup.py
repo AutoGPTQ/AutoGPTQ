@@ -16,11 +16,11 @@ requirements = [
     "rouge",
     "torch>=1.13.0",
     "safetensors",
-    "transformers>=4.26.1"
+    "transformers>=4.29.0",
+    "peft"
 ]
 
 extras_require = {
-    "llama": ["transformers>=4.28.0"],
     "triton": ["triton>=2.0.0"]
 }
 
@@ -33,7 +33,7 @@ if TORCH_AVAILABLE:
     if BUILD_CUDA_EXT and torch.cuda.is_available():
         from torch.utils import cpp_extension
         from distutils.sysconfig import get_python_lib
-        conda_cuda_include_dir=os.path.join(get_python_lib(),"nvidia/cuda_runtime/include")
+        conda_cuda_include_dir = os.path.join(get_python_lib(), "nvidia/cuda_runtime/include")
         if os.path.isdir(conda_cuda_include_dir):
             include_dirs.append(conda_cuda_include_dir)
             print(f"appending conda cuda include dir {conda_cuda_include_dir}")
