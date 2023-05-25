@@ -736,5 +736,11 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         if self.fused_mlp_module_type is not None:
             self.fused_mlp_module_type.warmup(self.model, seqlen=self.model.seqlen)
 
+    def __getattr__(self, item):
+        try:
+            return super().__getattr__(item)
+        except:
+            return getattr(self.model, item)
+
 
 __all__ = ["BaseGPTQForCausalLM", "BaseQuantizeConfig"]
