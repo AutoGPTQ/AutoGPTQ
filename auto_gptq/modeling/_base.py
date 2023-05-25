@@ -22,9 +22,64 @@ from ._utils import *
 from ..nn_modules._fused_base import FusedBaseAttentionModule, FusedBaseMLPModule
 from ..quantization import GPTQ
 from ..utils.data_utils import collate_data
-from ..utils.import_utils import TRITON_AVAILABLE
+from ..utils.import_utils import dynamically_import_QuantLinear, TRITON_AVAILABLE
 
 logger = getLogger(__name__)
+
+
+class GeneralQuantLinear(nn.Linear):
+    def __init__(self, quant_linear_module):
+        super().__init__(
+            in_features=quant_linear_module.infeatures,
+            out_features=quant_linear_module.outfeatures,
+            bias=True
+        )
+
+        self.infeatures = quant_linear_module.infeatures
+        self.outfeatures = quant_linear_module.outfeatures
+        self.bits = quant_linear_module.bits
+        self.group_size = quant_linear_module.group_size
+        self.maxq = quant_linear_module.maxq
+
+        self.weight.requires_grad = False
+
+        self.weight.data = quant_linear_module.qweight
+        self.qweight = self.weight
+        self.bias.data = quant_linear_module.bias
+
+        self.qweight.requires_grad = False
+        self.bias.requires_grad = False
+
+        self.qzeros = quant_linear_module.qzeros
+        self.scales = quant_linear_module.scales
+        self.g_idx = quant_linear_module.g_idx
+
+        if hasattr(quant_linear_module, "wf"):
+            self.wf = quant_linear_module.wf
+        if hasattr(quant_linear_module, "kernel_switch_threshold"):
+            self.kernel_switch_threshold = quant_linear_module.kernel_switch_threshold
+        if hasattr(quant_linear_module, "autogptq_cuda_available"):
+            self.autogptq_cuda_available = quant_linear_module.autogptq_cuda_available
+
+        self.forward = quant_linear_module.forward
+
+    @classmethod
+    def inject_to_model(cls, model, use_triton, desc_act, group_size):
+        QuantLinear = dynamically_import_QuantLinear(use_triton, desc_act, group_size)
+        for name, m in model.named_modules():
+            if not isinstance(m, QuantLinear):
+                continue
+            new_m = cls(m)
+            if '.' in name:
+                parent_name = name.rsplit('.', 1)[0]
+                child_name = name[len(parent_name) + 1:]
+                parent = model.get_submodule(parent_name)
+            else:
+                parent_name = ''
+                parent = model
+                child_name = name
+
+            setattr(parent, child_name, new_m)
 
 
 @dataclass
@@ -621,6 +676,8 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             offload_buffers=True
         )
         model = simple_dispatch_model(model, device_map)
+
+        GeneralQuantLinear.inject_to_model(model, use_triton, quantize_config.desc_act, quantize_config.group_size)
 
         # == step4: set seqlen == #
         model_config = model.config.to_dict()
