@@ -4,7 +4,6 @@ from dataclasses import asdict
 from enum import Enum
 
 import torch
-from auto_gptq.modeling._base import BaseGPTQForCausalLM, GeneralQuantLinear
 from peft import get_peft_model, PeftConfig, PeftModel, TaskType, PeftType
 from peft.peft_model import PEFT_TYPE_TO_MODEL_MAPPING
 from peft.tuners.lora import LoraLayer, LoraModel, Embedding, mark_only_lora_as_trainable, _freeze_adapter
@@ -13,6 +12,9 @@ from peft.utils.other import (
     TRANSFORMERS_MODELS_TO_LORA_TARGET_MODULES_MAPPING,
     TRANSFORMERS_MODELS_TO_ADALORA_TARGET_MODULES_MAPPING
 )
+
+from ..modeling._base import BaseGPTQForCausalLM
+from ..nn_modules.qlinear import GeneralQuantLinear
 
 
 class QuantLoraLinear(torch.nn.Linear, LoraLayer):
