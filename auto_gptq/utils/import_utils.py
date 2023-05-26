@@ -7,6 +7,13 @@ try:
 except ImportError:
     TRITON_AVAILABLE = False
 
+try:
+    import autogptq_cuda
+
+    AUTOGPTQ_CUDA_AVAILABLE = True
+except:
+    AUTOGPTQ_CUDA_AVAILABLE = False
+
 
 def dynamically_import_QuantLinear(use_triton: bool, desc_act: bool, group_size: int):
     if use_triton:

@@ -18,7 +18,16 @@ class FusedBaseModule(nn.Module, TritonModuleMixin):
 class FusedBaseAttentionModule(FusedBaseModule):
     @classmethod
     @abstractmethod
-    def inject_to_model(cls, model, use_triton=False, group_size=-1, use_cuda_fp16=True, desc_act=False, **kwargs):
+    def inject_to_model(
+        cls,
+        model,
+        use_triton=False,
+        group_size=-1,
+        use_cuda_fp16=True,
+        desc_act=False,
+        trainable=False,
+        **kwargs
+    ):
         raise NotImplementedError()
 
     @classmethod

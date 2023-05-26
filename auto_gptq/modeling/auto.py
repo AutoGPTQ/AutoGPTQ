@@ -65,6 +65,7 @@ class AutoGPTQForCausalLM:
         use_safetensors: bool = False,
         trust_remote_code: bool = False,
         warmup_triton: bool = False,
+        trainable: bool = False,
         **kwargs
     ) -> BaseGPTQForCausalLM:
         model_type = check_and_get_model_type(save_dir, trust_remote_code)
@@ -85,6 +86,7 @@ class AutoGPTQForCausalLM:
             use_safetensors=use_safetensors,
             trust_remote_code=trust_remote_code,
             warmup_triton=warmup_triton,
+            trainable=trainable,
             **keywords
         )
 

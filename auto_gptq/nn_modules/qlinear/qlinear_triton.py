@@ -11,7 +11,10 @@ from ..triton_utils.mixin import TritonModuleMixin
 logger = getLogger(__name__)
 
 try:
-    from ..triton_utils.kernels import quant_matmul_248, transpose_quant_matmul_248, QuantLinearFunction
+    from ..triton_utils.kernels import (
+        quant_matmul_248, transpose_quant_matmul_248, quant_matmul_inference_only_248,
+        QuantLinearFunction, QuantLinearInferenceOnlyFunction
+    )
 except ImportError:
     logger.error('triton not installed.')
     raise
@@ -24,7 +27,8 @@ class QuantLinear(nn.Module, TritonModuleMixin):
         group_size,
         infeatures,
         outfeatures,
-        bias
+        bias,
+        trainable=False
     ):
         super().__init__()
         if bits not in [2, 4, 8]:
@@ -57,6 +61,8 @@ class QuantLinear(nn.Module, TritonModuleMixin):
             self.register_buffer('bias', torch.zeros((outfeatures), dtype=torch.float16))
         else:
             self.bias = None
+
+        self.trainable = trainable
 
     def pack(self, linear, scales, zeros, g_idx=None):
         W = linear.weight.data.clone()
@@ -122,7 +128,8 @@ class QuantLinear(nn.Module, TritonModuleMixin):
 
     def forward(self, x):
         out_shape = x.shape[:-1] + (self.outfeatures,)
-        out = QuantLinearFunction.apply(
+        quant_linear_fn = QuantLinearFunction if self.trainable else QuantLinearInferenceOnlyFunction
+        out = quant_linear_fn.apply(
             x.reshape(-1, x.shape[-1]),
             self.qweight,
             self.scales,
@@ -160,11 +167,14 @@ class QuantLinear(nn.Module, TritonModuleMixin):
             for m in tqdm(range(0, math.ceil(math.log2(seqlen)) + 1)):
                 m = 2 ** m
                 for (k, n), (qweight, scales, qzeros, g_idx, bits, maxq) in kn_values.items():
-                    a = torch.randn(m, k, dtype=torch.float16, device=model.device)
-                    quant_matmul_248(a, qweight, scales, qzeros, g_idx, bits, maxq)
                     if transpose:
+                        a = torch.randn(m, k, dtype=torch.float16, device=model.device)
+                        quant_matmul_248(a, qweight, scales, qzeros, g_idx, bits, maxq)
                         a = torch.randn(m, n, dtype=torch.float16, device=model.device)
                         transpose_quant_matmul_248(a, qweight, scales, qzeros, g_idx, bits, maxq)
+                    else:
+                        a = torch.randn(m, k, dtype=torch.float16, device=model.device)
+                        quant_matmul_inference_only_248(a, qweight, scales, qzeros, g_idx, bits, maxq)
         del kn_values
 
 

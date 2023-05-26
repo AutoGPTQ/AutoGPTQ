@@ -26,10 +26,13 @@ class QuantLinear(nn.Module):
         outfeatures,
         bias,
         kernel_switch_threshold=128,
+        trainable=False
     ):
         super().__init__()
         if bits not in [2, 3, 4, 8]:
             raise NotImplementedError("Only 2,3,4,8 bits are supported.")
+        if trainable:
+            raise NotImplementedError("QuantLinear with cuda backend not support trainable mode yet.")
 
         self.infeatures = infeatures
         self.outfeatures = outfeatures
@@ -75,6 +78,8 @@ class QuantLinear(nn.Module):
         self.autogptq_cuda_available = _autogptq_cuda_available
         if infeatures % 256 != 0 or outfeatures % 256 != 0:
             self.autogptq_cuda_available = False
+
+        self.trainable = trainable
 
     def pack(self, linear, scales, zeros, g_idx=None):
         W = linear.weight.data.clone()

@@ -50,7 +50,17 @@ def get_module_by_name_suffix(model, module_name: str):
             return module
 
 
-def make_quant(module, names, bits, group_size, name='', use_triton=False, use_cuda_fp16=True, desc_act=False):
+def make_quant(
+    module,
+    names,
+    bits,
+    group_size,
+    name='',
+    use_triton=False,
+    use_cuda_fp16=True,
+    desc_act=False,
+    trainable=False
+):
     QuantLinear = dynamically_import_QuantLinear(use_triton=use_triton, desc_act=desc_act, group_size=group_size)
 
     if isinstance(module, QuantLinear):
@@ -71,13 +81,25 @@ def make_quant(module, names, bits, group_size, name='', use_triton=False, use_c
                 in_features = tmp.weight.shape[0]
                 out_features = tmp.weight.shape[1]
             if (not(desc_act) or group_size == -1) and not use_triton:
-                new_layer = QuantLinear(bits, group_size, in_features, out_features, True, use_cuda_fp16=use_cuda_fp16)
+                new_layer = QuantLinear(
+                    bits, group_size, in_features, out_features, True, use_cuda_fp16=use_cuda_fp16, trainable=trainable
+                )
             else:
-                new_layer = QuantLinear(bits, group_size, in_features, out_features, True)
+                new_layer = QuantLinear(bits, group_size, in_features, out_features, True, trainable=trainable)
             new_layer.device = ori_layer_device
             setattr(module, attr, new_layer.to(ori_layer_device))
     for name1, child in module.named_children():
-        make_quant(child, names, bits, group_size, name + '.' + name1 if name != '' else name1, use_triton=use_triton, use_cuda_fp16=use_cuda_fp16,desc_act=desc_act)
+        make_quant(
+            child,
+            names,
+            bits,
+            group_size,
+            name + '.' + name1 if name != '' else name1,
+            use_triton=use_triton,
+            use_cuda_fp16=use_cuda_fp16,
+            desc_act=desc_act,
+            trainable=trainable
+        )
 
 
 def pack_model(

@@ -23,7 +23,7 @@ from ..nn_modules.qlinear import GeneralQuantLinear
 from ..nn_modules._fused_base import FusedBaseAttentionModule, FusedBaseMLPModule
 from ..quantization import GPTQ
 from ..utils.data_utils import collate_data
-from ..utils.import_utils import dynamically_import_QuantLinear, TRITON_AVAILABLE
+from ..utils.import_utils import dynamically_import_QuantLinear, TRITON_AVAILABLE, AUTOGPTQ_CUDA_AVAILABLE
 
 logger = getLogger(__name__)
 
@@ -77,7 +77,16 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
     fused_attn_module_type: Optional[FusedBaseAttentionModule] = None
     fused_mlp_module_type: Optional[FusedBaseMLPModule] = None
 
-    def __init__(self, model: PreTrainedModel, quantized: bool, quantize_config: BaseQuantizeConfig):
+    def __init__(
+        self,
+        model: PreTrainedModel,
+        quantized: bool,
+        quantize_config: BaseQuantizeConfig,
+        is_triton_backend: bool = False,
+        injected_fused_attention: bool = False,
+        injected_fused_mlp: bool = False,
+        trainable: bool = False
+    ):
         super().__init__()
 
         self.model = model
@@ -85,6 +94,11 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         self._quantized = quantized
         self.quantize_config = quantize_config
         self.config = self.model.config
+
+        self.is_triton_backend = is_triton_backend
+        self.injected_fused_attention = injected_fused_attention
+        self.injected_fused_mlp = injected_fused_mlp
+        self.trainable = trainable
 
     @property
     def quantized(self):
@@ -510,6 +524,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         use_safetensors: bool = False,
         trust_remote_code: bool = False,
         warmup_triton: bool = False,
+        trainable: bool = False,
         **kwargs
     ):
         """load quantized model from local disk"""
@@ -517,7 +532,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             logger.warning("triton is not installed, reset use_triton to False")
             use_triton = False
 
-        # == step1: prepare configs and file names == #
+        # == step1: prepare configs and file names, and check values of arguments passed in == #
         config = AutoConfig.from_pretrained(save_dir, trust_remote_code=trust_remote_code)
         if config.model_type not in SUPPORTED_MODELS:
             raise TypeError(f"{config.model_type} isn't supported yet.")
@@ -542,6 +557,9 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                 break
         else:
             raise FileNotFoundError(f"Could not find model at {model_save_name}")
+
+        if not use_triton and trainable:
+            raise NotImplementedError("For now, trainable mode only supports triton backend.")
 
         # == step2: convert model to gptq-model (replace Linear with QuantLinear) == #
         def skip(*args, **kwargs):
@@ -578,7 +596,8 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                 quantize_config.group_size,
                 use_triton=use_triton,
                 use_cuda_fp16=use_cuda_fp16,
-                desc_act=quantize_config.desc_act
+                desc_act=quantize_config.desc_act,
+                trainable=trainable
             )
             model.tie_weights()
 
@@ -643,6 +662,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         # == step5: (optional) inject optimized module == #
         if inject_fused_attention:
             if cls.fused_attn_module_type is None:
+                inject_fused_attention = False
                 logger.warning(f"{cls.__name__} hasn't fused attention module yet, will skip inject fused attention.")
             else:
                 cls.fused_attn_module_type.inject_to_model(
@@ -650,10 +670,12 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                     use_triton=use_triton,
                     group_size=quantize_config.group_size,
                     use_cuda_fp16=use_cuda_fp16,
-                    desc_act=quantize_config.desc_act
+                    desc_act=quantize_config.desc_act,
+                    trainable=trainable
                 )
         if inject_fused_mlp:
             if cls.fused_mlp_module_type is None:
+                inject_fused_mlp = False
                 logger.warning(f"{cls.__name__} hasn't fused mlp module yet, will skip inject fused mlp.")
             else:
                 cls.fused_mlp_module_type.inject_to_model(
@@ -670,7 +692,15 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             if inject_fused_mlp and cls.fused_mlp_module_type is not None:
                 cls.fused_mlp_module_type.warmup(model, seqlen=model.seqlen)
 
-        return cls(model, True, quantize_config)
+        return cls(
+            model,
+            True,
+            quantize_config,
+            is_triton_backend=use_triton,
+            injected_fused_attention=inject_fused_attention,
+            injected_fused_mlp=inject_fused_mlp and use_triton,
+            trainable=trainable
+        )
 
     def warmup_triton(self, enabled: bool = True):
         if not enabled:
@@ -684,6 +714,16 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
 
         if self.fused_mlp_module_type is not None:
             self.fused_mlp_module_type.warmup(self.model, seqlen=self.model.seqlen)
+
+    def enable_trainable_mode(self, enabled: bool = True):
+        if not self.is_triton_backend and enabled:
+            raise NotImplementedError("For now, trainable mode only supports triton backend.")
+        for n, m in self.model.named_modules():
+            if hasattr(m, "trainable"):
+                setattr(m, "trainable", enabled)
+
+    def disable_trainable_mode(self):
+        self.enable_trainable_mode(enabled=False)
 
     def __getattr__(self, item):
         try:
