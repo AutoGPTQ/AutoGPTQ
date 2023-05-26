@@ -29,9 +29,9 @@ def move_to_device(obj: Union[torch.Tensor, nn.Module], device: torch.device):
 def find_layers(module, layers=None, name=''):
     if not layers:
         layers = [transformers.pytorch_utils.Conv1D, nn.Conv2d, nn.Linear]
-
-    if type(module) in layers:
-        return {name: module}
+    for layer in layers:
+        if isinstance(module,layer):
+            return {name: module}
     res = {}
     for name1, child in module.named_children():
         res.update(find_layers(child, layers=layers, name=name + '.' + name1 if name != '' else name1))
