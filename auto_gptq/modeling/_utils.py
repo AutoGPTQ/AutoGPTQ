@@ -61,13 +61,13 @@ def make_quant(module, names, bits, group_size, name='', use_triton=False, use_c
         if name1 in names:
             ori_layer_device = get_device(getattr(module, attr))
             delattr(module, attr)
-            if type(tmp) == nn.Linear:
+            if isinstance(tmp,nn.Linear):
                 in_features = tmp.in_features
                 out_features = tmp.out_features
-            elif type(tmp) == nn.Conv2d:
+            elif isinstance(tmp,nn.Conv2d):
                 in_features = tmp.in_channels
                 out_features = tmp.out_channels
-            elif type(tmp) == transformers.pytorch_utils.Conv1D:            
+            elif isinstance(tmp,transformers.pytorch_utils.Conv1D):            
                 in_features = tmp.weight.shape[0]
                 out_features = tmp.weight.shape[1]
             if (not(desc_act) or group_size == -1) and not use_triton:

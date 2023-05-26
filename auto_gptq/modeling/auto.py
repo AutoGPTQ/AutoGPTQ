@@ -20,7 +20,8 @@ GPTQ_CAUSAL_LM_MODEL_MAP = {
     "llama": LlamaGPTQForCausalLM,
     "opt": OPTGPTQForCausalLM,
     "moss": MOSSGPTQForCausalLM,
-    "RefinedWebModel": RWGPTQForCausalLM
+    "RefinedWebModel": RWGPTQForCausalLM,
+    "RefinedWeb":RWGPTQForCausalLM
 }
 
 
