@@ -2,9 +2,10 @@ import warnings
 import re
 from dataclasses import asdict
 from enum import Enum
+from typing import List, Optional
 
 import torch
-from peft import get_peft_model, PeftConfig, PeftModel, TaskType, PeftType
+from peft import get_peft_model, PeftConfig, PeftModel, PeftType
 from peft.peft_model import PEFT_TYPE_TO_MODEL_MAPPING
 from peft.tuners.lora import LoraLayer, LoraModel, Embedding, mark_only_lora_as_trainable, _freeze_adapter
 from peft.utils.other import (
@@ -14,14 +15,13 @@ from peft.utils.other import (
 )
 
 from ..modeling._base import BaseGPTQForCausalLM
-from ..nn_modules.qlinear import GeneralQuantLinear
 
 
-class QuantLoraLinear(torch.nn.Linear, LoraLayer):
+class GPTQLoraLinear(torch.nn.Linear, LoraLayer):
     def __init__(
         self,
         adapter_name: str,
-        quant_linear_module: GeneralQuantLinear,
+        linear_module: torch.nn.Linear,
         r: int = 0,
         lora_alpha: int = 1,
         lora_dropout: float = 0.0,
@@ -30,14 +30,14 @@ class QuantLoraLinear(torch.nn.Linear, LoraLayer):
     ):
         init_lora_weights = kwargs.pop("init_lora_weights", True)
 
-        torch.nn.Linear.__init__(self, quant_linear_module.in_features, quant_linear_module.out_features)
-        LoraLayer.__init__(self, quant_linear_module.in_features, quant_linear_module.out_features)
+        torch.nn.Linear.__init__(self, linear_module.in_features, linear_module.out_features)
+        LoraLayer.__init__(self, linear_module.in_features, linear_module.out_features)
 
-        self.quant_linear_module = quant_linear_module
+        self.linear_module = linear_module
 
         self.weight.requires_grad = False
-        self.weight = self.quant_linear_module.weight
-        self.bias = self.quant_linear_module.bias
+        self.weight = self.linear_module.weight
+        self.bias = self.linear_module.bias
         self.fan_in_fan_out = fan_in_fan_out
         if fan_in_fan_out:
             self.weight.data = self.weight.data.T
@@ -59,13 +59,13 @@ class QuantLoraLinear(torch.nn.Linear, LoraLayer):
     def forward(self, x: torch.Tensor):
         previous_dtype = x.dtype
         if self.active_adapter not in self.lora_A.keys():
-            return self.quant_linear_module(x)
+            return self.linear_module(x)
         if self.disable_adapters:
             if self.r[self.active_adapter] > 0 and self.merged:
                 self.unmerge()
-            result = self.quant_linear_module(x)
+            result = self.linear_module(x)
         elif self.r[self.active_adapter] > 0 and not self.merged:
-            result = self.quant_linear_module(x)
+            result = self.linear_module(x)
 
             lora_B = self.lora_B[self.active_adapter]
             lora_A = self.lora_A[self.active_adapter]
@@ -76,14 +76,14 @@ class QuantLoraLinear(torch.nn.Linear, LoraLayer):
             adapter_result = (lora_B(lora_A(lora_dropout(x))) * scale).type_as(result)
             result += adapter_result
         else:
-            result = self.quant_linear_module(x)
+            result = self.linear_module(x)
 
         result = result.to(previous_dtype)
 
         return result
 
 
-class QuantLoraModel(torch.nn.Module):
+class GPTQLoraModel(torch.nn.Module):
     def __init__(self, model, config, adapter_name):
         super().__init__()
         self.model = model
@@ -144,7 +144,7 @@ class QuantLoraModel(torch.nn.Module):
                         in_features, out_features = target.num_embeddings, target.embedding_dim
                         new_module = Embedding(adapter_name, in_features, out_features, **embedding_kwargs)
                     else:
-                        if isinstance(target, GeneralQuantLinear):
+                        if isinstance(target, torch.nn.Linear):
                             if kwargs["fan_in_fan_out"]:
                                 warnings.warn(
                                     "fan_in_fan_out is set to True but the target module is `torch.nn.Linear`. "
@@ -154,9 +154,10 @@ class QuantLoraModel(torch.nn.Module):
                         else:
                             raise ValueError(
                                 f"Target module {target} is not supported. "
-                                f"Currently, only `GeneralQuantLinear` are supported."
+                                f"Currently, only `torch.nn.Linear` and its subclasses are supported."
                             )
-                        new_module = QuantLoraLinear(adapter_name, target, **kwargs)
+                        new_module = GPTQLoraLinear(adapter_name, target, **kwargs)
+                        print(f"{target_name} => GPTQLoraLinear")
 
                     self._replace_module(parent, target_name, new_module, target)
         if not is_target_modules_in_base_model:
@@ -167,7 +168,7 @@ class QuantLoraModel(torch.nn.Module):
 
     def _replace_module(self, parent_module, child_name, new_module, old_module):
         setattr(parent_module, child_name, new_module)
-        if not isinstance(new_module, QuantLoraLinear):
+        if not isinstance(new_module, GPTQLoraLinear):
             new_module.weight = old_module.weight
             if hasattr(old_module, "bias"):
                 if old_module.bias is not None:
@@ -271,13 +272,23 @@ class QuantLoraModel(torch.nn.Module):
                         target.lora_embedding_B[adapter_name].data += target.lora_embedding_B[adapter].data * weight
 
 
+def find_all_linear_names(model: BaseGPTQForCausalLM, ignore: Optional[List[str]] = None):
+    results = set()
+    for n, m in model.named_modules():
+        if isinstance(m, torch.nn.Linear):
+            res = n.split('.')[-1]
+            if res not in ignore:
+                results.add(res)
+    return list(results)
+
+
 def get_gptq_peft_model(
     model: BaseGPTQForCausalLM,
     peft_config: PeftConfig = None,
     model_id: str = None,
     adapter_name: str = "default"
 ):
-    PEFT_TYPE_TO_MODEL_MAPPING[PeftType.LORA] = QuantLoraModel
+    PEFT_TYPE_TO_MODEL_MAPPING[PeftType.LORA] = GPTQLoraModel
 
     try:
         if model_id is None:
