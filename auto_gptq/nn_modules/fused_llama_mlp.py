@@ -2,14 +2,14 @@ import math
 from logging import getLogger
 
 import torch
-import torch.nn as nn
 from transformers.models.llama.modeling_llama import LlamaMLP
 
 from ._fused_base import FusedBaseMLPModule
+from ..utils.import_utils import TRITON_AVAILABLE
 
 logger = getLogger(__name__)
 
-try:
+if TRITON_AVAILABLE:
     import triton
     import triton.language as tl
     from .triton_utils import custom_autotune
@@ -225,9 +225,8 @@ try:
         c_ptrs = c_ptr + stride_cm * offs_am[:, None] + stride_cn * offs_bn[None, :]
         c_mask = (offs_am[:, None] < M) & (offs_bn[None, :] < N)
         tl.store(c_ptrs, c, mask=c_mask)
-except:
-    logger.error('triton not installed.')
-    raise
+else:
+    quant_fused_matmul_248_kernel = None
 
 
 class FusedLlamaMLPForQuantizedModel(FusedBaseMLPModule):
@@ -304,7 +303,10 @@ class FusedLlamaMLPForQuantizedModel(FusedBaseMLPModule):
     @classmethod
     def inject_to_model(cls, model, use_triton=False, **kwargs):
         if not use_triton:
-            logger.warning(f"{cls.__name__} not support integrate without triton yet.")
+            logger.warning(f"skip module injection for {cls.__name__} not support integrate without triton yet.")
+            return
+        elif not TRITON_AVAILABLE:
+            logger.warning(f"skip module injection for triton is not installed.")
             return
 
         for name, m in model.named_modules():

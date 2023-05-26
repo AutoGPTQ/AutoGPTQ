@@ -35,9 +35,9 @@ By default, cuda extensions will be installed when `torch` and `cuda` is already
 ```shell
 BUILD_CUDA_EXT=0 pip install auto-gptq
 ```
-And to make sure `quant_cuda` is not ever in your virtual environment, run:
+And to make sure `autogptq_cuda` is not ever in your virtual environment, run:
 ```shell
-pip uninstall quant_cuda -y
+pip uninstall autogptq_cuda -y
 ```
 #### to support LLaMa model
 For some people want to try LLaMa and whose `transformers` version not meet the newest one that supports it, using:
@@ -53,6 +53,9 @@ pip install auto-gptq[triton]
 ```
 
 ### Install from source
+<details>
+<summary>click to see details</summary>
+
 Clone the source code:
 ```shell
 git clone https://github.com/PanQiWei/AutoGPTQ.git && cd AutoGPTQ
@@ -67,21 +70,14 @@ Use `.[llama]` if you want to try LLaMa model.
 
 Use `.[triton]` if you want to integrate with triton and it's available on your operating system.
 
+</details>
 
-## Supported Models
-Currently, `auto_gptq` supports: `bloom`, `gpt2`, `gpt_neox`, `gptj`, `llama`, `moss` and `opt`; more Transformer models will come soon!
+## Quick Tour
 
-## Supported Evaluation Tasks
-Currently, `auto_gptq` supports: `LanguageModelingTask`, `SequenceClassificationTask` and `TextSummarizationTask`; more Tasks will come soon!
+### Quantization and Inference
+> warning: this is just a showcase of the usage of basic apis in AutoGPTQ, which uses only one sample to quantize a much small model, quality of quantized model using such little samples may not good.
 
-## Usage
-
-**Here are [tutorials](docs/tutorial)(continue updating...) for using `auto-gptq`, it's highly recommended for newcomers to read them first before trying example scripts.** 
-
-### Basic
-> warning: this is just a show case of the usage of basic apis in AutoGPTQ, which uses only one sample to quantize a much small model, thus may not performs as well as expected in LLMs.
-
-Below is an example for the simplest use of `auto_gptq`: 
+Below is an example for the simplest use of `auto_gptq` to quantize a model and inference after quantization: 
 ```python
 from transformers import AutoTokenizer, TextGenerationPipeline
 from auto_gptq import AutoGPTQForCausalLM, BaseQuantizeConfig
@@ -101,13 +97,14 @@ examples = [
 quantize_config = BaseQuantizeConfig(
     bits=4,  # quantize model to 4-bit
     group_size=128,  # it is recommended to set the value to 128
+    desc_act=False,  # set to False can significantly speed up inference but the perplexity may slightly bad 
 )
 
 # load un-quantized model, by default, the model will always be loaded into CPU memory
 model = AutoGPTQForCausalLM.from_pretrained(pretrained_model_dir, quantize_config)
 
 # quantize model, the examples should be list of dict whose keys can only be "input_ids" and "attention_mask"
-model.quantize(examples, use_triton=False)
+model.quantize(examples)
 
 # save quantized model
 model.save_quantized(quantized_model_dir)
@@ -116,10 +113,10 @@ model.save_quantized(quantized_model_dir)
 model.save_quantized(quantized_model_dir, use_safetensors=True)
 
 # load quantized model to the first GPU
-model = AutoGPTQForCausalLM.from_quantized(quantized_model_dir, device="cuda:0", use_triton=False)
+model = AutoGPTQForCausalLM.from_quantized(quantized_model_dir)
 
 # inference with model.generate
-print(tokenizer.decode(model.generate(**tokenizer("auto_gptq is", return_tensors="pt").to("cuda:0"))[0]))
+print(tokenizer.decode(model.generate(**tokenizer("auto_gptq is", return_tensors="pt").to(model.device))[0]))
 
 # or you can also use pipeline
 pipeline = TextGenerationPipeline(model=model, tokenizer=tokenizer)
@@ -129,7 +126,10 @@ print(pipeline("auto-gptq is")[0]["generated_text"])
 For more advanced features of model quantization, please reference to [this script](examples/quantization/quant_with_alpaca.py)
 
 ### Customize Model
-Below is an example to extend `auto_gptq` to support `OPT` model, as you will see, it's very easy:
+<details>
+
+<summary>Below is an example to extend `auto_gptq` to support `OPT` model, as you will see, it's very easy:</summary>
+
 ```python
 from auto_gptq.modeling import BaseGPTQForCausalLM
 
@@ -155,12 +155,17 @@ class OPTGPTQForCausalLM(BaseGPTQForCausalLM):
 ```
 After this, you can use `OPTGPTQForCausalLM.from_pretrained` and other methods as shown in Basic.
 
+</details>
+
 ### Evaluation on Downstream Tasks
 You can use tasks defined in `auto_gptq.eval_tasks` to evaluate model's performance on specific down-stream task before and after quantization.
 
 The predefined tasks support all causal-language-models implemented in [🤗 transformers](https://github.com/huggingface/transformers) and in this project.
 
-Below is an example to evaluate `EleutherAI/gpt-j-6b` on sequence-classification task using `cardiffnlp/tweet_sentiment_multilingual` dataset:
+<details>
+
+<summary>Below is an example to evaluate `EleutherAI/gpt-j-6b` on sequence-classification task using `cardiffnlp/tweet_sentiment_multilingual` dataset:</summary>
+
 ```python
 from functools import partial
 
@@ -236,8 +241,18 @@ print(
 )
 ```
 
-### More Examples
-For more examples, please turn to [examples](examples/README.md)
+</details>
+
+## Learn More
+[tutorials](docs/tutorial) provide step-by-step guidance to integrate `auto_gptq` with your own project and some best practice principles.
+
+[examples](examples/README.md) provide plenty of example scripts to use `auto_gptq` in different ways.
+
+## Supported Models
+Currently, `auto_gptq` supports: `bloom`, `gpt2`, `gpt_neox`, `gptj`, `llama`, `moss` and `opt`; more Transformer models will come soon!
+
+## Supported Evaluation Tasks
+Currently, `auto_gptq` supports: `LanguageModelingTask`, `SequenceClassificationTask` and `TextSummarizationTask`; more Tasks will come soon!
 
 ## Acknowledgement
 - Specially thanks **Elias Frantar**, **Saleh Ashkboos**, **Torsten Hoefler** and **Dan Alistarh** for proposing **GPTQ** algorithm and open source the [code](https://github.com/IST-DASLab/gptq).

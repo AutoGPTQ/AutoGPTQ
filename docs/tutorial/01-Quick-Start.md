@@ -78,9 +78,9 @@ Pretrained model's config and the quantize config will also be saved with file n
 Instead of `.from_pretrained`, you should use `.from_quantized` to load a quantized model.
 ```python
 device = "cuda:0"
-model = AutoGPTQForCausalLM.from_quantized(quantized_model_dir, use_triton=False)
+model = AutoGPTQForCausalLM.from_quantized(quantized_model_dir, device=device)
 ```
-This will first read and load `quantize_config.json` in `opt-125m-4bit-128g` directory, then based on the values of `bits` and `group_size` in it, load `gptq_model-4bit-128g.bin` model file into the first GPU.
+This will first read and load `quantize_config.json` in `opt-125m-4bit-128g` directory, then based on the values of `bits` and `group_size` in it, load `gptq_model-4bit-128g.bin` model file into the first visible GPU.
 
 Then you can initialize 🤗 Transformers' `TextGenerationPipeline` and do inference.
 ```python

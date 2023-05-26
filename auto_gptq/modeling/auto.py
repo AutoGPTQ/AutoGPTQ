@@ -1,5 +1,4 @@
-from inspect import signature
-from typing import Optional, Union
+from typing import Dict, Optional, Union
 
 from ._base import BaseQuantizeConfig, BaseGPTQForCausalLM
 from ._utils import check_and_get_model_type
@@ -39,13 +38,15 @@ class AutoGPTQForCausalLM:
         pretrained_model_name_or_path: str,
         quantize_config: BaseQuantizeConfig,
         max_memory: Optional[dict] = None,
+        trust_remote_code: bool = False,
         **model_init_kwargs
     ) -> BaseGPTQForCausalLM:
-        model_type = check_and_get_model_type(pretrained_model_name_or_path)
+        model_type = check_and_get_model_type(pretrained_model_name_or_path, trust_remote_code)
         return GPTQ_CAUSAL_LM_MODEL_MAP[model_type].from_pretrained(
             pretrained_model_name_or_path=pretrained_model_name_or_path,
             quantize_config=quantize_config,
             max_memory=max_memory,
+            trust_remote_code=trust_remote_code,
             **model_init_kwargs
         )
 
@@ -53,22 +54,22 @@ class AutoGPTQForCausalLM:
     def from_quantized(
         cls,
         save_dir: str,
-        device_map: Optional[str] = None,
+        device_map: Optional[Union[str, Dict[str, Union[str, int]]]] = None,
         max_memory: Optional[dict] = None,
         device: Optional[Union[str, int]] = None,
-        strict: bool = True,
+        low_cpu_mem_usage: bool = False,
         use_triton: bool = False,
-        inject_fused_attention: bool = False,
-        inject_fused_mlp: bool = False,
+        inject_fused_attention: bool = True,
+        inject_fused_mlp: bool = True,
         use_cuda_fp16: bool = True,
         quantize_config: Optional[BaseQuantizeConfig] = None,
         model_basename: Optional[str] = None,
         use_safetensors: bool = False,
         trust_remote_code: bool = False,
-        warmup_triton: bool = True,
+        warmup_triton: bool = False,
         **kwargs
     ) -> BaseGPTQForCausalLM:
-        model_type = check_and_get_model_type(save_dir)
+        model_type = check_and_get_model_type(save_dir, trust_remote_code)
         quant_func = GPTQ_CAUSAL_LM_MODEL_MAP[model_type].from_quantized
         keywords = {key: kwargs[key] for key in signature(quant_func).parameters if key in kwargs}
         return quant_func(
@@ -76,7 +77,7 @@ class AutoGPTQForCausalLM:
             device_map=device_map,
             max_memory=max_memory,
             device=device,
-            strict=strict,
+            low_cpu_mem_usage=low_cpu_mem_usage,
             use_triton=use_triton,
             inject_fused_attention=inject_fused_attention,
             inject_fused_mlp=inject_fused_mlp,
