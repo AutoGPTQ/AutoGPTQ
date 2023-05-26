@@ -56,7 +56,7 @@ def main():
                 model.seqlen = model_config[key]
                 break
     else:
-        logger.warning("can't get model's sequence length from model config, will set to 2048.")
+        print("can't get model's sequence length from model config, will set to 2048.")
         model.seqlen = 2048
      
     # load train dataset for quantize
