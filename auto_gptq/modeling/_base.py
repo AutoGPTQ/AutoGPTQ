@@ -642,11 +642,6 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         )
         model = simple_dispatch_model(model, device_map)
 
-        GeneralQuantLinear.inject_to_model(
-            model,
-            dynamically_import_QuantLinear(use_triton, quantize_config.desc_act, quantize_config.group_size)
-        )
-
         # == step4: set seqlen == #
         model_config = model.config.to_dict()
         seq_len_keys = ["max_position_embeddings", "seq_length", "n_positions"]
@@ -692,6 +687,11 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             if inject_fused_mlp and cls.fused_mlp_module_type is not None:
                 cls.fused_mlp_module_type.warmup(model, seqlen=model.seqlen)
 
+        # == step7: make model compatible with peft
+        cls.make_sure_compatible_with_peft(
+            model, use_triton, quantize_config.desc_act, quantize_config.group_size
+        )
+
         return cls(
             model,
             True,
@@ -724,6 +724,13 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
 
     def disable_trainable_mode(self):
         self.enable_trainable_mode(enabled=False)
+
+    @staticmethod
+    def make_sure_compatible_with_peft(model: PreTrainedModel, use_triton: bool, desc_act: bool, group_size: int):
+        GeneralQuantLinear.inject_to_model(
+            model,
+            dynamically_import_QuantLinear(use_triton, desc_act, group_size)
+        )
 
     def __getattr__(self, item):
         try:
