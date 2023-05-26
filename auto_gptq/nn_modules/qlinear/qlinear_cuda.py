@@ -188,7 +188,7 @@ class QuantLinear(nn.Module):
             elif self.bits == 3:
                 autogptq_cuda.vecquant3matmul(x.float(), self.qweight, out, self.scales.float(), self.qzeros, self.g_idx)
             elif self.bits == 4:
-                autogptq_cuda.vecquant4matmul(x.float(), self.qweight, out, self.scales.float(), self.qzeros, self.g_idx)
+                autogptq_cuda.vecquant4matmul(x.half(), self.qweight, out.half(), self.scales, self.qzeros, self.g_idx, self.infeatures // 2)
             elif self.bits == 8:
                 autogptq_cuda.vecquant8matmul(x.float(), self.qweight, out, self.scales.float(), self.qzeros, self.g_idx)
             else:
