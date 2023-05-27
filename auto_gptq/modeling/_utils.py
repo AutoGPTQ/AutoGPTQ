@@ -1,6 +1,7 @@
 from logging import getLogger
 from typing import Union
 
+import accelerate
 import torch
 import torch.nn as nn
 from transformers import AutoConfig
@@ -37,20 +38,20 @@ def find_layers(module, layers=None, name=''):
     return res
 
 
-def get_module_by_name(model, module_name: str):
+def get_module_by_name_prefix(model, module_name: str):
     for name, module in model.named_modules():
         if name.startswith(module_name):
             return module
 
 
+def get_module_by_name_suffix(model, module_name: str):
+    for name, module in model.named_modules():
+        if name.endswith(module_name):
+            return module
+
+
 def make_quant(module, names, bits, group_size, name='', use_triton=False, use_cuda_fp16=True, desc_act=False):
-    if use_triton:
-        from ..nn_modules.qlinear_triton import QuantLinear
-    else:
-        if not desc_act or group_size == -1:
-            from ..nn_modules.qlinear_old import QuantLinear
-        else:
-            from ..nn_modules.qlinear import QuantLinear
+    QuantLinear = dynamically_import_QuantLinear(use_triton=use_triton, desc_act=desc_act, group_size=group_size)
 
     if isinstance(module, QuantLinear):
         return
@@ -70,9 +71,9 @@ def make_quant(module, names, bits, group_size, name='', use_triton=False, use_c
                 in_features = tmp.weight.shape[0]
                 out_features = tmp.weight.shape[1]
             if (not(desc_act) or group_size == -1) and not use_triton:
-                new_layer = QuantLinear(bits, group_size, in_features, out_features, tmp.bias is not None, use_cuda_fp16=use_cuda_fp16)
+                new_layer = QuantLinear(bits, group_size, in_features, out_features, True, use_cuda_fp16=use_cuda_fp16)
             else:
-                new_layer = QuantLinear(bits, group_size, in_features, out_features, tmp.bias is not None)
+                new_layer = QuantLinear(bits, group_size, in_features, out_features, True)
             new_layer.device = ori_layer_device
             setattr(module, attr, new_layer.to(ori_layer_device))
     for name1, child in module.named_children():
@@ -118,20 +119,66 @@ def pack_model(
         QuantLinear.warmup(model.to(CUDA_0), seqlen=model.seqlen)
 
 
-def check_and_get_model_type(model_dir):
-    config = AutoConfig.from_pretrained(model_dir, trust_remote_code=True)
+def check_and_get_model_type(model_dir, trust_remote_code=False):
+    config = AutoConfig.from_pretrained(model_dir, trust_remote_code=trust_remote_code)
     if config.model_type not in SUPPORTED_MODELS:
         raise TypeError(f"{config.model_type} isn't supported yet.")
     model_type = config.model_type
     return model_type
 
 
+def simple_dispatch_model(model, device_map):
+    from accelerate.hooks import add_hook_to_module, AlignDevicesHook
+
+    if "" in device_map:
+        d = device_map[""]
+        model = model.to(torch.device(d))
+        model.hf_device_map = device_map
+        return model
+
+    tied_params = accelerate.utils.modeling.find_tied_parameters(model)
+    if set(device_map.values()) == {"cpu"} or set(device_map.values()) == {"cpu", "disk"}:
+        main_device = "cpu"
+    else:
+        main_device = [d for d in device_map.values() if d not in ["cpu", "disk"]][0]
+
+    cpu_offload_group = [(n, d) for n, d in device_map.items() if d == "cpu"]
+    prev_hook = None
+    for idx, (n, d) in enumerate(cpu_offload_group):
+        m = get_module_by_name_suffix(model, n)
+        _, prev_hook = accelerate.cpu_offload_with_hook(m, execution_device=main_device, prev_module_hook=prev_hook)
+    # set first cpu offload module's prev_module_hook to the last cpu offload module's hook
+    if len(cpu_offload_group) > 1:
+        get_module_by_name_suffix(model, cpu_offload_group[0][0])._hf_hook.prev_module_hook = prev_hook
+
+    for n, d in device_map.items():
+        m = get_module_by_name_suffix(model, n)
+        if d != "cpu":
+            d = torch.device(d)
+            hook = AlignDevicesHook(d, io_same_device=True, place_submodules=True)
+            add_hook_to_module(m, hook)
+    accelerate.utils.modeling.retie_parameters(model, tied_params)
+    model.hf_device_map = device_map
+
+    return model
+
+
+def make_sure_no_tensor_in_meta_device(model, use_triton, desc_act, group_size):
+    QuantLinear = dynamically_import_QuantLinear(use_triton, desc_act, group_size)
+    for n, m in model.named_modules():
+        if isinstance(m, QuantLinear) and m.bias.device == torch.device("meta"):
+            m.register_buffer('bias', torch.zeros((m.outfeatures), dtype=torch.float16, device="cpu"))
+
+
 __all__ = [
     "get_device",
     "move_to_device",
     "find_layers",
-    "get_module_by_name",
+    "get_module_by_name_prefix",
+    "get_module_by_name_suffix",
     "make_quant",
     "pack_model",
-    "check_and_get_model_type"
+    "check_and_get_model_type",
+    "simple_dispatch_model",
+    "make_sure_no_tensor_in_meta_device"
 ]

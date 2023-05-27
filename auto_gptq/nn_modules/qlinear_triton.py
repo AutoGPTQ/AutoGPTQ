@@ -6,11 +6,11 @@ import transformers
 from torch.cuda.amp import custom_bwd, custom_fwd
 from logging import getLogger
 
+from .triton_utils.mixin import TritonModuleMixin
 
 logger = getLogger(__name__)
 
 try:
-    from .triton_utils import TritonModuleMixin
     from .triton_utils.kernels import quant_matmul_248, transpose_quant_matmul_248, QuantLinearFunction
 except ImportError:
     logger.error('triton not installed.')
@@ -131,7 +131,7 @@ class QuantLinear(nn.Module, TritonModuleMixin):
             self.bits,
             self.maxq
         )
-        out = out.reshape(out_shape)
+        out = out.half().reshape(out_shape)
         out = out + self.bias if self.bias is not None else out
         return out
 
