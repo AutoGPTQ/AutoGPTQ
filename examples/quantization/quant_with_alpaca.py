@@ -85,6 +85,7 @@ def main():
     parser.add_argument("--per_gpu_max_memory", type=int, default=None, help="max memory used to load model per gpu")
     parser.add_argument("--cpu_max_memory", type=int, default=None, help="max memory used to offload model to cpu")
     parser.add_argument("--quant_batch_size", type=int, default=1, help="examples batch size for quantization")
+    parser.add_argument("--trust_remote_code", action="store_true", help="whether to trust remote code when loading model")
     args = parser.parse_args()
 
     max_memory = dict()
@@ -101,12 +102,13 @@ def main():
     tokenizer = AutoTokenizer.from_pretrained(
         args.pretrained_model_dir,
         use_fast=args.fast_tokenizer,
-        trust_remote_code=True
+        trust_remote_code=args.trust_remote_code
     )
     model = AutoGPTQForCausalLM.from_pretrained(
         args.pretrained_model_dir,
         quantize_config=BaseQuantizeConfig(bits=args.bits, group_size=args.group_size, desc_act=args.desc_act),
-        max_memory=max_memory
+        max_memory=max_memory,
+        trust_remote_code=args.trust_remote_code
     )
 
     examples = load_data("dataset/alpaca_data_cleaned.json", tokenizer, args.num_samples)
@@ -139,7 +141,8 @@ def main():
             use_triton=args.use_triton,
             max_memory=max_memory,
             inject_fused_mlp=True,
-            inject_fused_attention=True
+            inject_fused_attention=True,
+            trust_remote_code=args.trust_remote_code
         )
 
     pipeline_init_kwargs = {"model": model, "tokenizer": tokenizer}
