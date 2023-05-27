@@ -10,6 +10,7 @@ from .gpt2 import GPT2GPTQForCausalLM
 from .llama import LlamaGPTQForCausalLM
 from .moss import MOSSGPTQForCausalLM
 from .opt import OPTGPTQForCausalLM
+from .gpt_bigcode import GPTBigCodeGPTQForCausalLM
 
 
 GPTQ_CAUSAL_LM_MODEL_MAP = {
@@ -20,6 +21,7 @@ GPTQ_CAUSAL_LM_MODEL_MAP = {
     "llama": LlamaGPTQForCausalLM,
     "opt": OPTGPTQForCausalLM,
     "moss": MOSSGPTQForCausalLM,
+    "gpt_bigcode": GPTBigCodeGPTQForCausalLM
     "codegen": CodeGenGPTQForCausalLM
 }
 
