@@ -21,7 +21,7 @@ GPTQ_CAUSAL_LM_MODEL_MAP = {
     "llama": LlamaGPTQForCausalLM,
     "opt": OPTGPTQForCausalLM,
     "moss": MOSSGPTQForCausalLM,
-    "gpt_bigcode": GPTBigCodeGPTQForCausalLM
+    "gpt_bigcode": GPTBigCodeGPTQForCausalLM,
     "codegen": CodeGenGPTQForCausalLM
 }
 
