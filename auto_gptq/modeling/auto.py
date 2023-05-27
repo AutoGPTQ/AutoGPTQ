@@ -1,3 +1,4 @@
+from inspect import signature
 from typing import Dict, Optional, Union
 
 from ._base import BaseQuantizeConfig, BaseGPTQForCausalLM
