@@ -188,17 +188,24 @@ def benchmark_generation_speed(model, tokenizer, examples, generation_config):
         input_ids = example["input_ids"].to(model.device)
 
         start = time.time()
-        output_ids = model.generate(
+        outputs_ids = model.generate(
             input_ids=input_ids.unsqueeze(0),
             generation_config=generation_config,
             logits_processor=[
                 CustomizedMinNewTokensLogitsProcessor(generation_config.max_new_tokens, tokenizer.eos_token_id)
             ]
-        )[0]
+        )
         end = time.time()
 
         generation_time_list.append(end - start)
-        num_generated_tokens_list.append(len(output_ids) - len(input_ids))
+        num_generated_tokens = 0
+        for output_ids in outputs_ids:
+            num_generated_tokens += len(
+                [
+                    token_id for token_id in output_ids[len(input_ids):] if token_id != tokenizer.pad_token_id
+                ]
+            )
+        num_generated_tokens_list.append(num_generated_tokens)
 
         progress_bar.set_postfix(
             num_tokens=num_generated_tokens_list[-1],
@@ -279,7 +286,7 @@ def main():
 
     generation_config = GenerationConfig(
         num_beams=args.num_beams,
-        num_return_sequences=1,
+        num_return_sequences=args.num_beams,
         do_sample=args.do_sample,
         min_new_tokens=args.max_new_tokens,
         max_new_tokens=args.max_new_tokens,
