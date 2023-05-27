@@ -248,7 +248,19 @@ print(
 [examples](examples/README.md) provide plenty of example scripts to use `auto_gptq` in different ways.
 
 ## Supported Models
-Currently, `auto_gptq` supports: `bloom`, `gpt2`, `gpt_neox`, `gptj`, `llama`, `moss` and `opt`; more Transformer models will come soon!
+
+| model                              | quantization | inference | peft-lora | peft-adaption_prompt |
+|------------------------------------|--------------|-----------|-----------|----------------------|
+| bloom                              | ✅            | ✅         |           |                      |
+| gpt2                               | ✅            | ✅         |           |                      |
+| gpt_neox                           | ✅            | ✅         |           |                      |
+| gptj                               | ✅            | ✅         |           |                      |
+| llama                              | ✅            | ✅         |           |                      |
+| moss                               | ✅            | ✅         |           |                      |
+| opt                                | ✅            | ✅         |           |                      |
+| gpt_bigcode                        | ✅            | ✅         |           |                      |
+| codegen                            | ✅            | ✅         |           |                      |
+| falcon(RefinedWebModel/RefinedWeb) | ✅            | ✅         |           |                      |
 
 ## Supported Evaluation Tasks
 Currently, `auto_gptq` supports: `LanguageModelingTask`, `SequenceClassificationTask` and `TextSummarizationTask`; more Tasks will come soon!

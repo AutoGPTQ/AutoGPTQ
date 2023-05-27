@@ -250,7 +250,19 @@ print(
 [示例](examples/README.md) 提供了大量示例脚本以将 `auto_gptq` 用于不同领域。
 
 ## 支持的模型
-目前， `auto_gptq` 支持以下模型： `bloom`, `gpt2`, `gpt_neox`, `gptj`, `llama`, `moss` 和 `opt`；更多的 Transformer 模型即将到来！
+
+| model                              | quantization | inference | peft-lora | peft-adaption_prompt |
+|------------------------------------|--------------|-----------|-----------|----------------------|
+| bloom                              | ✅            | ✅         |           |                      |
+| gpt2                               | ✅            | ✅         |           |                      |
+| gpt_neox                           | ✅            | ✅         |           |                      |
+| gptj                               | ✅            | ✅         |           |                      |
+| llama                              | ✅            | ✅         |           |                      |
+| moss                               | ✅            | ✅         |           |                      |
+| opt                                | ✅            | ✅         |           |                      |
+| gpt_bigcode                        | ✅            | ✅         |           |                      |
+| codegen                            | ✅            | ✅         |           |                      |
+| falcon(RefinedWebModel/RefinedWeb) | ✅            | ✅         |           |                      |
 
 ## 支持的评估任务
 目前， `auto_gptq` 支持以下评估任务： `LanguageModelingTask`, `SequenceClassificationTask` 和 `TextSummarizationTask`；更多的评估任务即将到来！
