@@ -7,5 +7,6 @@ from .gptj import *
 from .llama import *
 from .moss import *
 from .opt import *
+from .rw import *
 from .gpt_bigcode import *
 from .codegen import *
