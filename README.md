@@ -22,6 +22,28 @@
 
 *For more histories please turn to [here](docs/NEWS_OR_UPDATE.md)*
 
+## Performance Comparison
+
+### Inference Speed
+> The result is generated using [this script](examples/benchmark/generation_speed.py), batch size of input is 1, decode strategy is beam search and enforce the model to generate 512 tokens, speed metric is tokens/s (the larger, the better).
+> 
+> The quantized model is loaded using the setup that can gain the fastest inference speed.
+
+| model         | GPU           | num_beams | fp16  | gptq-int4 |
+|---------------|---------------|-----------|-------|-----------|
+| llama-7b      | 1xA100-40G    | 1         | 18.87 | 25.53     |
+| llama-7b      | 1xA100-40G    | 4         | 68.79 | 91.30     |
+| moss-moon 16b | 1xA100-40G    | 1         | 12.48 | 15.25     |
+| moss-moon 16b | 1xA100-40G    | 4         | OOM   | 42.67     |
+| moss-moon 16b | 2xA100-40G    | 1         | 06.83 | 06.78     |
+| moss-moon 16b | 2xA100-40G    | 4         | 13.10 | 10.80     |
+| gpt-j 6b      | 1xRTX3060-12G | 1         | OOM   | 29.55     |
+| gpt-j 6b      | 1xRTX3060-12G | 4         | OOM   | 47.36     |
+
+
+### Perplexity
+For perplexity comparison, you can turn to [here](https://github.com/qwopqwop200/GPTQ-for-LLaMa#result) and [here](https://github.com/qwopqwop200/GPTQ-for-LLaMa#gptq-vs-bitsandbytes)
+
 ## Installation
 
 ### Quick Installation
@@ -255,7 +277,7 @@ print(
 | gpt2                               | ✅            | ✅         |           |                      |
 | gpt_neox                           | ✅            | ✅         |           |                      |
 | gptj                               | ✅            | ✅         |           |                      |
-| llama                              | ✅            | ✅         |           |                      |
+| llama                              | ✅            | ✅         |           | ✅                    |
 | moss                               | ✅            | ✅         |           |                      |
 | opt                                | ✅            | ✅         |           |                      |
 | gpt_bigcode                        | ✅            | ✅         |           |                      |

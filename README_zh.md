@@ -22,6 +22,28 @@
 
 *获取更多的历史信息，请转至[这里](docs/NEWS_OR_UPDATE.md)*
 
+## 性能对比
+
+### 推理速度
+> 以下结果通过[这个脚本](examples/benchmark/generation_speed.py)生成，文本输入的 batch size 为1，解码策略为 beam search 并且强制模型生成512个 token，速度的计量单位为 tokens/s（越大越好）。
+> 
+> 量化模型通过能够最大化推理速度的方式加载。
+
+| model         | GPU           | num_beams | fp16  | gptq-int4 |
+|---------------|---------------|-----------|-------|-----------|
+| llama-7b      | 1xA100-40G    | 1         | 18.87 | 25.53     |
+| llama-7b      | 1xA100-40G    | 4         | 68.79 | 91.30     |
+| moss-moon 16b | 1xA100-40G    | 1         | 12.48 | 15.25     |
+| moss-moon 16b | 1xA100-40G    | 4         | OOM   | 42.67     |
+| moss-moon 16b | 2xA100-40G    | 1         | 06.83 | 06.78     |
+| moss-moon 16b | 2xA100-40G    | 4         | 13.10 | 10.80     |
+| gpt-j 6b      | 1xRTX3060-12G | 1         | OOM   | 29.55     |
+| gpt-j 6b      | 1xRTX3060-12G | 4         | OOM   | 47.36     |
+
+
+### 困惑度（PPL）
+对于困惑度的对比， 你可以参考 [这里](https://github.com/qwopqwop200/GPTQ-for-LLaMa#result) 和 [这里](https://github.com/qwopqwop200/GPTQ-for-LLaMa#gptq-vs-bitsandbytes)
+
 ## 安装
 
 ### 快速安装
@@ -257,7 +279,7 @@ print(
 | gpt2                               | ✅            | ✅         |           |                      |
 | gpt_neox                           | ✅            | ✅         |           |                      |
 | gptj                               | ✅            | ✅         |           |                      |
-| llama                              | ✅            | ✅         |           |                      |
+| llama                              | ✅            | ✅         |           | ✅                    |
 | moss                               | ✅            | ✅         |           |                      |
 | opt                                | ✅            | ✅         |           |                      |
 | gpt_bigcode                        | ✅            | ✅         |           |                      |
