@@ -3,6 +3,7 @@ from typing import Dict, Optional, Union
 from ._base import BaseQuantizeConfig, BaseGPTQForCausalLM
 from ._utils import check_and_get_model_type
 from .bloom import BloomGPTQForCausalLM
+from .codegen import CodeGenGPTQForCausalLM
 from .gpt_neox import GPTNeoXGPTQForCausalLM
 from .gptj import GPTJGPTQForCausalLM
 from .gpt2 import GPT2GPTQForCausalLM
@@ -21,6 +22,7 @@ GPTQ_CAUSAL_LM_MODEL_MAP = {
     "opt": OPTGPTQForCausalLM,
     "moss": MOSSGPTQForCausalLM,
     "gpt_bigcode": GPTBigCodeGPTQForCausalLM
+    "codegen": CodeGenGPTQForCausalLM
 }
 
 
