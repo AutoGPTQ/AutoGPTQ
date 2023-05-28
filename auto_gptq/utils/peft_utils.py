@@ -89,28 +89,7 @@ class GPTQLoraLinear(torch.nn.Linear, LoraLayer):
         return result
 
 
-class GPTQLoraModel(torch.nn.Module):
-    def __init__(self, model, config, adapter_name):
-        super().__init__()
-        self.model = model
-        self.forward = self.model.forward
-        self.peft_config = config
-        self.add_adapter(adapter_name, self.peft_config[adapter_name])
-
-    def add_adapter(self, adapter_name, config=None):
-        if config is not None:
-            model_config = self.model.config.to_dict() if hasattr(self.model.config, "to_dict") else self.model.config
-            config = self._prepare_lora_config(config, model_config)
-            self.peft_config[adapter_name] = config
-        self._find_and_replace(adapter_name)
-        if len(self.peft_config) > 1 and self.peft_config[adapter_name].bias != "none":
-            raise ValueError(
-                "LoraModel supports only 1 adapter with bias. When using multiple adapters, set bias to 'none' for all adapters."
-            )
-        mark_only_lora_as_trainable(self.model, self.peft_config[adapter_name].bias)
-        if self.peft_config[adapter_name].inference_mode:
-            _freeze_adapter(self.model, adapter_name)
-
+class GPTQLoraModel(LoraModel):
     def _find_and_replace(self, adapter_name):
         lora_config = self.peft_config[adapter_name]
         is_target_modules_in_base_model = False
@@ -188,93 +167,14 @@ class GPTQLoraModel(torch.nn.Module):
             if "lora_" in name:
                 module.to(old_module.weight.device)
 
-    def __getattr__(self, name: str):
-        """Forward missing attributes to the wrapped module."""
-        try:
-            return super().__getattr__(name)  # defer to nn.Module's logic
-        except AttributeError:
-            return getattr(self.model, name)
-
-    def get_peft_config_as_dict(self, inference: bool = False):
-        config_dict = {}
-        for key, value in self.peft_config.items():
-            config = {k: v.value if isinstance(v, Enum) else v for k, v in asdict(value).items()}
-            if inference:
-                config["inference_mode"] = True
-        config_dict[key] = config
-        return config
-
-    def _set_adapter_layers(self, enabled=True):
-        for module in self.model.modules():
-            if isinstance(module, LoraLayer):
-                module.disable_adapters = False if enabled else True
-
-    def enable_adapter_layers(self):
-        self._set_adapter_layers(enabled=True)
-
-    def disable_adapter_layers(self):
-        self._set_adapter_layers(enabled=False)
-
-    def set_adapter(self, adapter_name):
-        for module in self.model.modules():
-            if isinstance(module, LoraLayer):
-                if module.merged:
-                    warnings.warn("Adapter cannot be set when the model is merged. Unmerging the model first.")
-                    module.unmerge()
-                module.active_adapter = adapter_name
-
     def merge_adapter(self):
         raise NotImplementedError("gptq model not support merge lora adapter")
 
     def unmerge_adapter(self):
         raise NotImplementedError("gptq model not support unmerge lora adapter")
 
-    @staticmethod
-    def _prepare_lora_config(peft_config, model_config):
-        if peft_config.target_modules is None:
-            if model_config["model_type"] not in TRANSFORMERS_MODELS_TO_LORA_TARGET_MODULES_MAPPING:
-                raise ValueError("Please specify `target_modules` in `peft_config`")
-            peft_config.target_modules = TRANSFORMERS_MODELS_TO_LORA_TARGET_MODULES_MAPPING[model_config["model_type"]]
-        if peft_config.inference_mode:
-            peft_config.merge_weights = True
-        return peft_config
-
     def merge_and_unload(self):
         raise NotImplementedError("gptq model not support merge and unload")
-
-    def add_weighted_adapter(self, adapters, weights, adapter_name):
-        if len({self.peft_config[adapter].r for adapter in adapters}) != 1:
-            raise ValueError("All adapters must have the same r value")
-        self.peft_config[adapter_name] = self.peft_config[adapters[0]]
-        self.peft_config[adapter_name].lora_alpha = self.peft_config[adapters[0]].r
-        self._find_and_replace(adapter_name)
-        mark_only_lora_as_trainable(self.model, self.peft_config[adapter_name].bias)
-        _freeze_adapter(self.model, adapter_name)
-        key_list = [key for key, _ in self.model.named_modules() if "lora" not in key]
-        for key in key_list:
-            _, target, _ = _get_submodules(self.model, key)
-            if isinstance(target, LoraLayer):
-                if adapter_name in target.lora_A:
-                    target.lora_A[adapter_name].weight.data = target.lora_A[adapter_name].weight.data * 0.0
-                    target.lora_B[adapter_name].weight.data = target.lora_B[adapter_name].weight.data * 0.0
-                    for adapter, weight in zip(adapters, weights):
-                        if adapter not in target.lora_A:
-                            continue
-                        target.lora_A[adapter_name].weight.data += (
-                            target.lora_A[adapter].weight.data * weight * target.scaling[adapter]
-                        )
-                        target.lora_B[adapter_name].weight.data += target.lora_B[adapter].weight.data * weight
-
-                elif adapter_name in target.lora_embedding_A:
-                    target.lora_embedding_A[adapter_name].data = target.lora_embedding_A[adapter_name].data * 0.0
-                    target.lora_embedding_B[adapter_name].data = target.lora_embedding_B[adapter_name].data * 0.0
-                    for adapter, weight in zip(adapters, weights):
-                        if adapter not in target.lora_embedding_A:
-                            continue
-                        target.lora_embedding_A[adapter_name].data += (
-                            target.lora_embedding_A[adapter].data * weight * target.scaling[adapter]
-                        )
-                        target.lora_embedding_B[adapter_name].data += target.lora_embedding_B[adapter].data * weight
 
 
 def find_all_linear_names(model: BaseGPTQForCausalLM, ignore: Optional[List[str]] = None, ignore_lm_head: bool = True):
