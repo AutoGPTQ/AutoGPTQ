@@ -388,6 +388,13 @@ def get_gptq_peft_model(
                 peft_config = GPTQAdaLoraConfig(**peft_config.to_dict())
             peft_config.injected_fused_attention = model.injected_fused_attention
             peft_config.injected_fused_mlp = model.injected_fused_mlp
+        if peft_type == PeftType.ADAPTION_PROMPT.value and peft_config.adapter_layers > model.config.num_hidden_layers:
+            warnings.warn(
+                f"model has only {model.config.num_hidden_layers} layers "
+                f"but adapter_layers is set to {peft_config.adapter_layers}, "
+                f"will reset value to {model.config.num_hidden_layers}."
+            )
+            peft_config.adapter_layers = model.config.num_hidden_layers
 
     with hijack_peft_mappings():
         try:
