@@ -83,11 +83,34 @@ Use `--help` flag to see detailed descriptions for more command arguments.
 > Commands in this chapter should be run under `benchmark` folder.
 
 ### Generation Speed
-`generation_speed.py` scripts gives an example of how to benchmark the generations speed of pretrained and quantized models that `auto_gptq` supports, this benchmarks model generation speed in tokens/s metric.
+`generation_speed.py` script gives an example of how to benchmark the generations speed of pretrained and quantized models that `auto_gptq` supports, this benchmarks model generation speed in tokens/s metric.
 
-To eexcute this script, using command like this:
+To execute this script, using command like this:
 ```shell
 CUDA_VISIBLE_DEVICES=0 python generation_speed.py --model_name_pr_path PATH/TO/MODEL/DIR
+```
+
+Use `--help` flag to see detailed descriptions for more command arguments.
+
+## PEFT
+> Commands in this chapter should be run under `peft` folder.
+
+### Lora
+`peft_lora_clm.py` script gives an example of instruction tuning gptq quantized model's lora adapter using tools in `auto_gptq.utils.peft_utils` and `🤗 peft` on alpaca dataset.
+
+To execute this script, using command like this:
+```shell
+CUDA_VISIBLE_DEVICES=0 python peft_lora_clm.py --model_name_or_path PATH/TO/MODEL/DIR
+```
+
+Use `--help` flag to see detailed descriptions for more command arguments.
+
+### AdaLora
+`peft_adalora_clm.py` script gives an example of instruction tuning gptq quantized model's adalora adapter using tools in `auto_gptq.utils.peft_utils` and `🤗 peft` on alpaca dataset.
+
+To execute this script, using command like this:
+```shell
+CUDA_VISIBLE_DEVICES=0 python peft_adalora_clm.py --model_name_or_path PATH/TO/MODEL/DIR
 ```
 
 Use `--help` flag to see detailed descriptions for more command arguments.
