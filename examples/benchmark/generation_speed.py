@@ -282,7 +282,9 @@ def main():
         model.warmup_triton()
 
     logger.info("loading data")
-    examples = load_data("dataset/alpaca_data_cleaned.json", tokenizer, args.num_samples, args.max_new_tokens)
+    examples = load_data(
+        "../quantization/dataset/alpaca_data_cleaned.json", tokenizer, args.num_samples, args.max_new_tokens
+    )
 
     generation_config = GenerationConfig(
         num_beams=args.num_beams,
