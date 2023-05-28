@@ -1,5 +1,6 @@
 import warnings
 import re
+from contextlib import contextmanager
 from dataclasses import asdict
 from enum import Enum
 from typing import List, Optional
@@ -7,7 +8,8 @@ from typing import List, Optional
 import torch
 from peft import get_peft_model, PeftConfig, PeftModel, PeftType
 from peft.peft_model import PEFT_TYPE_TO_MODEL_MAPPING
-from peft.tuners.lora import LoraLayer, LoraModel, Embedding, mark_only_lora_as_trainable, _freeze_adapter
+from peft.tuners.lora import LoraConfig, LoraLayer, LoraModel, Embedding, mark_only_lora_as_trainable, _freeze_adapter
+from peft.mapping import PEFT_TYPE_TO_CONFIG_MAPPING
 from peft.utils.other import (
     _get_submodules,
     TRANSFORMERS_MODELS_TO_LORA_TARGET_MODULES_MAPPING,
@@ -15,6 +17,10 @@ from peft.utils.other import (
 )
 
 from ..modeling._base import BaseGPTQForCausalLM
+
+
+class GPTQLoraConfig(LoraConfig):
+    injected_fused_attention: bool = False
 
 
 class GPTQLoraLinear(torch.nn.Linear, LoraLayer):
@@ -157,7 +163,6 @@ class GPTQLoraModel(torch.nn.Module):
                                 f"Currently, only `torch.nn.Linear` and its subclasses are supported."
                             )
                         new_module = GPTQLoraLinear(adapter_name, target, **kwargs)
-                        print(f"{target_name} => GPTQLoraLinear")
 
                     self._replace_module(parent, target_name, new_module, target)
         if not is_target_modules_in_base_model:
@@ -272,7 +277,12 @@ class GPTQLoraModel(torch.nn.Module):
                         target.lora_embedding_B[adapter_name].data += target.lora_embedding_B[adapter].data * weight
 
 
-def find_all_linear_names(model: BaseGPTQForCausalLM, ignore: Optional[List[str]] = None):
+def find_all_linear_names(model: BaseGPTQForCausalLM, ignore: Optional[List[str]] = None, ignore_lm_head: bool = True):
+    if not ignore:
+        ignore = []
+    lm_head_name = model.lm_head_name
+    if ignore_lm_head and lm_head_name not in ignore:
+        ignore.append(lm_head_name)
     results = set()
     for n, m in model.named_modules():
         if isinstance(m, torch.nn.Linear):
@@ -282,26 +292,54 @@ def find_all_linear_names(model: BaseGPTQForCausalLM, ignore: Optional[List[str]
     return list(results)
 
 
+@contextmanager
+def hijack_peft_mappings():
+    PEFT_TYPE_TO_CONFIG_MAPPING[PeftType.LORA] = GPTQLoraConfig
+    PEFT_TYPE_TO_MODEL_MAPPING[PeftType.LORA] = GPTQLoraModel
+
+    try:
+        yield
+    except:
+        PEFT_TYPE_TO_CONFIG_MAPPING[PeftType.LORA] = LoraConfig
+        PEFT_TYPE_TO_MODEL_MAPPING[PeftType.LORA] = LoraModel
+        raise
+    finally:
+        PEFT_TYPE_TO_CONFIG_MAPPING[PeftType.LORA] = LoraConfig
+        PEFT_TYPE_TO_MODEL_MAPPING[PeftType.LORA] = LoraModel
+
+
 def get_gptq_peft_model(
     model: BaseGPTQForCausalLM,
     peft_config: PeftConfig = None,
     model_id: str = None,
     adapter_name: str = "default"
 ):
-    PEFT_TYPE_TO_MODEL_MAPPING[PeftType.LORA] = GPTQLoraModel
+    if (
+        model.fused_attn_module_type is not None and not model.injected_fused_attention
+    ):
+        warnings.warn(
+            "You can just ignore this warning if the peft type you use isn't lora.\n"
+            f"{model.__class__.__name__} supports injecting fused attention but not enables this time. "
+            "If you are training lora adapters, you must also disable fused attention injection when loading quantized "
+            "base model at inference time, otherwise adapters may not be added to base model properly. "
+            "If you are loading lora adapters to do inference, you can reference to adapter's config file to check "
+            "whether the adapters are trained using base model that not enable fused attention injection"
+        )
 
-    try:
-        if model_id is None:
-            if not peft_config:
-                raise ValueError("peft_config can't be None when model_id is None.")
-            peft_model = get_peft_model(model.model, peft_config)
-        else:
-            peft_model = PeftModel.from_pretrained(model.model, model_id, adapter_name)
-    except:
-        PEFT_TYPE_TO_MODEL_MAPPING[PeftType.LORA] = LoraModel
-        raise NotImplementedError(f"auto_gptq not support {peft_config.peft_type.value} peft type yet.")
-    finally:
-        PEFT_TYPE_TO_MODEL_MAPPING[PeftType.LORA] = LoraModel
+    if isinstance(peft_config, LoraConfig) and not isinstance(peft_config, GPTQLoraConfig):
+        peft_config = GPTQLoraConfig(**peft_config.to_dict())
+        peft_config.injected_fused_attention = model.injected_fused_attention
+
+    with hijack_peft_mappings():
+        try:
+            if model_id is None:
+                if not peft_config:
+                    raise ValueError("peft_config can't be None when model_id is None.")
+                peft_model = get_peft_model(model.model, peft_config)
+            else:
+                peft_model = PeftModel.from_pretrained(model.model, model_id, adapter_name)
+        except:
+            raise NotImplementedError(f"auto_gptq not support {peft_config.peft_type.value} peft type yet.")
 
     return peft_model
 
