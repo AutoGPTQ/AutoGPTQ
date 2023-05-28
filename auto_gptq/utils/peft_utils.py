@@ -312,7 +312,9 @@ def get_gptq_peft_model(
     model: BaseGPTQForCausalLM,
     peft_config: PeftConfig = None,
     model_id: str = None,
-    adapter_name: str = "default"
+    adapter_name: str = "default",
+    auto_find_all_linears: bool = True,
+    train_mode: bool = False
 ):
     if (
         model.fused_attn_module_type is not None and not model.injected_fused_attention
@@ -323,8 +325,15 @@ def get_gptq_peft_model(
             "If you are training lora adapters, you must also disable fused attention injection when loading quantized "
             "base model at inference time, otherwise adapters may not be added to base model properly. "
             "If you are loading lora adapters to do inference, you can reference to adapter's config file to check "
-            "whether the adapters are trained using base model that not enable fused attention injection"
+            "whether the adapters are trained using base model that not enable fused attention injection."
         )
+
+    if train_mode and not peft_config:
+        raise ValueError("peft_config not specified when in train mode.")
+    if not train_mode and not model_id:
+        raise ValueError("model_id(where to load adapters) not specified when in inference mode.")
+    if train_mode and peft_config.peft_type == PeftType.LORA and auto_find_all_linears:
+        peft_config.target_modules = find_all_linear_names(model, ignore_lm_head=True)
 
     if isinstance(peft_config, LoraConfig) and not isinstance(peft_config, GPTQLoraConfig):
         peft_config = GPTQLoraConfig(**peft_config.to_dict())
@@ -332,9 +341,7 @@ def get_gptq_peft_model(
 
     with hijack_peft_mappings():
         try:
-            if model_id is None:
-                if not peft_config:
-                    raise ValueError("peft_config can't be None when model_id is None.")
+            if train_mode:
                 peft_model = get_peft_model(model.model, peft_config)
             else:
                 peft_model = PeftModel.from_pretrained(model.model, model_id, adapter_name)
