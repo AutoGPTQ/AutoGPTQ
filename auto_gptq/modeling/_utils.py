@@ -29,9 +29,9 @@ def move_to_device(obj: Union[torch.Tensor, nn.Module], device: torch.device):
 def find_layers(module, layers=None, name=''):
     if not layers:
         layers = [transformers.pytorch_utils.Conv1D, nn.Conv2d, nn.Linear]
-
-    if type(module) in layers:
-        return {name: module}
+    for layer in layers:
+        if isinstance(module,layer):
+            return {name: module}
     res = {}
     for name1, child in module.named_children():
         res.update(find_layers(child, layers=layers, name=name + '.' + name1 if name != '' else name1))
@@ -71,13 +71,13 @@ def make_quant(
         if name1 in names:
             ori_layer_device = get_device(getattr(module, attr))
             delattr(module, attr)
-            if type(tmp) == nn.Linear:
+            if isinstance(tmp,nn.Linear):
                 in_features = tmp.in_features
                 out_features = tmp.out_features
-            elif type(tmp) == nn.Conv2d:
+            elif isinstance(tmp,nn.Conv2d):
                 in_features = tmp.in_channels
                 out_features = tmp.out_channels
-            elif type(tmp) == transformers.pytorch_utils.Conv1D:            
+            elif isinstance(tmp,transformers.pytorch_utils.Conv1D):            
                 in_features = tmp.weight.shape[0]
                 out_features = tmp.weight.shape[1]
             if (not(desc_act) or group_size == -1) and not use_triton:

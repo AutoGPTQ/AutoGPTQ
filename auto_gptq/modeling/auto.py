@@ -1,15 +1,19 @@
+from inspect import signature
 from typing import Dict, Optional, Union
 
 from ._base import BaseQuantizeConfig, BaseGPTQForCausalLM
 from ._utils import check_and_get_model_type
 from .bloom import BloomGPTQForCausalLM
+from .codegen import CodeGenGPTQForCausalLM
 from .gpt_neox import GPTNeoXGPTQForCausalLM
 from .gptj import GPTJGPTQForCausalLM
 from .gpt2 import GPT2GPTQForCausalLM
 from .llama import LlamaGPTQForCausalLM
 from .moss import MOSSGPTQForCausalLM
 from .opt import OPTGPTQForCausalLM
-from inspect import signature
+from .rw import RWGPTQForCausalLM
+from .gpt_bigcode import GPTBigCodeGPTQForCausalLM
+
 
 GPTQ_CAUSAL_LM_MODEL_MAP = {
     "bloom": BloomGPTQForCausalLM,
@@ -18,7 +22,11 @@ GPTQ_CAUSAL_LM_MODEL_MAP = {
     "gpt2": GPT2GPTQForCausalLM,
     "llama": LlamaGPTQForCausalLM,
     "opt": OPTGPTQForCausalLM,
-    "moss": MOSSGPTQForCausalLM
+    "moss": MOSSGPTQForCausalLM,
+    "gpt_bigcode": GPTBigCodeGPTQForCausalLM,
+    "codegen": CodeGenGPTQForCausalLM,
+    "RefinedWebModel": RWGPTQForCausalLM,
+    "RefinedWeb":RWGPTQForCausalLM
 }
 
 

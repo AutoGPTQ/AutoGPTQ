@@ -16,12 +16,33 @@
 </h4>
 
 ## News or Update
-- 2023-05-12 - (In Progress) - `peft` + `auto-gptq` + multi-modal data = easily fine tune LLMs to gain multi-modal instruction following ability with low resources, stay tune!
+- 2023-05-27 - (Update) - Support quantization and inference for `gpt_bigcode`, `codegen` and `RefineWeb/RefineWebModel`(falcon) model types.
 - 2023-05-04 - (Update) - Support using faster cuda kernel when `not desc_act or group_size == -1`.
 - 2023-04-29 - (Update) - Support loading quantized model from arbitrary quantize_config and model_basename.
-- 2023-04-28 - (Update) - Support CPU offload and quantize/inference on multiple devices, support `gpt2` type models.
 
 *For more histories please turn to [here](docs/NEWS_OR_UPDATE.md)*
+
+## Performance Comparison
+
+### Inference Speed
+> The result is generated using [this script](examples/benchmark/generation_speed.py), batch size of input is 1, decode strategy is beam search and enforce the model to generate 512 tokens, speed metric is tokens/s (the larger, the better).
+> 
+> The quantized model is loaded using the setup that can gain the fastest inference speed.
+
+| model         | GPU           | num_beams | fp16  | gptq-int4 |
+|---------------|---------------|-----------|-------|-----------|
+| llama-7b      | 1xA100-40G    | 1         | 18.87 | 25.53     |
+| llama-7b      | 1xA100-40G    | 4         | 68.79 | 91.30     |
+| moss-moon 16b | 1xA100-40G    | 1         | 12.48 | 15.25     |
+| moss-moon 16b | 1xA100-40G    | 4         | OOM   | 42.67     |
+| moss-moon 16b | 2xA100-40G    | 1         | 06.83 | 06.78     |
+| moss-moon 16b | 2xA100-40G    | 4         | 13.10 | 10.80     |
+| gpt-j 6b      | 1xRTX3060-12G | 1         | OOM   | 29.55     |
+| gpt-j 6b      | 1xRTX3060-12G | 4         | OOM   | 47.36     |
+
+
+### Perplexity
+For perplexity comparison, you can turn to [here](https://github.com/qwopqwop200/GPTQ-for-LLaMa#result) and [here](https://github.com/qwopqwop200/GPTQ-for-LLaMa#gptq-vs-bitsandbytes)
 
 ## Installation
 
@@ -243,7 +264,19 @@ print(
 [examples](examples/README.md) provide plenty of example scripts to use `auto_gptq` in different ways.
 
 ## Supported Models
-Currently, `auto_gptq` supports: `bloom`, `gpt2`, `gpt_neox`, `gptj`, `llama`, `moss` and `opt`; more Transformer models will come soon!
+
+| model                              | quantization | inference | peft-lora | peft-adaption_prompt |
+|------------------------------------|--------------|-----------|-----------|----------------------|
+| bloom                              | ✅            | ✅         |           |                      |
+| gpt2                               | ✅            | ✅         |           |                      |
+| gpt_neox                           | ✅            | ✅         |           |                      |
+| gptj                               | ✅            | ✅         |           |                      |
+| llama                              | ✅            | ✅         |           | ✅                    |
+| moss                               | ✅            | ✅         |           |                      |
+| opt                                | ✅            | ✅         |           |                      |
+| gpt_bigcode                        | ✅            | ✅         |           |                      |
+| codegen                            | ✅            | ✅         |           |                      |
+| falcon(RefinedWebModel/RefinedWeb) | ✅            | ✅         |           |                      |
 
 ## Supported Evaluation Tasks
 Currently, `auto_gptq` supports: `LanguageModelingTask`, `SequenceClassificationTask` and `TextSummarizationTask`; more Tasks will come soon!
@@ -251,3 +284,6 @@ Currently, `auto_gptq` supports: `LanguageModelingTask`, `SequenceClassification
 ## Acknowledgement
 - Specially thanks **Elias Frantar**, **Saleh Ashkboos**, **Torsten Hoefler** and **Dan Alistarh** for proposing **GPTQ** algorithm and open source the [code](https://github.com/IST-DASLab/gptq).
 - Specially thanks **qwopqwop200**, for code in this project that relevant to quantization are mainly referenced from [GPTQ-for-LLaMa](https://github.com/qwopqwop200/GPTQ-for-LLaMa/tree/cuda).
+
+
+[![Star History Chart](https://api.star-history.com/svg?repos=PanQiwei/AutoGPTQ&type=Date)](https://star-history.com/#PanQiWei/AutoGPTQ&Date)

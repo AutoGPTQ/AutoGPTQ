@@ -16,12 +16,33 @@
 </h4>
 
 ## 新闻或更新
-- 2023-05-12 - (进行中) - `peft` + `auto-gptq` + 多模态数据 = 低资源条件下轻松微调大语言模型以获得多模态指令遵循能力，敬请关注！
+- 2023-05-27 - (更新) - 支持以下模型的量化和推理： `gpt_bigcode`， `codegen` 以及 `RefineWeb/RefineWebModel`（falcon）。
 - 2023-05-04 - (更新) - 支持在 `not desc_act or group_size == -1` 的情况下使用更快的 cuda 算子。
 - 2023-04-29 - (更新) - 支持从指定的模型权重文件名或量化配置(quantize_config)加载量化过的模型。
-- 2023-04-28 - (更新) - 支持 CPU 分载权重和在多设备上执行模型量化或推理, 支持 `gpt2` 类型的模型。
 
 *获取更多的历史信息，请转至[这里](docs/NEWS_OR_UPDATE.md)*
+
+## 性能对比
+
+### 推理速度
+> 以下结果通过[这个脚本](examples/benchmark/generation_speed.py)生成，文本输入的 batch size 为1，解码策略为 beam search 并且强制模型生成512个 token，速度的计量单位为 tokens/s（越大越好）。
+> 
+> 量化模型通过能够最大化推理速度的方式加载。
+
+| model         | GPU           | num_beams | fp16  | gptq-int4 |
+|---------------|---------------|-----------|-------|-----------|
+| llama-7b      | 1xA100-40G    | 1         | 18.87 | 25.53     |
+| llama-7b      | 1xA100-40G    | 4         | 68.79 | 91.30     |
+| moss-moon 16b | 1xA100-40G    | 1         | 12.48 | 15.25     |
+| moss-moon 16b | 1xA100-40G    | 4         | OOM   | 42.67     |
+| moss-moon 16b | 2xA100-40G    | 1         | 06.83 | 06.78     |
+| moss-moon 16b | 2xA100-40G    | 4         | 13.10 | 10.80     |
+| gpt-j 6b      | 1xRTX3060-12G | 1         | OOM   | 29.55     |
+| gpt-j 6b      | 1xRTX3060-12G | 4         | OOM   | 47.36     |
+
+
+### 困惑度（PPL）
+对于困惑度的对比， 你可以参考 [这里](https://github.com/qwopqwop200/GPTQ-for-LLaMa#result) 和 [这里](https://github.com/qwopqwop200/GPTQ-for-LLaMa#gptq-vs-bitsandbytes)
 
 ## 安装
 
@@ -245,7 +266,19 @@ print(
 [示例](examples/README.md) 提供了大量示例脚本以将 `auto_gptq` 用于不同领域。
 
 ## 支持的模型
-目前， `auto_gptq` 支持以下模型： `bloom`, `gpt2`, `gpt_neox`, `gptj`, `llama`, `moss` 和 `opt`；更多的 Transformer 模型即将到来！
+
+| model                              | quantization | inference | peft-lora | peft-adaption_prompt |
+|------------------------------------|--------------|-----------|-----------|----------------------|
+| bloom                              | ✅            | ✅         |           |                      |
+| gpt2                               | ✅            | ✅         |           |                      |
+| gpt_neox                           | ✅            | ✅         |           |                      |
+| gptj                               | ✅            | ✅         |           |                      |
+| llama                              | ✅            | ✅         |           | ✅                    |
+| moss                               | ✅            | ✅         |           |                      |
+| opt                                | ✅            | ✅         |           |                      |
+| gpt_bigcode                        | ✅            | ✅         |           |                      |
+| codegen                            | ✅            | ✅         |           |                      |
+| falcon(RefinedWebModel/RefinedWeb) | ✅            | ✅         |           |                      |
 
 ## 支持的评估任务
 目前， `auto_gptq` 支持以下评估任务： `LanguageModelingTask`, `SequenceClassificationTask` 和 `TextSummarizationTask`；更多的评估任务即将到来！
@@ -253,3 +286,5 @@ print(
 ## 致谢
 - 特别感谢 **Elias Frantar**， **Saleh Ashkboos**， **Torsten Hoefler** 和 **Dan Alistarh** 提出 **GPTQ** 算法并开源[代码](https://github.com/IST-DASLab/gptq)。
 - 特别感谢 **qwopqwop200**， 本项目中涉及到模型量化的代码主要参考自 [GPTQ-for-LLaMa](https://github.com/qwopqwop200/GPTQ-for-LLaMa/tree/cuda)。
+
+[![Star History Chart](https://api.star-history.com/svg?repos=PanQiwei/AutoGPTQ&type=Date)](https://star-history.com/#PanQiWei/AutoGPTQ&Date)

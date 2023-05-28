@@ -78,3 +78,16 @@ python push_quantized_model_to_hf_hub.py --quantized_model_dir PATH/TO/QUANTIZED
 ```
 
 Use `--help` flag to see detailed descriptions for more command arguments.
+
+## Benchmark
+> Commands in this chapter should be run under `benchmark` folder.
+
+### Generation Speed
+`generation_speed.py` scripts gives an example of how to benchmark the generations speed of pretrained and quantized models that `auto_gptq` supports, this benchmarks model generation speed in tokens/s metric.
+
+To eexcute this script, using command like this:
+```shell
+CUDA_VISIBLE_DEVICES=0 python generation_speed.py --model_name_pr_path PATH/TO/MODEL/DIR
+```
+
+Use `--help` flag to see detailed descriptions for more command arguments.

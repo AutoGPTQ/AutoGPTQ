@@ -442,6 +442,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         quantize_config: BaseQuantizeConfig,
         max_memory: Optional[dict] = None,
         trust_remote_code: bool = False,
+        torch_dtype: torch.dtype = torch.float16,
         **model_init_kwargs
     ):
         """load un-quantized pretrained model to cpu"""
@@ -461,7 +462,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             raise TypeError(f"{config.model_type} isn't supported yet.")
 
         # enforce some values despite user specified
-        model_init_kwargs["torch_dtype"] = torch.float16
+        model_init_kwargs["torch_dtype"] = torch_dtype
         model_init_kwargs["trust_remote_code"] = trust_remote_code
         if max_memory:
             if "disk" in max_memory:
@@ -516,6 +517,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         device: Optional[Union[str, int]] = None,
         low_cpu_mem_usage: bool = False,
         use_triton: bool = False,
+        torch_dtype: torch.dtype = torch.float16,
         inject_fused_attention: bool = True,
         inject_fused_mlp: bool = True,
         use_cuda_fp16: bool = True,
@@ -579,7 +581,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             model = AutoModelForCausalLM.from_config(
                 config,
                 trust_remote_code=trust_remote_code,
-                torch_dtype=torch.float16
+                torch_dtype=torch_dtype
             )
 
             layers = find_layers(model)
