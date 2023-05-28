@@ -160,9 +160,9 @@ with torch.cuda.amp.autocast():
                 tokenizer.batch_decode(torch.argmax(outputs.logits, -1).detach().cpu().numpy(), skip_special_tokens=True)
             )
 
-        eval_epoch_loss = eval_loss / len(train_dataloader)
+        eval_epoch_loss = eval_loss / len(eval_dataloader)
         eval_ppl = torch.exp(eval_epoch_loss)
-        train_epoch_loss = total_loss / len(eval_dataloader)
+        train_epoch_loss = total_loss / len(train_dataloader)
         train_ppl = torch.exp(train_epoch_loss)
         print(f"{epoch=}: {train_ppl=} {train_epoch_loss=} {eval_ppl=} {eval_epoch_loss=}")
 
