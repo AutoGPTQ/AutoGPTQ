@@ -11,6 +11,8 @@ To Execute `basic_usage.py`, using command like this:
 python basic_usage.py
 ```
 
+This script also showcases how to download/upload quantized model from/to 🤗 Hub, to enable those features, you can uncomment the commented codes.
+
 To Execute `basic_usage_with_wikitext2.py`, using command like this:
 ```shell
 python basic_usage_with_wikitext2.py
