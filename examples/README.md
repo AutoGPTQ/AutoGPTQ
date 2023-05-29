@@ -60,25 +60,6 @@ CUDA_VISIBLE_DEVICES=0 python run_text_summarization_task.py --base_model_dir PA
 
 Use `--help` flag to see detailed descriptions for more command arguments.
 
-## Push To Hub
-> Commands in this chapter should be run under `push_to_hub` folder.
-
-You can upload and share your quantized model to Hugging Face Hub by using `push_to_hub` function.
-
-`push_quantized_model_to_hf_hub.py` provide a simple example to upload quantized model, tokenizer and configs at once.
-
-First, you need to login, run the following command in the virtual environment where Hugging Face Transformers is installed:
-```shell
-huggingface-cli login
-```
-
-Then run the script like this:
-```shell
-python push_quantized_model_to_hf_hub.py --quantized_model_dir PATH/TO/QUANTIZED/MODEL/DIR --tokenizer_dir PATH/TO/TOKENIZER/DIR --repo_id REPO/ID
-```
-
-Use `--help` flag to see detailed descriptions for more command arguments.
-
 ## Benchmark
 > Commands in this chapter should be run under `benchmark` folder.
 
