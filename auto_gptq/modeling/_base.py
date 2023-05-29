@@ -1,9 +1,10 @@
 import copy
 import json
+import warnings
 import os
 from dataclasses import dataclass, field, fields
 from logging import getLogger
-from os.path import join, isfile
+from os.path import join, isfile, isdir
 from typing import Dict, List, Optional, Union
 
 import accelerate
@@ -35,6 +36,8 @@ class BaseQuantizeConfig(PushToHubMixin):
     desc_act: bool = field(default=True)
     sym: bool = field(default=True)
     true_sequential: bool = field(default=True)
+    model_name_or_path: Optional[str] = field(default=None)
+    model_file_base_name: Optional[str] = field(default=None)
 
     def __post_init__(self):
         fields_info = fields(self)
@@ -94,6 +97,8 @@ class BaseQuantizeConfig(PushToHubMixin):
             "desc_act": self.desc_act,
             "sym": self.sym,
             "true_sequential": self.true_sequential,
+            "base_model_name_or_path": self.model_name_or_path,
+            "model_file_base_name": self.model_file_base_name,
         }
 
 
@@ -103,8 +108,6 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
     outside_layer_modules: List[str] = None
     inside_layer_modules: List[List[str]] = None
     lm_head_name: str = "lm_head"
-    
-    _quantized_model_path: str = None
 
     fused_attn_module_type: Optional[FusedBaseAttentionModule] = None
     fused_mlp_module_type: Optional[FusedBaseMLPModule] = None
@@ -464,8 +467,8 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             create_pr (`bool`, *optional*, defaults to `False`):
                 Whether or not to create a PR with the uploaded files or directly commit.
         """
-        if self._quantized_model_path is None and save_dir is None:
-            raise ValueError("Quantized model is not saved and save_dir was not provided")
+        if (self.quantize_config.model_name_or_path is None or not isdir(self.quantize_config.model_name_or_path)) and save_dir is None:
+            raise ValueError("Quantized model should be saved first, or you can provide save_dir to make sure model is saved to local disk before uploading.")
         
         if save_dir is not None:
             logger.info(f"Saving model to {save_dir}")
@@ -476,10 +479,10 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         )
         repo_id = repo_url.repo_id
 
-        if self._quantized_model_path is not None:
-            work_dir = self._quantized_model_path
+        if quantized_model_path is not None:
+            work_dir = self.quantize_config.model_name_or_path
             operations = [
-                CommitOperationAdd(path_or_fileobj=os.path.join(work_dir, f), path_in_repo=f)
+                CommitOperationAdd(path_or_fileobj=join(work_dir, f), path_in_repo=f)
                 for f in os.listdir(work_dir)
             ]
             logger.info(f"Uploading the following files to {repo_id}: {','.join(os.listdir(work_dir))}")
@@ -501,7 +504,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
 
         self.model.to(CPU)
 
-        model_save_name = f"gptq_model-{self.quantize_config.bits}bit-{self.quantize_config.group_size}g"
+        model_save_name = self.quantize_config.model_file_base_name or f"gptq_model-{self.quantize_config.bits}bit-{self.quantize_config.group_size}g"
         if use_safetensors:
             model_save_name += ".safetensors"
             state_dict = self.model.state_dict()
@@ -513,7 +516,8 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
 
         self.model.config.save_pretrained(save_dir)
         self.quantize_config.save_pretrained(save_dir)
-        self._quantized_model_path = save_dir
+        self.quantize_config.model_name_or_path = save_dir
+        self.quantize_config.model_file_base_name = model_save_name
 
     def save_pretrained(self, save_dir: str, use_safetensors: bool = False, **kwargs):
         """alias of save_quantized"""
@@ -595,8 +599,8 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
     @classmethod
     def from_quantized(
         cls,
-
-        model_name_or_path: str,
+        model_name_or_path: Optional[str] = None,
+        save_dir: Optional[str] = None,
         device_map: Optional[Union[str, Dict[str, Union[int, str]]]] = None,
         max_memory: Optional[dict] = None,
         device: Optional[Union[str, int]] = None,
@@ -630,6 +634,14 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             use_triton = False
 
         # == step1: prepare configs and file names == #
+        if model_name_or_path and save_dir:
+            logger.warning("save_dir will be ignored because model_name_or_path is explicit specified.")
+        if not model_name_or_path and save_dir:
+            model_name_or_path = save_dir
+            warnings.warn("save_dir is deprecated and will be removed in version 0.3.0", PendingDeprecationWarning, stacklevel=2)
+        if not model_name_or_path and not save_dir:
+            raise ValueError("at least one of model_name_or_path or save_dir should be specified.")
+        
         config = AutoConfig.from_pretrained(model_name_or_path, trust_remote_code=trust_remote_code)
 
         if config.model_type not in SUPPORTED_MODELS:
@@ -637,9 +649,15 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
 
         if quantize_config is None:
             quantize_config = BaseQuantizeConfig.from_pretrained(model_name_or_path, **kwargs)
-
+        
         if model_basename is None:
-            model_basename = f"gptq_model-{quantize_config.bits}bit-{quantize_config.group_size}g"
+            if quantize_config.model_file_base_name:
+                model_basename = quantize_config.model_file_base_name
+            else:
+                model_basename = f"gptq_model-{quantize_config.bits}bit-{quantize_config.group_size}g"
+        
+        quantize_config.model_name_or_path = model_name_or_path
+        quantize_config.model_file_base_name = model_basename
 
         extensions = []
         if use_safetensors:
@@ -648,7 +666,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             extensions += [".bin", ".pt"]
 
         model_name_or_path = str(model_name_or_path)
-        is_local = os.path.isdir(model_name_or_path)
+        is_local = isdir(model_name_or_path)
 
         resolved_archive_file = None
         if is_local:
@@ -657,7 +675,6 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             for ext in extensions:
                 if isfile(model_save_name + ext):
                     resolved_archive_file = model_save_name + ext
-                    cls._quantized_model_path = model_name_or_path
                     break
         else: # remote
             cached_file_kwargs = {
@@ -676,7 +693,6 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             for ext in extensions:
                 resolved_archive_file = cached_file(model_name_or_path, model_basename + ext, **cached_file_kwargs)
                 if resolved_archive_file is not None:
-                    cls._quantized_model_path = os.path.dirname(resolved_archive_file)
                     break
         
         if resolved_archive_file is None: # Could not find a model file to use
