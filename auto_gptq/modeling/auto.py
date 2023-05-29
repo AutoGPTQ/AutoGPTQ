@@ -68,7 +68,7 @@ class AutoGPTQForCausalLM:
         warmup_triton: bool = False,
         **kwargs
     ) -> BaseGPTQForCausalLM:
-        model_type = check_and_get_model_type(save_dir, trust_remote_code)
+        model_type = check_and_get_model_type(save_dir or model_name_or_path, trust_remote_code)
         quant_func = GPTQ_CAUSAL_LM_MODEL_MAP[model_type].from_quantized
         keywords = {key: kwargs[key] for key in signature(quant_func).parameters if key in kwargs}
         return quant_func(
