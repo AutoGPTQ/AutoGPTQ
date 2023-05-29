@@ -16,7 +16,7 @@ from peft import TaskType
 
 parser = ArgumentParser()
 parser.add_argument("--model_name_or_path", type=str)
-parser.add_argument("--lr", type=float, default=3e-3)
+parser.add_argument("--lr", type=float, default=3e-5)
 parser.add_argument("--num_epochs", type=int, default=1)
 parser.add_argument("--sample_max_length", type=int, default=1024, help="max length of sample")
 parser.add_argument("--block_max_length", type=int, default=1024, help="max length of data block(bunch of samples)")
