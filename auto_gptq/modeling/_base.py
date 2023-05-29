@@ -97,7 +97,7 @@ class BaseQuantizeConfig(PushToHubMixin):
             "desc_act": self.desc_act,
             "sym": self.sym,
             "true_sequential": self.true_sequential,
-            "base_model_name_or_path": self.model_name_or_path,
+            "model_name_or_path": self.model_name_or_path,
             "model_file_base_name": self.model_file_base_name,
         }
 
