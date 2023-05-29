@@ -16,9 +16,9 @@
 </h4>
 
 ## 新闻或更新
+- 2023-05-30 - (更新) - 支持从 🤗 Hub 下载量化好的模型或上次量化好的模型到 🤗 Hub。
 - 2023-05-27 - (更新) - 支持以下模型的量化和推理： `gpt_bigcode`， `codegen` 以及 `RefineWeb/RefineWebModel`（falcon）。
 - 2023-05-04 - (更新) - 支持在 `not desc_act or group_size == -1` 的情况下使用更快的 cuda 算子。
-- 2023-04-29 - (更新) - 支持从指定的模型权重文件名或量化配置(quantize_config)加载量化过的模型。
 
 *获取更多的历史信息，请转至[这里](docs/NEWS_OR_UPDATE.md)*
 
@@ -138,13 +138,13 @@ model.save_quantized(quantized_model_dir, use_safetensors=True)
 # 或者可以使用 use_auth_token="hf_xxxxxxx" 来显式地添加账户认证 token
 # （取消下面三行代码的注释来使用该功能）
 # repo_id = f"YourUserName/{quantized_model_dir}"
-# commit_message = f"AutoGPTQ model for {pretrained_model}: {quantize_config.bits}bits, gr{quantize_config.group_size}, desc_act={quantize_config.desc_act}"
+# commit_message = f"AutoGPTQ model for {pretrained_model_dir}: {quantize_config.bits}bits, gr{quantize_config.group_size}, desc_act={quantize_config.desc_act}"
 # model.push_to_hub(repo_id, commit_message=commit_message, use_auth_token=True)
 
 # 或者你也可以同时将量化好的模型保存到本地并上传至 Hugging Face Hub
 # （取消下面三行代码的注释来使用该功能）
 # repo_id = f"YourUserName/{quantized_model_dir}"
-# commit_message = f"AutoGPTQ model for {pretrained_model}: {quantize_config.bits}bits, gr{quantize_config.group_size}, desc_act={quantize_config.desc_act}"
+# commit_message = f"AutoGPTQ model for {pretrained_model_dir}: {quantize_config.bits}bits, gr{quantize_config.group_size}, desc_act={quantize_config.desc_act}"
 # model.push_to_hub(repo_id, save_dir=quantized_model_dir, use_safetensors=True, commit_message=commit_message, use_auth_token=True)
 
 # 加载量化好的模型到能被识别到的第一块显卡中

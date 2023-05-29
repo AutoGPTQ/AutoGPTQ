@@ -16,9 +16,9 @@
 </h4>
 
 ## News or Update
+- 2023-05-30 - (Update) - support download/upload quantized model from/to 🤗 Hub.
 - 2023-05-27 - (Update) - Support quantization and inference for `gpt_bigcode`, `codegen` and `RefineWeb/RefineWebModel`(falcon) model types.
 - 2023-05-04 - (Update) - Support using faster cuda kernel when `not desc_act or group_size == -1`.
-- 2023-04-29 - (Update) - Support loading quantized model from arbitrary quantize_config and model_basename.
 
 *For more histories please turn to [here](docs/NEWS_OR_UPDATE.md)*
 
@@ -141,13 +141,13 @@ model.save_quantized(quantized_model_dir, use_safetensors=True)
 # or pass explcit token with: use_auth_token="hf_xxxxxxx"
 # (uncomment the following three lines to enable this feature)
 # repo_id = f"YourUserName/{quantized_model_dir}"
-# commit_message = f"AutoGPTQ model for {pretrained_model}: {quantize_config.bits}bits, gr{quantize_config.group_size}, desc_act={quantize_config.desc_act}"
+# commit_message = f"AutoGPTQ model for {pretrained_model_dir}: {quantize_config.bits}bits, gr{quantize_config.group_size}, desc_act={quantize_config.desc_act}"
 # model.push_to_hub(repo_id, commit_message=commit_message, use_auth_token=True)
 
 # alternatively you can save and push at the same time
 # (uncomment the following three lines to enable this feature)
 # repo_id = f"YourUserName/{quantized_model_dir}"
-# commit_message = f"AutoGPTQ model for {pretrained_model}: {quantize_config.bits}bits, gr{quantize_config.group_size}, desc_act={quantize_config.desc_act}"
+# commit_message = f"AutoGPTQ model for {pretrained_model_dir}: {quantize_config.bits}bits, gr{quantize_config.group_size}, desc_act={quantize_config.desc_act}"
 # model.push_to_hub(repo_id, save_dir=quantized_model_dir, use_safetensors=True, commit_message=commit_message, use_auth_token=True)
 
 # load quantized model to the first GPU
