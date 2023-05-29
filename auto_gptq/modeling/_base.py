@@ -479,7 +479,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         )
         repo_id = repo_url.repo_id
 
-        if quantized_model_path is not None:
+        if self.quantize_config.model_name_or_path is not None:
             work_dir = self.quantize_config.model_name_or_path
             operations = [
                 CommitOperationAdd(path_or_fileobj=join(work_dir, f), path_in_repo=f)
