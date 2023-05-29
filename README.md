@@ -130,7 +130,7 @@ model.save_quantized(quantized_model_dir, use_safetensors=True)
 # model.push_to_hub(repo_id, save_dir=quantized_model_dir, use_safetensors=True, commit_message=commit_message, use_auth_token=True)
 
 # load quantized model to the first GPU
-model = AutoGPTQForCausalLM.from_quantized(quantized_model_dir)
+model = AutoGPTQForCausalLM.from_quantized(quantized_model_dir, device="cuda:0")
 
 # download quantized model from Hugging Face Hub and load to the first GPU
 # model = AutoGPTQForCausalLM.from_quantized(repo_id, device="cuda:0", use_safetensors=True, use_triton=False)
