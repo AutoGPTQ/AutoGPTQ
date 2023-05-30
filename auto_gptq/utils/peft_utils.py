@@ -353,8 +353,6 @@ def get_gptq_peft_model(
     auto_find_all_linears: bool = True,
     train_mode: bool = False
 ):
-    if train_mode and not model.is_triton_backend:
-        raise NotImplementedError("currently only support triton backend when in train mode.")
     if train_mode and not model.trainable:
         model.enable_trainable_mode()
     if train_mode and not peft_config:
