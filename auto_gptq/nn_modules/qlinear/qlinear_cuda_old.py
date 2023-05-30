@@ -35,7 +35,6 @@ class QuantLinear(nn.Module):
             raise NotImplementedError("Only 2,3,4,8 bits are supported.")
         if trainable:
             _autogptq_cuda_available = False
-            logger.warning("QuantLinear with cuda backend not support trainable mode yet, Switch to the pytorch backend.")
         self.infeatures = infeatures
         self.outfeatures = outfeatures
         self.bits = bits
