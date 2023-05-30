@@ -290,7 +290,11 @@ print(
 
 ## 支持的模型
 
-| model                              | quantization | inference | peft-lora | peft-adaption_prompt |
+> 你可以使用 `model.config.model_type` 来对照下表以检查你正在使用的一个模型是否被 `auto_gptq` 所支持。
+> 
+> 比如， `WizardLM`，`vicuna` 和 `gpt4all` 模型的 `model_type` 皆为 `llama`， 因此这些模型皆被 `auto_gptq` 所支持。
+
+| model type                         | quantization | inference | peft-lora | peft-adaption_prompt |
 |------------------------------------|--------------|-----------|-----------|----------------------|
 | bloom                              | ✅            | ✅         |           |                      |
 | gpt2                               | ✅            | ✅         |           |                      |

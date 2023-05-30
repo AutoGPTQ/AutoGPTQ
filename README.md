@@ -291,7 +291,11 @@ print(
 
 ## Supported Models
 
-| model                              | quantization | inference | peft-lora | peft-adaption_prompt |
+> you can use `model.config.model_type` to compare with the table below to check whether the model you use is supported by `auto_gptq`.
+> 
+> for example, model_type of `WizardLM`, `vicuna` and `gpt4all` are all `llama`, hence they are all supported by `auto_gptq`.
+
+| model type                         | quantization | inference | peft-lora | peft-adaption_prompt |
 |------------------------------------|--------------|-----------|-----------|----------------------|
 | bloom                              | ✅            | ✅         |           |                      |
 | gpt2                               | ✅            | ✅         |           |                      |
