@@ -561,7 +561,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             raise FileNotFoundError(f"Could not find model at {model_save_name}")
 
         if not use_triton and trainable:
-            raise NotImplementedError("For now, trainable mode only supports triton backend.")
+            logger.warning("QuantLinear with cuda backend not support trainable mode yet, Switch to the pytorch backend.")
 
         # == step2: convert model to gptq-model (replace Linear with QuantLinear) == #
         def skip(*args, **kwargs):
