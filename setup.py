@@ -1,3 +1,11 @@
+import sys
+import platform
+python_min_version = (3, 8, 0)
+python_min_version_str = '.'.join(map(str, python_min_version))
+if sys.version_info < python_min_version:
+    print("You are using Python {}. Python >={} is required.".format(platform.python_version(), python_min_version_str))
+    sys.exit(-1)
+
 import os
 from setuptools import setup, find_packages
 
@@ -7,9 +15,12 @@ try:
 except ImportError:
     TORCH_AVAILABLE = False
 
+CUDA_VERSION = "".join(os.environ.get("CUDA_VERSION", "").split("."))
+
+version = "0.2.0" + (f"+cu{CUDA_VERSION}" if CUDA_VERSION else "")
 common_setup_kwargs = {
-    "version": "0.2.0",
-    "name": "auto_auto_gptq",
+    "version": version,
+    "name": "auto_gptq",
     "author": "PanQiWei",
     "description": "An easy-to-use LLMs quantization package with user-friendly apis, based on GPTQ algorithm.",
     "url": "https://github.com/PanQiWei/AutoGPTQ",
@@ -30,7 +41,7 @@ common_setup_kwargs = {
         "Programming Language :: Python :: 3.10",
         "Programming Language :: C++",
     ],
-    "python_requires": ">=3.8"
+    "python_requires": f">={python_min_version_str}"
 }
 
 requirements = [
