@@ -45,6 +45,8 @@ jobs:
           python -m pip install --upgrade setuptools wheel
 
       - name: Build Wheel
+        env:
+          CUDA_VERSION: ${{ matrix.cuda }}
         run: |
           $env:CUDA_PATH = $env:CONDA_PREFIX
           $env:CUDA_HOME = $env:CONDA_PREFIX
