@@ -7,7 +7,31 @@ try:
 except ImportError:
     TORCH_AVAILABLE = False
 
-version = "0.2.0-dev"
+common_setup_kwargs = {
+    "version": "0.2.0",
+    "name": "auto_auto_gptq",
+    "author": "PanQiWei",
+    "description": "An easy-to-use LLMs quantization package with user-friendly apis, based on GPTQ algorithm.",
+    "url": "https://github.com/PanQiWei/AutoGPTQ",
+    "keywords": ["gptq", "quantization", "large-language-models", "pytorch", "transformers"],
+    "platforms": ["windows", "linux"],
+    "classifiers": [
+        "Environment :: GPU :: NVIDIA CUDA :: 11.7",
+        "Environment :: GPU :: NVIDIA CUDA :: 11.8",
+        "Framework :: pytorch",
+        "Framework :: transformers",
+        "License :: OSI Approved :: MIT License",
+        "Natural Language :: Chinese (Simplified)",
+        "Natural Language :: English",
+        "Operating System :: Microsoft :: Windows",
+        "Operating System :: Linux",
+        "Programming Language :: Python :: 3.8",
+        "Programming Language :: Python :: 3.9",
+        "Programming Language :: Python :: 3.10",
+        "Programming Language :: C++",
+    ],
+    "python_requires": ">=3.8"
+}
 
 requirements = [
     "accelerate>=0.19.0",
@@ -51,21 +75,19 @@ if TORCH_AVAILABLE:
             "ext_modules": extensions,
             "cmdclass": {'build_ext': cpp_extension.BuildExtension}
         }
+    common_setup_kwargs.update(additional_setup_kwargs)
     setup(
-        name="auto_gptq",
         packages=find_packages(),
-        version=version,
         install_requires=requirements,
         extras_require=extras_require,
         include_dirs=include_dirs,
-        **additional_setup_kwargs
+        **common_setup_kwargs
     )
 else:
     setup(
-        name="auto_gptq",
         packages=find_packages(),
-        version=version,
         install_requires=requirements,
         extras_require=extras_require,
-        include_dirs=include_dirs
+        include_dirs=include_dirs,
+        **common_setup_kwargs
     )
