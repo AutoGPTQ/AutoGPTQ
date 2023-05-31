@@ -41,7 +41,7 @@ jobs:
         env:
           CUDA_VERSION: ${{ matrix.cuda }}
         run: |
-          mamba install -y 'pytorch[version=2.0.0,build=py*_cuda${CUDA_VERSION}*]' 'pytorch-cuda=${CUDA_VERSION}' 'sentencepiece' 'cuda' 'ninja' -c 'pytorch' -c 'nvidia/label/cuda-${CUDA_VERSION}.0' -c 'nvidia' -c 'conda-forge' -c 'defaults'
+          mamba install -y "pytorch[version=2.0.0,build=py*_cuda$CUDA_VERSION*]" "pytorch-cuda=$CUDA_VERSION" 'sentencepiece' 'cuda' 'ninja' -c 'pytorch' -c "nvidia/label/cuda-$CUDA_VERSION.0" -c 'nvidia' -c 'conda-forge' -c 'defaults'
           python -m pip install --upgrade setuptools wheel
 
       - name: Build Wheel
