@@ -1,3 +1,11 @@
+import sys
+import platform
+python_min_version = (3, 8, 0)
+python_min_version_str = '.'.join(map(str, python_min_version))
+if sys.version_info < python_min_version:
+    print("You are using Python {}. Python >={} is required.".format(platform.python_version(), python_min_version_str))
+    sys.exit(-1)
+
 import os
 from setuptools import setup, find_packages
 
@@ -7,7 +15,34 @@ try:
 except ImportError:
     TORCH_AVAILABLE = False
 
-version = "0.2.0-dev"
+CUDA_VERSION = "".join(os.environ.get("CUDA_VERSION", "").split("."))
+
+version = "0.2.0" + (f"+cu{CUDA_VERSION}" if CUDA_VERSION else "")
+common_setup_kwargs = {
+    "version": version,
+    "name": "auto_gptq",
+    "author": "PanQiWei",
+    "description": "An easy-to-use LLMs quantization package with user-friendly apis, based on GPTQ algorithm.",
+    "url": "https://github.com/PanQiWei/AutoGPTQ",
+    "keywords": ["gptq", "quantization", "large-language-models", "pytorch", "transformers"],
+    "platforms": ["windows", "linux"],
+    "classifiers": [
+        "Environment :: GPU :: NVIDIA CUDA :: 11.7",
+        "Environment :: GPU :: NVIDIA CUDA :: 11.8",
+        "Framework :: pytorch",
+        "Framework :: transformers",
+        "License :: OSI Approved :: MIT License",
+        "Natural Language :: Chinese (Simplified)",
+        "Natural Language :: English",
+        "Operating System :: Microsoft :: Windows",
+        "Operating System :: Linux",
+        "Programming Language :: Python :: 3.8",
+        "Programming Language :: Python :: 3.9",
+        "Programming Language :: Python :: 3.10",
+        "Programming Language :: C++",
+    ],
+    "python_requires": f">={python_min_version_str}"
+}
 
 requirements = [
     "accelerate>=0.19.0",
@@ -51,21 +86,19 @@ if TORCH_AVAILABLE:
             "ext_modules": extensions,
             "cmdclass": {'build_ext': cpp_extension.BuildExtension}
         }
+    common_setup_kwargs.update(additional_setup_kwargs)
     setup(
-        name="auto_gptq",
         packages=find_packages(),
-        version=version,
         install_requires=requirements,
         extras_require=extras_require,
         include_dirs=include_dirs,
-        **additional_setup_kwargs
+        **common_setup_kwargs
     )
 else:
     setup(
-        name="auto_gptq",
         packages=find_packages(),
-        version=version,
         install_requires=requirements,
         extras_require=extras_require,
-        include_dirs=include_dirs
+        include_dirs=include_dirs,
+        **common_setup_kwargs
     )
