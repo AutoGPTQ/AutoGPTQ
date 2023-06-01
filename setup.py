@@ -1,12 +1,7 @@
-import sys
-import platform
-python_min_version = (3, 8, 0)
-python_min_version_str = '.'.join(map(str, python_min_version))
-if sys.version_info < python_min_version:
-    print("You are using Python {}. Python >={} is required.".format(platform.python_version(), python_min_version_str))
-    sys.exit(-1)
-
 import os
+import platform
+import sys
+from pathlib import Path
 from setuptools import setup, find_packages
 
 try:
@@ -14,6 +9,12 @@ try:
     TORCH_AVAILABLE = True
 except ImportError:
     TORCH_AVAILABLE = False
+
+python_min_version = (3, 8, 0)
+python_min_version_str = '.'.join(map(str, python_min_version))
+if sys.version_info < python_min_version:
+    print(f"You are using Python {platform.python_version()}. Python >={python_min_version_str} is required.")
+    sys.exit(-1)
 
 CUDA_VERSION = "".join(os.environ.get("CUDA_VERSION", "").split("."))
 
@@ -23,6 +24,8 @@ common_setup_kwargs = {
     "name": "auto_gptq",
     "author": "PanQiWei",
     "description": "An easy-to-use LLMs quantization package with user-friendly apis, based on GPTQ algorithm.",
+    "long_description": (Path(__file__).parent / "README.md").read_text(),
+    "long_description_content_type": "text/markdown",
     "url": "https://github.com/PanQiWei/AutoGPTQ",
     "keywords": ["gptq", "quantization", "large-language-models", "pytorch", "transformers"],
     "platforms": ["windows", "linux"],
