@@ -9,6 +9,7 @@ try:
     TORCH_AVAILABLE = True
 except ImportError:
     TORCH_AVAILABLE = False
+    
 
 python_min_version = (3, 8, 0)
 python_min_version_str = '.'.join(map(str, python_min_version))
@@ -64,7 +65,7 @@ if TORCH_AVAILABLE:
     BUILD_CUDA_EXT = int(os.environ.get('BUILD_CUDA_EXT', '1')) == 1
     
     additional_setup_kwargs = dict()
-    if BUILD_CUDA_EXT and torch.cuda.is_available():
+    if BUILD_CUDA_EXT and (torch.cuda.is_available() or os.environ.get("GITHUB_ACTIONS", "false") == "true"):
         from torch.utils import cpp_extension
         from distutils.sysconfig import get_python_lib
         conda_cuda_include_dir=os.path.join(get_python_lib(),"nvidia/cuda_runtime/include")
