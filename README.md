@@ -16,7 +16,11 @@
 </h4>
 
 ## News or Update
-- 2023-05-30 - (Update) - support download/upload quantized model from/to 🤗 Hub.
+
+**To experience adapter training using `auto_gptq` quantized model in advance, you can try [this branch](https://github.com/PanQiWei/AutoGPTQ/tree/peft_integration) and discuss [in here](https://github.com/PanQiWei/AutoGPTQ/issues/103), examples are [in here](https://github.com/PanQiWei/AutoGPTQ/tree/peft_integration/examples/peft).**
+
+- 2023-05-25 - (In Progress) - Integrate with 🤗 peft to use gptq quantized model to train adapters, support LoRA, AdaLoRA, AdaptionPrompt, etc.
+- 2023-05-30 - (Update) - Support download/upload quantized model from/to 🤗 Hub.
 - 2023-05-27 - (Update) - Support quantization and inference for `gpt_bigcode`, `codegen` and `RefineWeb/RefineWebModel`(falcon) model types.
 - 2023-05-04 - (Update) - Support using faster cuda kernel when `not desc_act or group_size == -1`.
 

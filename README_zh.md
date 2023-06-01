@@ -16,6 +16,10 @@
 </h4>
 
 ## 新闻或更新
+
+**提前体验使用 `auto_gptq` 量化过的模型来训练适应层，你可以尝试[这个分支](https://github.com/PanQiWei/AutoGPTQ/tree/peft_integration) 并在[这里](https://github.com/PanQiWei/AutoGPTQ/issues/103)进行讨论，你也可以参考[这里](https://github.com/PanQiWei/AutoGPTQ/tree/peft_integration/examples/peft)所提供的示例脚本。**
+
+- 2023-05-25 - (开发中) - 集成 🤗 peft 来使用 gptq 量化过的模型训练适应层，支持 LoRA，AdaLoRA，AdaptionPrompt 等。
 - 2023-05-30 - (更新) - 支持从 🤗 Hub 下载量化好的模型或上次量化好的模型到 🤗 Hub。
 - 2023-05-27 - (更新) - 支持以下模型的量化和推理： `gpt_bigcode`， `codegen` 以及 `RefineWeb/RefineWebModel`（falcon）。
 - 2023-05-04 - (更新) - 支持在 `not desc_act or group_size == -1` 的情况下使用更快的 cuda 算子。
