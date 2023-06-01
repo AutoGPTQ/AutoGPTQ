@@ -29,13 +29,9 @@ common_setup_kwargs = {
     "classifiers": [
         "Environment :: GPU :: NVIDIA CUDA :: 11.7",
         "Environment :: GPU :: NVIDIA CUDA :: 11.8",
-        "Framework :: pytorch",
-        "Framework :: transformers",
         "License :: OSI Approved :: MIT License",
         "Natural Language :: Chinese (Simplified)",
         "Natural Language :: English",
-        "Operating System :: Microsoft :: Windows",
-        "Operating System :: Linux",
         "Programming Language :: Python :: 3.8",
         "Programming Language :: Python :: 3.9",
         "Programming Language :: Python :: 3.10",
