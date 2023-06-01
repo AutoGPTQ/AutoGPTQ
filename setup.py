@@ -9,7 +9,6 @@ try:
     TORCH_AVAILABLE = True
 except ImportError:
     TORCH_AVAILABLE = False
-    
 
 python_min_version = (3, 8, 0)
 python_min_version_str = '.'.join(map(str, python_min_version))

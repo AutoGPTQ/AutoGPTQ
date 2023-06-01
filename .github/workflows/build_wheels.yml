@@ -4,6 +4,7 @@ on: workflow_dispatch
 
 jobs:
   build_wheels:
+    if: ${{ github.repository_owner == 'PanQiWei' }}
     name: Build wheels for ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
