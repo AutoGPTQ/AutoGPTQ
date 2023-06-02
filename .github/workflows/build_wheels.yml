@@ -1,0 +1,100 @@
+name: Build AutoGPTQ Wheels
+
+on: workflow_dispatch
+
+jobs:
+  build_wheels:
+    if: ${{ github.repository_owner == 'PanQiWei' }}
+    name: Build wheels for ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        pyver: ["3.8", "3.9", "3.10"]
+        cuda: ["11.7", "11.8"]
+    defaults:
+      run:
+        shell: pwsh
+    env:
+        CUDA_VERSION: ${{ matrix.cuda }}
+
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          ref: 'main'
+
+      - uses: actions/setup-python@v3
+        with:
+          python-version: ${{ matrix.pyver }}
+
+      - name: Setup Mamba
+        uses: conda-incubator/setup-miniconda@v2.2.0
+        with:
+          activate-environment: "build"
+          python-version: ${{ matrix.pyver }}
+          mamba-version: "*"
+          use-mamba: true
+          channels: conda-forge,defaults
+          channel-priority: true
+          add-pip-as-python-dependency: true
+          auto-activate-base: false
+
+      - name: Install Dependencies
+        run: |
+          mamba install -y "pytorch[version=2.0.0,build=py*_cuda${env:CUDA_VERSION}*]" "pytorch-cuda=${env:CUDA_VERSION}" 'sentencepiece' 'cuda' 'ninja' -c 'pytorch' -c "nvidia/label/cuda-${env:CUDA_VERSION}.0" -c 'nvidia' -c 'conda-forge' -c 'defaults'
+          python -m pip install --upgrade build setuptools wheel
+
+      - name: Build Wheel
+        run: |
+          $env:CUDA_PATH = $env:CONDA_PREFIX
+          $env:CUDA_HOME = $env:CONDA_PREFIX
+          if ($IsLinux) {$env:LD_LIBRARY_PATH = $env:CONDA_PREFIX + '/lib:' + $env:LD_LIBRARY_PATH}
+          $env:TORCH_CUDA_ARCH_LIST = '6.0 6.1 7.0 7.5 8.0 8.6+PTX'
+          if ([decimal]$env:CUDA_VERSION -ge 11.8) { $env:TORCH_CUDA_ARCH_LIST = '6.0 6.1 7.0 7.5 8.0 8.6 8.9 9.0+PTX' }
+          python -m build -n
+
+      - uses: actions/upload-artifact@v3
+        if: runner.os == 'Linux'
+        with:
+          name: 'linux-wheels'
+          path: ./dist/*.whl
+
+      - uses: actions/upload-artifact@v3
+        if: runner.os == 'Windows'
+        with:
+          name: 'windows-wheels'
+          path: ./dist/*.whl
+
+  build_sdist:
+    name: Build source distribution
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: pwsh
+
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          ref: 'main'
+
+      - uses: actions/setup-python@v3
+        with:
+          python-version: "3.10"
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade build setuptools wheel
+
+      - name: Build Wheel
+        run: |
+          python -m build -n
+
+      - uses: actions/upload-artifact@v3
+        with:
+          name: 'sdist'
+          path: ./dist/*.tar.gz
+
+      - uses: actions/upload-artifact@v3
+        with:
+          name: 'no-cuda-wheel'
+          path: ./dist/*.whl

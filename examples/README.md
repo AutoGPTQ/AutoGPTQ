@@ -11,6 +11,8 @@ To Execute `basic_usage.py`, using command like this:
 python basic_usage.py
 ```
 
+This script also showcases how to download/upload quantized model from/to 🤗 Hub, to enable those features, you can uncomment the commented codes.
+
 To Execute `basic_usage_with_wikitext2.py`, using command like this:
 ```shell
 python basic_usage_with_wikitext2.py
@@ -56,25 +58,6 @@ Use `--help` flag to see detailed descriptions for more command arguments.
 To execute this script, using command like this:
 ```shell
 CUDA_VISIBLE_DEVICES=0 python run_text_summarization_task.py --base_model_dir PATH/TO/BASE/MODEL/DIR --quantized_model_dir PATH/TO/QUANTIZED/MODEL/DIR
-```
-
-Use `--help` flag to see detailed descriptions for more command arguments.
-
-## Push To Hub
-> Commands in this chapter should be run under `push_to_hub` folder.
-
-You can upload and share your quantized model to Hugging Face Hub by using `push_to_hub` function.
-
-`push_quantized_model_to_hf_hub.py` provide a simple example to upload quantized model, tokenizer and configs at once.
-
-First, you need to login, run the following command in the virtual environment where Hugging Face Transformers is installed:
-```shell
-huggingface-cli login
-```
-
-Then run the script like this:
-```shell
-python push_quantized_model_to_hf_hub.py --quantized_model_dir PATH/TO/QUANTIZED/MODEL/DIR --tokenizer_dir PATH/TO/TOKENIZER/DIR --repo_id REPO/ID
 ```
 
 Use `--help` flag to see detailed descriptions for more command arguments.

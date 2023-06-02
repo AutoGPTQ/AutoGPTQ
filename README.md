@@ -16,9 +16,13 @@
 </h4>
 
 ## News or Update
+
+**To experience adapter training using `auto_gptq` quantized model in advance, you can try [this branch](https://github.com/PanQiWei/AutoGPTQ/tree/peft_integration) and discuss [in here](https://github.com/PanQiWei/AutoGPTQ/issues/103), examples are [in here](https://github.com/PanQiWei/AutoGPTQ/tree/peft_integration/examples/peft).**
+
+- 2023-05-25 - (In Progress) - Integrate with 🤗 peft to use gptq quantized model to train adapters, support LoRA, AdaLoRA, AdaptionPrompt, etc.
+- 2023-05-30 - (Update) - Support download/upload quantized model from/to 🤗 Hub.
 - 2023-05-27 - (Update) - Support quantization and inference for `gpt_bigcode`, `codegen` and `RefineWeb/RefineWebModel`(falcon) model types.
 - 2023-05-04 - (Update) - Support using faster cuda kernel when `not desc_act or group_size == -1`.
-- 2023-04-29 - (Update) - Support loading quantized model from arbitrary quantize_config and model_basename.
 
 *For more histories please turn to [here](docs/NEWS_OR_UPDATE.md)*
 
@@ -50,6 +54,11 @@ For perplexity comparison, you can turn to [here](https://github.com/qwopqwop200
 You can install the latest stable release of AutoGPTQ from pip:
 ```shell
 pip install auto-gptq
+```
+Start from v0.2.0, you can download pre-build wheel that satisfied your environment setup from each version's release assets and install it to skip building stage for the fastest installation speed. For example:
+```shell
+# firstly, cd the directory where the wheel saved, then execute command below
+pip install auto_gptq-0.2.0+cu118-cp310-cp310-linux_x86_64.whl # install v0.2.0 auto_gptq pre-build wheel for linux in an environment whose python=3.10 and cuda=11.8
 ```
 #### disable cuda extensions
 By default, cuda extensions will be installed when `torch` and `cuda` is already installed in your machine, if you don't want to use them, using:
@@ -96,11 +105,14 @@ Below is an example for the simplest use of `auto_gptq` to quantize a model and 
 ```python
 from transformers import AutoTokenizer, TextGenerationPipeline
 from auto_gptq import AutoGPTQForCausalLM, BaseQuantizeConfig
+import logging
 
+logging.basicConfig(
+    format="%(asctime)s %(levelname)s [%(name)s] %(message)s", level=logging.INFO, datefmt="%Y-%m-%d %H:%M:%S"
+)
 
 pretrained_model_dir = "facebook/opt-125m"
 quantized_model_dir = "opt-125m-4bit"
-
 
 tokenizer = AutoTokenizer.from_pretrained(pretrained_model_dir, use_fast=True)
 examples = [
@@ -127,8 +139,25 @@ model.save_quantized(quantized_model_dir)
 # save quantized model using safetensors
 model.save_quantized(quantized_model_dir, use_safetensors=True)
 
+# push quantized model to Hugging Face Hub. 
+# to use use_auth_token=True, Login first via huggingface-cli login.
+# or pass explcit token with: use_auth_token="hf_xxxxxxx"
+# (uncomment the following three lines to enable this feature)
+# repo_id = f"YourUserName/{quantized_model_dir}"
+# commit_message = f"AutoGPTQ model for {pretrained_model_dir}: {quantize_config.bits}bits, gr{quantize_config.group_size}, desc_act={quantize_config.desc_act}"
+# model.push_to_hub(repo_id, commit_message=commit_message, use_auth_token=True)
+
+# alternatively you can save and push at the same time
+# (uncomment the following three lines to enable this feature)
+# repo_id = f"YourUserName/{quantized_model_dir}"
+# commit_message = f"AutoGPTQ model for {pretrained_model_dir}: {quantize_config.bits}bits, gr{quantize_config.group_size}, desc_act={quantize_config.desc_act}"
+# model.push_to_hub(repo_id, save_dir=quantized_model_dir, use_safetensors=True, commit_message=commit_message, use_auth_token=True)
+
 # load quantized model to the first GPU
-model = AutoGPTQForCausalLM.from_quantized(quantized_model_dir)
+model = AutoGPTQForCausalLM.from_quantized(quantized_model_dir, device="cuda:0")
+
+# download quantized model from Hugging Face Hub and load to the first GPU
+# model = AutoGPTQForCausalLM.from_quantized(repo_id, device="cuda:0", use_safetensors=True, use_triton=False)
 
 # inference with model.generate
 print(tokenizer.decode(model.generate(**tokenizer("auto_gptq is", return_tensors="pt").to(model.device))[0]))
@@ -265,7 +294,11 @@ print(
 
 ## Supported Models
 
-| model                              | quantization | inference | peft-lora | peft-adaption_prompt |
+> you can use `model.config.model_type` to compare with the table below to check whether the model you use is supported by `auto_gptq`.
+> 
+> for example, model_type of `WizardLM`, `vicuna` and `gpt4all` are all `llama`, hence they are all supported by `auto_gptq`.
+
+| model type                         | quantization | inference | peft-lora | peft-adaption_prompt |
 |------------------------------------|--------------|-----------|-----------|----------------------|
 | bloom                              | ✅            | ✅         |           |                      |
 | gpt2                               | ✅            | ✅         |           |                      |

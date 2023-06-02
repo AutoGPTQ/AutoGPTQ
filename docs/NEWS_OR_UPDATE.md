@@ -1,4 +1,5 @@
 ## <center>News or Update</center>
+- 2023-05-30 - (Update) - support download/upload quantized model from/to 🤗 Hub.
 - 2023-05-27 - (Update) - Support quantization and inference for `gpt_bigcode`, `codegen` and `RefineWeb/RefineWebModel`(falcon) model types.
 - 2023-05-04 - (Update) - Support using faster cuda kernel when `not desc_act or group_size == -1`
 - 2023-04-29 - (Update) - Support loading quantized model from arbitrary quantize_config and model_basename.

@@ -1,9 +1,10 @@
 import copy
 import json
+import warnings
 import os
 from dataclasses import dataclass, field, fields
 from logging import getLogger
-from os.path import join, isfile
+from os.path import join, isfile, isdir
 from typing import Dict, List, Optional, Union
 
 import accelerate
@@ -13,9 +14,9 @@ import transformers
 from accelerate.hooks import remove_hook_from_module
 from safetensors.torch import save_file as safe_save
 from transformers import AutoConfig, AutoModelForCausalLM, PreTrainedModel
+from transformers.utils.hub import PushToHubMixin, cached_file, create_repo, create_commit, CommitOperationAdd
 from transformers.utils.generic import ContextManagers
 from transformers.modeling_utils import no_init_weights
-from transformers.utils.hub import PushToHubMixin
 
 from ._const import *
 from ._utils import *
@@ -36,6 +37,8 @@ class BaseQuantizeConfig(PushToHubMixin):
     desc_act: bool = field(default=True)
     sym: bool = field(default=True)
     true_sequential: bool = field(default=True)
+    model_name_or_path: Optional[str] = field(default=None)
+    model_file_base_name: Optional[str] = field(default=None)
 
     def __post_init__(self):
         fields_info = fields(self)
@@ -52,10 +55,41 @@ class BaseQuantizeConfig(PushToHubMixin):
             json.dump(self.to_dict(), f, indent=2)
 
     @classmethod
-    def from_pretrained(cls, save_dir: str):
-        with open(join(save_dir, "quantize_config.json"), "r", encoding="utf-8") as f:
-            return cls(**json.load(f))
+    def from_pretrained(cls, save_dir: str, **kwargs):
+        # Parameters related to loading from Hugging Face Hub
+        cache_dir = kwargs.pop("cache_dir", None)
+        force_download = kwargs.pop("force_download", False)
+        resume_download = kwargs.pop("resume_download", False)
+        proxies = kwargs.pop("proxies", None)
+        local_files_only = kwargs.pop("local_files_only", False)
+        use_auth_token = kwargs.pop("use_auth_token", None)
+        revision = kwargs.pop("revision", None)
+        subfolder = kwargs.pop("subfolder", None)
+        commit_hash = kwargs.pop("_commit_hash", None)
 
+        quantize_config_filename = "quantize_config.json"
+        if os.path.isdir(save_dir):  # Local
+            resolved_config_file = join(save_dir, quantize_config_filename)
+        else: # Remote
+               resolved_config_file = cached_file(
+                    save_dir,
+                    quantize_config_filename,
+                    cache_dir=cache_dir,
+                    force_download=force_download,
+                    resume_download=resume_download,
+                    proxies=proxies,
+                    use_auth_token=use_auth_token,
+                    revision=revision,
+                    local_files_only=local_files_only,
+                    subfolder=subfolder,
+                    _raise_exceptions_for_missing_entries=False,
+                    _raise_exceptions_for_connection_errors=False,
+                    _commit_hash=commit_hash,
+               )
+
+        with open(resolved_config_file, "r", encoding="utf-8") as f:
+            return cls(**json.load(f))
+                
     def to_dict(self):
         return {
             "bits": self.bits,
@@ -64,6 +98,8 @@ class BaseQuantizeConfig(PushToHubMixin):
             "desc_act": self.desc_act,
             "sym": self.sym,
             "true_sequential": self.true_sequential,
+            "model_name_or_path": self.model_name_or_path,
+            "model_file_base_name": self.model_file_base_name,
         }
 
 
@@ -206,7 +242,8 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                             break
                 layer_inputs.append(move_to_device(inp, self.data_device))
                 attention_masks.append(kwargs["attention_mask"].to(self.data_device))
-                if (pos_ids := kwargs.get("position_ids", None)) is not None:
+                pos_ids = kwargs.get("position_ids", None)
+                if pos_ids is not None:
                     position_ids.append(move_to_device(pos_ids, self.data_device))
                 one_kwargs = dict()
                 for k, v in kwargs.items():  # make sure other arguments also be captured
@@ -307,10 +344,8 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                     additional_layer_inputs = {
                         "attention_mask": layer_attention_mask
                     }
-                    if (
-                        layer_position_ids := None if not position_ids
-                        else move_to_device(position_ids[j], cur_layer_device)
-                    ) is not None:
+                    layer_position_ids = None if not position_ids else move_to_device(position_ids[j], cur_layer_device)
+                    if layer_position_ids is not None:
                         additional_layer_inputs["position_ids"] = layer_position_ids
                     for k, v in layer_input_kwargs[j].items():
                         if isinstance(v, torch.Tensor):
@@ -342,10 +377,8 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                 additional_layer_inputs = {
                     "attention_mask": layer_attention_mask
                 }
-                if (
-                    layer_position_ids := None if not position_ids
-                    else move_to_device(position_ids[j], cur_layer_device)
-                ) is not None:
+                layer_position_ids = None if not position_ids else move_to_device(position_ids[j], cur_layer_device)
+                if layer_position_ids is not None:
                     additional_layer_inputs["position_ids"] = layer_position_ids
                 for k, v in layer_input_kwargs[j].items():
                     if isinstance(v, torch.Tensor):
@@ -408,6 +441,72 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         """shortcut for model.prepare_inputs_for_generation"""
         return self.model.prepare_inputs_for_generation(*args, **kwargs)
 
+    def push_to_hub(
+        self,
+        repo_id: str,
+        save_dir: Optional[str] = None,
+        use_safetensors: Optional[bool] = True,
+        commit_message: Optional[str] = "Upload of AutoGPTQ quantized model",
+        use_auth_token: Optional[Union[bool, str]] = None,
+        private: Optional[bool] = None,
+        token: Optional[Union[bool, str]] = None,
+        create_pr: Optional[bool] = False,
+    ) -> str:
+        """
+        Upload the model to the Hugging Face Hub.
+
+        Parameters:
+            repo_id (`str`):
+                The name of the repository you want to push your tool to. It should contain your organization name when
+                pushing to a given organization.
+            save_dir (`str`, *optional*):
+                The name of the local folder to save the model to.
+                If the model has already been saved, this parameter can be omitted.
+            use_safetensors (`bool`, *optional*):
+                Save the model using `safetensors`.
+                If the model has already been saved, this parameter can be omitted.
+            commit_message (`str`, *optional*, defaults to `"Upload tool"`):
+                Message to commit while pushing.
+            use_auth_token (`bool` or `str`, *optional*):
+                The token to use as HTTP bearer authorization for remote files. If `True`, will use the token generated
+                when running `huggingface-cli login` (stored in `~/.huggingface`). Will default to `True` if `repo_url`
+                is not specified.
+            private (`bool`, *optional*):
+                Whether or not the repository created should be private.
+            token (`bool` or `str`, *optional*):
+                The token to use as HTTP bearer authorization for remote files. If unset, will use the token generated
+                when running `huggingface-cli login` (stored in `~/.huggingface`).
+            create_pr (`bool`, *optional*, defaults to `False`):
+                Whether or not to create a PR with the uploaded files or directly commit.
+        """
+        if (self.quantize_config.model_name_or_path is None or not isdir(self.quantize_config.model_name_or_path)) and save_dir is None:
+            raise ValueError("Quantized model should be saved first, or you can provide save_dir to make sure model is saved to local disk before uploading.")
+        
+        if save_dir is not None:
+            logger.info(f"Saving model to {save_dir}")
+            self.save_quantized(save_dir, use_safetensors)
+
+        repo_url = create_repo(
+            repo_id=repo_id, token=token, private=private, exist_ok=True, repo_type="model"
+        )
+        repo_id = repo_url.repo_id
+
+        if self.quantize_config.model_name_or_path is not None:
+            work_dir = self.quantize_config.model_name_or_path
+            operations = [
+                CommitOperationAdd(path_or_fileobj=join(work_dir, f), path_in_repo=f)
+                for f in os.listdir(work_dir)
+            ]
+            logger.info(f"Uploading the following files to {repo_id}: {','.join(os.listdir(work_dir))}")
+            return create_commit(
+                repo_id=repo_id,
+                operations=operations,
+                commit_message=commit_message,
+                token=use_auth_token,
+                create_pr=create_pr,
+                repo_type="model",
+            )
+
     def save_quantized(self, save_dir: str, use_safetensors: bool = False):
         """save quantized model and configs to local disk"""
         os.makedirs(save_dir, exist_ok=True)
@@ -417,18 +516,20 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
 
         self.model.to(CPU)
 
-        model_save_name = f"gptq_model-{self.quantize_config.bits}bit-{self.quantize_config.group_size}g"
+        model_base_name = self.quantize_config.model_file_base_name or f"gptq_model-{self.quantize_config.bits}bit-{self.quantize_config.group_size}g"
         if use_safetensors:
-            model_save_name += ".safetensors"
+            model_save_name = model_base_name + ".safetensors"
             state_dict = self.model.state_dict()
             state_dict = {k: v.clone().contiguous() for k, v in state_dict.items()}
             safe_save(state_dict, join(save_dir, model_save_name))
         else:
-            model_save_name += ".bin"
+            model_save_name = model_base_name + ".bin"
             torch.save(self.model.state_dict(), join(save_dir, model_save_name))
 
         self.model.config.save_pretrained(save_dir)
         self.quantize_config.save_pretrained(save_dir)
+        self.quantize_config.model_name_or_path = save_dir
+        self.quantize_config.model_file_base_name = model_base_name
 
     def save_pretrained(self, save_dir: str, use_safetensors: bool = False, **kwargs):
         """alias of save_quantized"""
@@ -511,7 +612,8 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
     @classmethod
     def from_quantized(
         cls,
-        save_dir: str,
+        model_name_or_path: Optional[str] = None,
+        save_dir: Optional[str] = None,
         device_map: Optional[Union[str, Dict[str, Union[int, str]]]] = None,
         max_memory: Optional[dict] = None,
         device: Optional[Union[str, int]] = None,
@@ -530,22 +632,47 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         **kwargs
     ):
         """load quantized model from local disk"""
+       
+        # Parameters related to loading from Hugging Face Hub
+        cache_dir = kwargs.pop("cache_dir", None)
+        force_download = kwargs.pop("force_download", False)
+        resume_download = kwargs.pop("resume_download", False)
+        proxies = kwargs.pop("proxies", None)
+        local_files_only = kwargs.pop("local_files_only", False)
+        use_auth_token = kwargs.pop("use_auth_token", None)
+        revision = kwargs.pop("revision", None)
+        subfolder = kwargs.pop("subfolder", "")
+        commit_hash = kwargs.pop("_commit_hash", None)
+
         if use_triton and not TRITON_AVAILABLE:
             logger.warning("triton is not installed, reset use_triton to False")
             use_triton = False
 
-        # == step1: prepare configs and file names, and check values of arguments passed in == #
-        config = AutoConfig.from_pretrained(save_dir, trust_remote_code=trust_remote_code)
+        # == step1: prepare configs and file names == #
+        if model_name_or_path and save_dir:
+            logger.warning("save_dir will be ignored because model_name_or_path is explicit specified.")
+        if not model_name_or_path and save_dir:
+            model_name_or_path = save_dir
+            warnings.warn("save_dir is deprecated and will be removed in version 0.3.0", PendingDeprecationWarning, stacklevel=2)
+        if not model_name_or_path and not save_dir:
+            raise ValueError("at least one of model_name_or_path or save_dir should be specified.")
+        
+        config = AutoConfig.from_pretrained(model_name_or_path, trust_remote_code=trust_remote_code)
+
         if config.model_type not in SUPPORTED_MODELS:
             raise TypeError(f"{config.model_type} isn't supported yet.")
 
         if quantize_config is None:
-            quantize_config = BaseQuantizeConfig.from_pretrained(save_dir)
-
+            quantize_config = BaseQuantizeConfig.from_pretrained(model_name_or_path, **kwargs)
+        
         if model_basename is None:
-            model_basename = f"gptq_model-{quantize_config.bits}bit-{quantize_config.group_size}g"
-
-        model_save_name = join(save_dir, model_basename)
+            if quantize_config.model_file_base_name:
+                model_basename = quantize_config.model_file_base_name
+            else:
+                model_basename = f"gptq_model-{quantize_config.bits}bit-{quantize_config.group_size}g"
+        
+        quantize_config.model_name_or_path = model_name_or_path
+        quantize_config.model_file_base_name = model_basename
 
         extensions = []
         if use_safetensors:
@@ -553,12 +680,40 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         else:
             extensions += [".bin", ".pt"]
 
-        for ext in extensions:
-            if isfile(model_save_name + ext):
-                model_save_name += ext
-                break
-        else:
-            raise FileNotFoundError(f"Could not find model at {model_save_name}")
+        model_name_or_path = str(model_name_or_path)
+        is_local = isdir(model_name_or_path)
+
+        resolved_archive_file = None
+        if is_local:
+            model_save_name = join(model_name_or_path, model_basename)
+
+            for ext in extensions:
+                if isfile(model_save_name + ext):
+                    resolved_archive_file = model_save_name + ext
+                    break
+        else: # remote
+            cached_file_kwargs = {
+                "cache_dir": cache_dir,
+                "force_download": force_download,
+                "proxies": proxies,
+                "resume_download": resume_download,
+                "local_files_only": local_files_only,
+                "use_auth_token": use_auth_token,
+                "revision": revision,
+                "subfolder": subfolder,
+                "_raise_exceptions_for_missing_entries": False,
+                "_commit_hash": commit_hash,
+            }
+            
+            for ext in extensions:
+                resolved_archive_file = cached_file(model_name_or_path, model_basename + ext, **cached_file_kwargs)
+                if resolved_archive_file is not None:
+                    break
+        
+        if resolved_archive_file is None: # Could not find a model file to use
+            raise FileNotFoundError(f"Could not find model in {model_name_or_path}")
+                
+        model_save_name = resolved_archive_file
 
         if not use_triton and trainable:
             logger.warning("QuantLinear with cuda backend not support trainable mode yet, Switch to the pytorch backend.")

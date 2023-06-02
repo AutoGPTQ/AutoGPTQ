@@ -16,9 +16,13 @@
 </h4>
 
 ## 新闻或更新
+
+**提前体验使用 `auto_gptq` 量化过的模型来训练适应层，你可以尝试[这个分支](https://github.com/PanQiWei/AutoGPTQ/tree/peft_integration) 并在[这里](https://github.com/PanQiWei/AutoGPTQ/issues/103)进行讨论，你也可以参考[这里](https://github.com/PanQiWei/AutoGPTQ/tree/peft_integration/examples/peft)所提供的示例脚本。**
+
+- 2023-05-25 - (开发中) - 集成 🤗 peft 来使用 gptq 量化过的模型训练适应层，支持 LoRA，AdaLoRA，AdaptionPrompt 等。
+- 2023-05-30 - (更新) - 支持从 🤗 Hub 下载量化好的模型或上次量化好的模型到 🤗 Hub。
 - 2023-05-27 - (更新) - 支持以下模型的量化和推理： `gpt_bigcode`， `codegen` 以及 `RefineWeb/RefineWebModel`（falcon）。
 - 2023-05-04 - (更新) - 支持在 `not desc_act or group_size == -1` 的情况下使用更快的 cuda 算子。
-- 2023-04-29 - (更新) - 支持从指定的模型权重文件名或量化配置(quantize_config)加载量化过的模型。
 
 *获取更多的历史信息，请转至[这里](docs/NEWS_OR_UPDATE.md)*
 
@@ -50,6 +54,11 @@
 你可以通过 pip 来安装 AutoGPTQ 当前最新的稳定版本：
 ```shell
 pip install auto-gptq
+```
+从 0.2.0 版本开始，你可以从每次版本发布的资产文件列表中下载预构建好的符合你系统配置情况的轮子文件，并通过安装这些轮子文件来跳过漫长的构建过程以达到最快的安装速度。如下是一个例子：
+```shell
+# 首先，进入轮子文件存放的目录，然后执行下面的命令
+pip install auto_gptq-0.2.0+cu118-cp310-cp310-linux_x86_64.whl # 在 linux 操作系统的一个 python=3.10 且 cuda=11.8 的环境下安装 0.2.0 版本的 auto_gptq
 ```
 #### 取消 cuda 拓展的安装
 默认情况下，在 `torch` 和 `cuda` 已经于你的机器上被安装时，cuda 拓展将被自动安装，如果你不想要这些拓展的话，采用以下安装命令：
@@ -127,8 +136,25 @@ model.save_quantized(quantized_model_dir)
 # 使用 safetensors 保存量化好的模型
 model.save_quantized(quantized_model_dir, use_safetensors=True)
 
+# 将量化好的模型直接上传至 Hugging Face Hub 
+# 当使用 use_auth_token=True 时, 确保你已经首先使用 huggingface-cli login 进行了登录
+# 或者可以使用 use_auth_token="hf_xxxxxxx" 来显式地添加账户认证 token
+# （取消下面三行代码的注释来使用该功能）
+# repo_id = f"YourUserName/{quantized_model_dir}"
+# commit_message = f"AutoGPTQ model for {pretrained_model_dir}: {quantize_config.bits}bits, gr{quantize_config.group_size}, desc_act={quantize_config.desc_act}"
+# model.push_to_hub(repo_id, commit_message=commit_message, use_auth_token=True)
+
+# 或者你也可以同时将量化好的模型保存到本地并上传至 Hugging Face Hub
+# （取消下面三行代码的注释来使用该功能）
+# repo_id = f"YourUserName/{quantized_model_dir}"
+# commit_message = f"AutoGPTQ model for {pretrained_model_dir}: {quantize_config.bits}bits, gr{quantize_config.group_size}, desc_act={quantize_config.desc_act}"
+# model.push_to_hub(repo_id, save_dir=quantized_model_dir, use_safetensors=True, commit_message=commit_message, use_auth_token=True)
+
 # 加载量化好的模型到能被识别到的第一块显卡中
-model = AutoGPTQForCausalLM.from_quantized(quantized_model_dir)
+model = AutoGPTQForCausalLM.from_quantized(quantized_model_dir, device="cuda:0")
+
+# 从 Hugging Face Hub 下载量化好的模型并加载到能被识别到的第一块显卡中
+# model = AutoGPTQForCausalLM.from_quantized(repo_id, device="cuda:0", use_safetensors=True, use_triton=False)
 
 # 使用 model.generate 执行推理
 print(tokenizer.decode(model.generate(**tokenizer("auto_gptq is", return_tensors="pt").to(model.device))[0]))
@@ -267,7 +293,11 @@ print(
 
 ## 支持的模型
 
-| model                              | quantization | inference | peft-lora | peft-adaption_prompt |
+> 你可以使用 `model.config.model_type` 来对照下表以检查你正在使用的一个模型是否被 `auto_gptq` 所支持。
+> 
+> 比如， `WizardLM`，`vicuna` 和 `gpt4all` 模型的 `model_type` 皆为 `llama`， 因此这些模型皆被 `auto_gptq` 所支持。
+
+| model type                         | quantization | inference | peft-lora | peft-adaption_prompt |
 |------------------------------------|--------------|-----------|-----------|----------------------|
 | bloom                              | ✅            | ✅         |           |                      |
 | gpt2                               | ✅            | ✅         |           |                      |
