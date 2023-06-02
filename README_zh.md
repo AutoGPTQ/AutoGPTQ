@@ -57,7 +57,7 @@ pip install auto-gptq
 ```
 从 0.2.0 版本开始，你可以从每次版本发布的资产文件列表中下载预构建好的符合你系统配置情况的轮子文件，并通过安装这些轮子文件来跳过漫长的构建过程以达到最快的安装速度。如下是一个例子：
 ```shell
-pip install auto_gptq-0.2.0+cu118-cp310-cp310-linux_x86_64.whl # 在 python=3.10 且 cuda=11.8 的环境下安装 0.2.0 版本的 auto_gptq
+pip install auto_gptq-0.2.0+cu118-cp310-cp310-linux_x86_64.whl # 在 linux 操作系统的一个 python=3.10 且 cuda=11.8 的环境下安装 0.2.0 版本的 auto_gptq
 ```
 #### 取消 cuda 拓展的安装
 默认情况下，在 `torch` 和 `cuda` 已经于你的机器上被安装时，cuda 拓展将被自动安装，如果你不想要这些拓展的话，采用以下安装命令：
