@@ -76,7 +76,7 @@ class QuantLinear(nn.Module):
 
         self.kernel_switch_threshold = kernel_switch_threshold
         self.autogptq_cuda_available = _autogptq_cuda_available
-        if infeatures % 256 != 0 or outfeatures % 256 != 0:
+        if infeatures % 64 != 0 or outfeatures % 64 != 0:
             self.autogptq_cuda_available = False
 
         self.trainable = trainable
