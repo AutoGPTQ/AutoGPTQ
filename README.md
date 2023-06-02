@@ -57,6 +57,7 @@ pip install auto-gptq
 ```
 Start from v0.2.0, you can download pre-build wheel that satisfied your environment setup from each version's release assets and install it to skip building stage for the fastest installation speed. For example:
 ```shell
+# firstly, cd the directory where the wheel saved, then execute command below
 pip install auto_gptq-0.2.0+cu118-cp310-cp310-linux_x86_64.whl # install v0.2.0 auto_gptq pre-build wheel for linux in an environment whose python=3.10 and cuda=11.8
 ```
 #### disable cuda extensions
