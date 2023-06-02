@@ -3,12 +3,15 @@ from typing import Optional
 from ._base import BaseQuantizeConfig, BaseGPTQForCausalLM
 from ._utils import check_and_get_model_type
 from .bloom import BloomGPTQForCausalLM
+from .codegen import CodeGenGPTQForCausalLM
 from .gpt_neox import GPTNeoXGPTQForCausalLM
 from .gptj import GPTJGPTQForCausalLM
 from .gpt2 import GPT2GPTQForCausalLM
 from .llama import LlamaGPTQForCausalLM
 from .moss import MOSSGPTQForCausalLM
 from .opt import OPTGPTQForCausalLM
+from .rw import RWGPTQForCausalLM
+from .gpt_bigcode import GPTBigCodeGPTQForCausalLM
 from .mpt import MPTGPTQForCausalLM
 
 
@@ -20,6 +23,10 @@ GPTQ_CAUSAL_LM_MODEL_MAP = {
     "llama": LlamaGPTQForCausalLM,
     "opt": OPTGPTQForCausalLM,
     "moss": MOSSGPTQForCausalLM,
+    "gpt_bigcode": GPTBigCodeGPTQForCausalLM,
+    "codegen": CodeGenGPTQForCausalLM,
+    "RefinedWebModel": RWGPTQForCausalLM,
+    "RefinedWeb":RWGPTQForCausalLM,
     "mpt": MPTGPTQForCausalLM
 }
 
@@ -38,40 +45,58 @@ class AutoGPTQForCausalLM:
         pretrained_model_name_or_path: str,
         quantize_config: BaseQuantizeConfig,
         max_memory: Optional[dict] = None,
+        trust_remote_code: bool = False,
         **model_init_kwargs
     ) -> BaseGPTQForCausalLM:
-        model_type = check_and_get_model_type(pretrained_model_name_or_path)
+        model_type = check_and_get_model_type(pretrained_model_name_or_path, trust_remote_code)
         return GPTQ_CAUSAL_LM_MODEL_MAP[model_type].from_pretrained(
             pretrained_model_name_or_path=pretrained_model_name_or_path,
             quantize_config=quantize_config,
             max_memory=max_memory,
+            trust_remote_code=trust_remote_code,
             **model_init_kwargs
         )
 
     @classmethod
     def from_quantized(
         cls,
-        save_dir: str,
-        device: str = "cpu",
-        use_safetensors: bool = False,
-        use_triton: bool = False,
+        model_name_or_path: Optional[str] = None,
+        save_dir: Optional[str] = None,
+        device_map: Optional[Union[str, Dict[str, Union[str, int]]]] = None,
         max_memory: Optional[dict] = None,
-        device_map: Optional[str] = None,
+        device: Optional[Union[str, int]] = None,
+        low_cpu_mem_usage: bool = False,
+        use_triton: bool = False,
+        inject_fused_attention: bool = True,
+        inject_fused_mlp: bool = True,
+        use_cuda_fp16: bool = True,
         quantize_config: Optional[BaseQuantizeConfig] = None,
         model_basename: Optional[str] = None,
-        trust_remote_code: bool = False
+        use_safetensors: bool = False,
+        trust_remote_code: bool = False,
+        warmup_triton: bool = False,
+        **kwargs
     ) -> BaseGPTQForCausalLM:
-        model_type = check_and_get_model_type(save_dir)
-        return GPTQ_CAUSAL_LM_MODEL_MAP[model_type].from_quantized(
+        model_type = check_and_get_model_type(save_dir or model_name_or_path, trust_remote_code)
+        quant_func = GPTQ_CAUSAL_LM_MODEL_MAP[model_type].from_quantized
+        keywords = {key: kwargs[key] for key in signature(quant_func).parameters if key in kwargs}
+        return quant_func(
+            model_name_or_path=model_name_or_path,
             save_dir=save_dir,
-            device=device,
-            use_safetensors=use_safetensors,
-            use_triton=use_triton,
-            max_memory=max_memory,
             device_map=device_map,
+            max_memory=max_memory,
+            device=device,
+            low_cpu_mem_usage=low_cpu_mem_usage,
+            use_triton=use_triton,
+            inject_fused_attention=inject_fused_attention,
+            inject_fused_mlp=inject_fused_mlp,
+            use_cuda_fp16=use_cuda_fp16,
             quantize_config=quantize_config,
             model_basename=model_basename,
-            trust_remote_code=trust_remote_code
+            use_safetensors=use_safetensors,
+            trust_remote_code=trust_remote_code,
+            warmup_triton=warmup_triton,
+            **keywords
         )
 
 

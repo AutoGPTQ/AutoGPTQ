@@ -16,12 +16,37 @@
 </h4>
 
 ## News or Update
-- 2023-05-12 - (In Progress) - `peft` + `auto-gptq` + multi-modal data = easily fine tune LLMs to gain multi-modal instruction following ability with low resources, stay tune!
+
+**To experience adapter training using `auto_gptq` quantized model in advance, you can try [this branch](https://github.com/PanQiWei/AutoGPTQ/tree/peft_integration) and discuss [in here](https://github.com/PanQiWei/AutoGPTQ/issues/103), examples are [in here](https://github.com/PanQiWei/AutoGPTQ/tree/peft_integration/examples/peft).**
+
+- 2023-05-25 - (In Progress) - Integrate with 🤗 peft to use gptq quantized model to train adapters, support LoRA, AdaLoRA, AdaptionPrompt, etc.
+- 2023-05-30 - (Update) - Support download/upload quantized model from/to 🤗 Hub.
+- 2023-05-27 - (Update) - Support quantization and inference for `gpt_bigcode`, `codegen` and `RefineWeb/RefineWebModel`(falcon) model types.
 - 2023-05-04 - (Update) - Support using faster cuda kernel when `not desc_act or group_size == -1`.
-- 2023-04-29 - (Update) - Support loading quantized model from arbitrary quantize_config and model_basename.
-- 2023-04-28 - (Update) - Support CPU offload and quantize/inference on multiple devices, support `gpt2` type models.
 
 *For more histories please turn to [here](docs/NEWS_OR_UPDATE.md)*
+
+## Performance Comparison
+
+### Inference Speed
+> The result is generated using [this script](examples/benchmark/generation_speed.py), batch size of input is 1, decode strategy is beam search and enforce the model to generate 512 tokens, speed metric is tokens/s (the larger, the better).
+> 
+> The quantized model is loaded using the setup that can gain the fastest inference speed.
+
+| model         | GPU           | num_beams | fp16  | gptq-int4 |
+|---------------|---------------|-----------|-------|-----------|
+| llama-7b      | 1xA100-40G    | 1         | 18.87 | 25.53     |
+| llama-7b      | 1xA100-40G    | 4         | 68.79 | 91.30     |
+| moss-moon 16b | 1xA100-40G    | 1         | 12.48 | 15.25     |
+| moss-moon 16b | 1xA100-40G    | 4         | OOM   | 42.67     |
+| moss-moon 16b | 2xA100-40G    | 1         | 06.83 | 06.78     |
+| moss-moon 16b | 2xA100-40G    | 4         | 13.10 | 10.80     |
+| gpt-j 6b      | 1xRTX3060-12G | 1         | OOM   | 29.55     |
+| gpt-j 6b      | 1xRTX3060-12G | 4         | OOM   | 47.36     |
+
+
+### Perplexity
+For perplexity comparison, you can turn to [here](https://github.com/qwopqwop200/GPTQ-for-LLaMa#result) and [here](https://github.com/qwopqwop200/GPTQ-for-LLaMa#gptq-vs-bitsandbytes)
 
 ## Installation
 
@@ -30,14 +55,19 @@ You can install the latest stable release of AutoGPTQ from pip:
 ```shell
 pip install auto-gptq
 ```
+Start from v0.2.0, you can download pre-build wheel that satisfied your environment setup from each version's release assets and install it to skip building stage for the fastest installation speed. For example:
+```shell
+# firstly, cd the directory where the wheel saved, then execute command below
+pip install auto_gptq-0.2.0+cu118-cp310-cp310-linux_x86_64.whl # install v0.2.0 auto_gptq pre-build wheel for linux in an environment whose python=3.10 and cuda=11.8
+```
 #### disable cuda extensions
 By default, cuda extensions will be installed when `torch` and `cuda` is already installed in your machine, if you don't want to use them, using:
 ```shell
 BUILD_CUDA_EXT=0 pip install auto-gptq
 ```
-And to make sure `quant_cuda` is not ever in your virtual environment, run:
+And to make sure `autogptq_cuda` is not ever in your virtual environment, run:
 ```shell
-pip uninstall quant_cuda -y
+pip uninstall autogptq_cuda -y
 ```
 #### to support LLaMa model
 For some people want to try LLaMa and whose `transformers` version not meet the newest one that supports it, using:
@@ -53,6 +83,9 @@ pip install auto-gptq[triton]
 ```
 
 ### Install from source
+<details>
+<summary>click to see details</summary>
+
 Clone the source code:
 ```shell
 git clone https://github.com/PanQiWei/AutoGPTQ.git && cd AutoGPTQ
@@ -67,29 +100,25 @@ Use `.[llama]` if you want to try LLaMa model.
 
 Use `.[triton]` if you want to integrate with triton and it's available on your operating system.
 
+</details>
 
-## Supported Models
-Currently, `auto_gptq` supports: `bloom`, `gpt2`, `gpt_neox`, `gptj`, `llama`, `moss` and `opt`; more Transformer models will come soon!
+## Quick Tour
 
-## Supported Evaluation Tasks
-Currently, `auto_gptq` supports: `LanguageModelingTask`, `SequenceClassificationTask` and `TextSummarizationTask`; more Tasks will come soon!
+### Quantization and Inference
+> warning: this is just a showcase of the usage of basic apis in AutoGPTQ, which uses only one sample to quantize a much small model, quality of quantized model using such little samples may not good.
 
-## Usage
-
-**Here are [tutorials](docs/tutorial)(continue updating...) for using `auto-gptq`, it's highly recommended for newcomers to read them first before trying example scripts.** 
-
-### Basic
-> warning: this is just a show case of the usage of basic apis in AutoGPTQ, which uses only one sample to quantize a much small model, thus may not performs as well as expected in LLMs.
-
-Below is an example for the simplest use of `auto_gptq`: 
+Below is an example for the simplest use of `auto_gptq` to quantize a model and inference after quantization: 
 ```python
 from transformers import AutoTokenizer, TextGenerationPipeline
 from auto_gptq import AutoGPTQForCausalLM, BaseQuantizeConfig
+import logging
 
+logging.basicConfig(
+    format="%(asctime)s %(levelname)s [%(name)s] %(message)s", level=logging.INFO, datefmt="%Y-%m-%d %H:%M:%S"
+)
 
 pretrained_model_dir = "facebook/opt-125m"
 quantized_model_dir = "opt-125m-4bit"
-
 
 tokenizer = AutoTokenizer.from_pretrained(pretrained_model_dir, use_fast=True)
 examples = [
@@ -101,13 +130,14 @@ examples = [
 quantize_config = BaseQuantizeConfig(
     bits=4,  # quantize model to 4-bit
     group_size=128,  # it is recommended to set the value to 128
+    desc_act=False,  # set to False can significantly speed up inference but the perplexity may slightly bad 
 )
 
 # load un-quantized model, by default, the model will always be loaded into CPU memory
 model = AutoGPTQForCausalLM.from_pretrained(pretrained_model_dir, quantize_config)
 
 # quantize model, the examples should be list of dict whose keys can only be "input_ids" and "attention_mask"
-model.quantize(examples, use_triton=False)
+model.quantize(examples)
 
 # save quantized model
 model.save_quantized(quantized_model_dir)
@@ -115,11 +145,28 @@ model.save_quantized(quantized_model_dir)
 # save quantized model using safetensors
 model.save_quantized(quantized_model_dir, use_safetensors=True)
 
+# push quantized model to Hugging Face Hub. 
+# to use use_auth_token=True, Login first via huggingface-cli login.
+# or pass explcit token with: use_auth_token="hf_xxxxxxx"
+# (uncomment the following three lines to enable this feature)
+# repo_id = f"YourUserName/{quantized_model_dir}"
+# commit_message = f"AutoGPTQ model for {pretrained_model_dir}: {quantize_config.bits}bits, gr{quantize_config.group_size}, desc_act={quantize_config.desc_act}"
+# model.push_to_hub(repo_id, commit_message=commit_message, use_auth_token=True)
+
+# alternatively you can save and push at the same time
+# (uncomment the following three lines to enable this feature)
+# repo_id = f"YourUserName/{quantized_model_dir}"
+# commit_message = f"AutoGPTQ model for {pretrained_model_dir}: {quantize_config.bits}bits, gr{quantize_config.group_size}, desc_act={quantize_config.desc_act}"
+# model.push_to_hub(repo_id, save_dir=quantized_model_dir, use_safetensors=True, commit_message=commit_message, use_auth_token=True)
+
 # load quantized model to the first GPU
-model = AutoGPTQForCausalLM.from_quantized(quantized_model_dir, device="cuda:0", use_triton=False)
+model = AutoGPTQForCausalLM.from_quantized(quantized_model_dir, device="cuda:0")
+
+# download quantized model from Hugging Face Hub and load to the first GPU
+# model = AutoGPTQForCausalLM.from_quantized(repo_id, device="cuda:0", use_safetensors=True, use_triton=False)
 
 # inference with model.generate
-print(tokenizer.decode(model.generate(**tokenizer("auto_gptq is", return_tensors="pt").to("cuda:0"))[0]))
+print(tokenizer.decode(model.generate(**tokenizer("auto_gptq is", return_tensors="pt").to(model.device))[0]))
 
 # or you can also use pipeline
 pipeline = TextGenerationPipeline(model=model, tokenizer=tokenizer)
@@ -129,7 +176,10 @@ print(pipeline("auto-gptq is")[0]["generated_text"])
 For more advanced features of model quantization, please reference to [this script](examples/quantization/quant_with_alpaca.py)
 
 ### Customize Model
-Below is an example to extend `auto_gptq` to support `OPT` model, as you will see, it's very easy:
+<details>
+
+<summary>Below is an example to extend `auto_gptq` to support `OPT` model, as you will see, it's very easy:</summary>
+
 ```python
 from auto_gptq.modeling import BaseGPTQForCausalLM
 
@@ -155,12 +205,17 @@ class OPTGPTQForCausalLM(BaseGPTQForCausalLM):
 ```
 After this, you can use `OPTGPTQForCausalLM.from_pretrained` and other methods as shown in Basic.
 
+</details>
+
 ### Evaluation on Downstream Tasks
 You can use tasks defined in `auto_gptq.eval_tasks` to evaluate model's performance on specific down-stream task before and after quantization.
 
 The predefined tasks support all causal-language-models implemented in [🤗 transformers](https://github.com/huggingface/transformers) and in this project.
 
-Below is an example to evaluate `EleutherAI/gpt-j-6b` on sequence-classification task using `cardiffnlp/tweet_sentiment_multilingual` dataset:
+<details>
+
+<summary>Below is an example to evaluate `EleutherAI/gpt-j-6b` on sequence-classification task using `cardiffnlp/tweet_sentiment_multilingual` dataset:</summary>
+
 ```python
 from functools import partial
 
@@ -236,9 +291,38 @@ print(
 )
 ```
 
-### More Examples
-For more examples, please turn to [examples](examples/README.md)
+</details>
+
+## Learn More
+[tutorials](docs/tutorial) provide step-by-step guidance to integrate `auto_gptq` with your own project and some best practice principles.
+
+[examples](examples/README.md) provide plenty of example scripts to use `auto_gptq` in different ways.
+
+## Supported Models
+
+> you can use `model.config.model_type` to compare with the table below to check whether the model you use is supported by `auto_gptq`.
+> 
+> for example, model_type of `WizardLM`, `vicuna` and `gpt4all` are all `llama`, hence they are all supported by `auto_gptq`.
+
+| model type                         | quantization | inference | peft-lora | peft-adaption_prompt |
+|------------------------------------|--------------|-----------|-----------|----------------------|
+| bloom                              | ✅            | ✅         |           |                      |
+| gpt2                               | ✅            | ✅         |           |                      |
+| gpt_neox                           | ✅            | ✅         |           |                      |
+| gptj                               | ✅            | ✅         |           |                      |
+| llama                              | ✅            | ✅         |           | ✅                    |
+| moss                               | ✅            | ✅         |           |                      |
+| opt                                | ✅            | ✅         |           |                      |
+| gpt_bigcode                        | ✅            | ✅         |           |                      |
+| codegen                            | ✅            | ✅         |           |                      |
+| falcon(RefinedWebModel/RefinedWeb) | ✅            | ✅         |           |                      |
+
+## Supported Evaluation Tasks
+Currently, `auto_gptq` supports: `LanguageModelingTask`, `SequenceClassificationTask` and `TextSummarizationTask`; more Tasks will come soon!
 
 ## Acknowledgement
 - Specially thanks **Elias Frantar**, **Saleh Ashkboos**, **Torsten Hoefler** and **Dan Alistarh** for proposing **GPTQ** algorithm and open source the [code](https://github.com/IST-DASLab/gptq).
 - Specially thanks **qwopqwop200**, for code in this project that relevant to quantization are mainly referenced from [GPTQ-for-LLaMa](https://github.com/qwopqwop200/GPTQ-for-LLaMa/tree/cuda).
+
+
+[![Star History Chart](https://api.star-history.com/svg?repos=PanQiwei/AutoGPTQ&type=Date)](https://star-history.com/#PanQiWei/AutoGPTQ&Date)

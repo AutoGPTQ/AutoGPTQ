@@ -4,13 +4,17 @@ Welcome to the tutorial of AutoGPTQ, in this chapter, you will learn advanced mo
 ## Arguments Introduction
 In previous chapter, you learned how to load model into CPU or single GPU with the two basic apis:
 - `.from_pretrained`: by default, load the whole pretrained model into CPU.
-- `.from_quantized`: by default, load the whole quantized model into CPU, one can set `device='cuda'` to load model into a single GPU.
+- `.from_quantized`: by default, `auto_gptq` will automatically find the suitable way to load the quantized model.
+  - if there is only single GPU and model can fit into it, will load the whole model into that GPU;
+  - if there are multiple GPUs and model can fit into them, will evenly split model and load into those GPUs;
+  - if model can't fit into GPU(s), will use CPU offloading.
 
-However, the default settings above may not meet many users' demands, for they want to try really large models but haven't enough CPU/GPU memory.
+However, the default settings above may not meet many users' demands, for they want to have more control of model loading.
 
-Luckily, in AutoGPTQ, we provide two advanced arguments that users can tweak based on the memory of hardware:
+Luckily, in AutoGPTQ, we provide some advanced arguments that users can tweak to manually config model loading strategy:
+- `low_cpu_mem_usage`: `bool` type argument, defaults to False, can be used both in `.from_pretrained` and `.from_quantized`, one can enable it when there is a limitation of CPU memory(by default model will be initialized in CPU) or want to load model faster.
 - `max_memory`: an optional `List[Dict[Union[str, int], str]]` type argument, can be used both in `.from_pretrained` and `.from_quantized`.
-- `device_map`: an optional `str` type argument, currently only be supported in `.from_quantized`.
+- `device_map`: an optional `Union[str, Dict[str, Union[int, str]]]` type argument, currently only be supported in `.from_quantized`.
 
 Before `auto-gptq`'s existence, there are many users have already used other popular tools such as [GPTQ-for-LLaMa](https://github.com/qwopqwop200/GPTQ-for-LLaMa) to quantize their model and saved with different name without `quantize_config.json` file introduced in previous chapter.
 
@@ -50,16 +54,18 @@ max_memory = {0: "20GIB", "cpu": "20GIB"}
 In this case, you can also load model that smaller than 40GB but the rest 20GB will be kept in CPU memory, only be collected into GPU when needed.
 
 ### device_map
-So far, only `.from_quantized` supports this argument. You can specify it to use pre-set model loading strategies. Because under the hood, modules in model will be mapped to different devices based on the given `max_memory`, it's more convenient to use `device_map` directly if you don't want to spend much time on calculating how much memory in each device should be use to load model.
+So far, only `.from_quantized` supports this argument. 
 
-In the simplest way, you can set `device_map='auto'` and let 🤗 Accelerate handle the device map computation. For more pre-set strategies, you can reference to [this document](https://huggingface.co/docs/accelerate/main/en/usage_guides/big_modeling#designing-a-device-map).
+You can provide a string to this argument to use pre-set model loading strategies. Current valid values are `["auto", "balanced", "balanced_low_0", "sequential"]`
+
+In the simplest way, you can set `device_map='auto'` and let 🤗 Accelerate handle the device map computation. For more details of this argument, you can reference to [this document](https://huggingface.co/docs/accelerate/main/en/usage_guides/big_modeling#designing-a-device-map).
 
 ## Best Practice
 
 ### At Quantization
 It's always recommended to first consider loading the whole model into GPU(s) for it can save the time spend on transferring module's weights between CPU and GPU.
 
-However, not everyone have large GPU memory. Roughly speaking, always specify the maximum memory CPU will be used to load model, then, for each GPU, you can preserve memory that can fit in 1~2(2~3 for the first GPU incase CPU offload used) model layers for examples' tensors and calculations in quantization, and load model weights using all others left. By this, all you need to do is a simple math based on the number of GPUs you have, the size of model weights file(s) and the number of model layers.
+However, not everyone have large GPU memory. Roughly speaking, always specify the maximum memory CPU will be used to load model, then, for each GPU, you can preserve memory that can fit in 1\~2(2\~3 for the first GPU incase CPU offload used) model layers for examples' tensors and calculations in quantization, and load model weights using all others left. By this, all you need to do is a simple math based on the number of GPUs you have, the size of model weights file(s) and the number of model layers.
 
 ### At Inference
 For inference, following this principle: always using single GPU if you can, otherwise multiple GPUs, CPU offload is the last one to consider.

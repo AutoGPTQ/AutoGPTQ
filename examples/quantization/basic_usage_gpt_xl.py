@@ -43,6 +43,7 @@ def main():
     quantize_config = BaseQuantizeConfig(
         bits=4,  # quantize model to 4-bit
         group_size=128,  # it is recommended to set the value to 128
+        desc_act=False,  # desc_act and groupsize only works on triton
     )
     
     # get model maximum sequence length
@@ -55,7 +56,7 @@ def main():
                 model.seqlen = model_config[key]
                 break
     else:
-        logger.warning("can't get model's sequence length from model config, will set to 2048.")
+        print("can't get model's sequence length from model config, will set to 2048.")
         model.seqlen = 2048
      
     # load train dataset for quantize
