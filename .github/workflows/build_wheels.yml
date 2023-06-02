@@ -59,13 +59,41 @@ jobs:
           path: ./dist/*.whl
 
       - uses: actions/upload-artifact@v3
-        if: runner.os == 'Linux'
+        if: runner.os == 'Windows'
+        with:
+          name: 'windows-wheels'
+          path: ./dist/*.whl
+
+  build_sdist:
+    name: Build source distribution
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: pwsh
+
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          ref: 'main'
+
+      - uses: actions/setup-python@v3
+        with:
+          python-version: "3.10"
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade build setuptools wheel
+
+      - name: Build Wheel
+        run: |
+          python -m build -n
+
+      - uses: actions/upload-artifact@v3
         with:
           name: 'sdist'
           path: ./dist/*.tar.gz
 
       - uses: actions/upload-artifact@v3
-        if: runner.os == 'Windows'
         with:
-          name: 'windows-wheels'
+          name: 'no-cuda-wheel'
           path: ./dist/*.whl
