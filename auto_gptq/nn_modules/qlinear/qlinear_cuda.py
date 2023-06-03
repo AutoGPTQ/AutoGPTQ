@@ -9,12 +9,13 @@ import transformers
 logger = getLogger(__name__)
 
 try:
-    import autogptq_cuda
-
+    import autogptq_cuda_256
+    import autogptq_cuda_64
     _autogptq_cuda_available = True
 except ImportError:
     logger.warning('CUDA extension not installed.')
     _autogptq_cuda_available = False
+
 
 
 class QuantLinear(nn.Module):
@@ -29,6 +30,8 @@ class QuantLinear(nn.Module):
         trainable=False
     ):
         super().__init__()
+        global _autogptq_cuda_available
+
         if bits not in [2, 3, 4, 8]:
             raise NotImplementedError("Only 2,3,4,8 bits are supported.")
         if trainable:
@@ -76,7 +79,11 @@ class QuantLinear(nn.Module):
 
         self.kernel_switch_threshold = kernel_switch_threshold
         self.autogptq_cuda_available = _autogptq_cuda_available
+        
+        self.autogptq_cuda = autogptq_cuda_256
         if infeatures % 256 != 0 or outfeatures % 256 != 0:
+            self.autogptq_cuda = autogptq_cuda_64
+        if infeatures % 64 != 0 or outfeatures % 64 != 0:
             self.autogptq_cuda_available = False
 
         self.trainable = trainable
@@ -189,13 +196,13 @@ class QuantLinear(nn.Module):
         ):
             out = torch.zeros((x.shape[0], self.outfeatures), device=x.device, dtype=torch.float32)
             if self.bits == 2:
-                autogptq_cuda.vecquant2matmul(x.float(), self.qweight, out, self.scales.float(), self.qzeros, self.g_idx)
+                self.autogptq_cuda.vecquant2matmul(x.float(), self.qweight, out, self.scales.float(), self.qzeros, self.g_idx)
             elif self.bits == 3:
-                autogptq_cuda.vecquant3matmul(x.float(), self.qweight, out, self.scales.float(), self.qzeros, self.g_idx)
+                self.autogptq_cuda.vecquant3matmul(x.float(), self.qweight, out, self.scales.float(), self.qzeros, self.g_idx)
             elif self.bits == 4:
-                autogptq_cuda.vecquant4matmul(x.half(), self.qweight, out.half(), self.scales, self.qzeros, self.g_idx, self.infeatures // 2)
+                self.autogptq_cuda.vecquant4matmul(x.half(), self.qweight, out.half(), self.scales, self.qzeros, self.g_idx, self.infeatures // 2)
             elif self.bits == 8:
-                autogptq_cuda.vecquant8matmul(x.float(), self.qweight, out, self.scales.float(), self.qzeros, self.g_idx)
+                self.autogptq_cuda.vecquant8matmul(x.float(), self.qweight, out, self.scales.float(), self.qzeros, self.g_idx)
             else:
                 raise NotImplementedError("Only 2,3,4,8 bits are supported.")
         else:

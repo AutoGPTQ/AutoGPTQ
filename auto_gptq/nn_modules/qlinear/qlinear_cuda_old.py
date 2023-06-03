@@ -7,10 +7,9 @@ import torch.nn as nn
 import transformers
 
 logger = getLogger(__name__)
-
 try:
-    import autogptq_cuda
-
+    import autogptq_cuda_256
+    import autogptq_cuda_64
     _autogptq_cuda_available = True
 except ImportError:
     logger.warning('CUDA extension not installed.')
@@ -29,8 +28,8 @@ class QuantLinear(nn.Module):
         kernel_switch_threshold=128,
         trainable=False
     ):
-
         super().__init__()
+        global _autogptq_cuda_available
         if bits not in [2, 3, 4, 8]:
             raise NotImplementedError("Only 2,3,4,8 bits are supported.")
         if trainable:
@@ -81,7 +80,10 @@ class QuantLinear(nn.Module):
 
         self.kernel_switch_threshold = kernel_switch_threshold
         self.autogptq_cuda_available = _autogptq_cuda_available
+        self.autogptq_cuda = autogptq_cuda_256
         if infeatures % 256 != 0 or outfeatures % 256 != 0:
+            self.autogptq_cuda = autogptq_cuda_64
+        if infeatures % 64 != 0 or outfeatures % 64 != 0:
             self.autogptq_cuda_available = False
 
         self.trainable = trainable
@@ -188,24 +190,24 @@ class QuantLinear(nn.Module):
             if self.use_cuda_fp16:
                 x = x.half()
                 if self.bits == 2:
-                    autogptq_cuda.vecquant2matmul_faster_old(x, self.qweight, out, self.scales.float(), self.qzeros, self.group_size, self.half_indim)
+                    self.autogptq_cuda.vecquant2matmul_faster_old(x, self.qweight, out, self.scales.float(), self.qzeros, self.group_size, self.half_indim)
                 elif self.bits == 3:
-                    autogptq_cuda.vecquant3matmul_faster_old(x, self.qweight, out, self.scales.float(), self.qzeros, self.group_size, self.half_indim)
+                    self.autogptq_cuda.vecquant3matmul_faster_old(x, self.qweight, out, self.scales.float(), self.qzeros, self.group_size, self.half_indim)
                 elif self.bits == 4:
-                    autogptq_cuda.vecquant4matmul_faster_old(x, self.qweight, out, self.scales.float(), self.qzeros, self.group_size, self.half_indim)
+                    self.autogptq_cuda.vecquant4matmul_faster_old(x, self.qweight, out, self.scales.float(), self.qzeros, self.group_size, self.half_indim)
 
                 else:
                     raise NotImplementedError("Only 2,3,4 bits are supported.")
             else:
                 x = x.float()
                 if self.bits == 2:
-                    autogptq_cuda.vecquant2matmul_old(x, self.qweight, out, self.scales.float(), self.qzeros, self.group_size)
+                    self.autogptq_cuda.vecquant2matmul_old(x, self.qweight, out, self.scales.float(), self.qzeros, self.group_size)
                 elif self.bits == 3:
-                    autogptq_cuda.vecquant3matmul_old(x, self.qweight, out, self.scales.float(), self.qzeros, self.group_size)
+                    self.autogptq_cuda.vecquant3matmul_old(x, self.qweight, out, self.scales.float(), self.qzeros, self.group_size)
                 elif self.bits == 4:
-                    autogptq_cuda.vecquant4matmul_old(x, self.qweight, out, self.scales.float(), self.qzeros, self.group_size)
+                    self.autogptq_cuda.vecquant4matmul_old(x, self.qweight, out, self.scales.float(), self.qzeros, self.group_size)
                 elif self.bits == 8:
-                    autogptq_cuda.vecquant8matmul_old(x, self.qweight, out, self.scales.float(), self.qzeros, self.group_size)
+                    self.autogptq_cuda.vecquant8matmul_old(x, self.qweight, out, self.scales.float(), self.qzeros, self.group_size)
                 else:
                     raise NotImplementedError("Only 2,3,4,8 bits are supported.")
         else:
