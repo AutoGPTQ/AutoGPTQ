@@ -75,10 +75,17 @@ if TORCH_AVAILABLE:
             print(f"appending conda cuda include dir {conda_cuda_include_dir}")
         extensions = [
             cpp_extension.CUDAExtension(
-                "autogptq_cuda",
+                "autogptq_cuda_64",
                 [
-                    "autogptq_cuda/autogptq_cuda.cpp",
-                    "autogptq_cuda/autogptq_cuda_kernel.cu"
+                    "autogptq_cuda/autogptq_cuda_64.cpp",
+                    "autogptq_cuda/autogptq_cuda_kernel_64.cu"
+                ]
+            ),
+            cpp_extension.CUDAExtension(
+                "autogptq_cuda_256",
+                [
+                    "autogptq_cuda/autogptq_cuda_256.cpp",
+                    "autogptq_cuda/autogptq_cuda_kernel_256.cu"
                 ]
             )
         ]
