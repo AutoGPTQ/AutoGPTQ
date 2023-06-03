@@ -145,8 +145,8 @@ def load_model_tokenizer(
     use_triton: bool = False,
     use_safetensors: bool = False,
     use_fast_tokenizer: bool = False,
-    inject_fused_attention: bool = False,
-    inject_fused_mlp: bool = False
+    inject_fused_attention: bool = True,
+    inject_fused_mlp: bool = True
 ):
     tokenizer = AutoTokenizer.from_pretrained(
         pretrained_model_name_or_path=tokenizer_name_or_path or model_name_or_path,
