@@ -20,7 +20,7 @@ if sys.version_info < python_min_version:
 
 CUDA_VERSION = "".join(os.environ.get("CUDA_VERSION", "").split("."))
 
-version = "0.2.1" + (f"+cu{CUDA_VERSION}" if CUDA_VERSION and IN_GITHUB_ACTIONS else "")
+version = "0.3.0.dev0" + (f"+cu{CUDA_VERSION}" if CUDA_VERSION and IN_GITHUB_ACTIONS else "")
 common_setup_kwargs = {
     "version": version,
     "name": "auto_gptq",
