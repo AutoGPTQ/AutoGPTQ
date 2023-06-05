@@ -126,7 +126,16 @@ class FusedLlamaAttentionForQuantizedModel(FusedBaseAttentionModule):
         return attn_output, attn_weights, past_key_value
 
     @classmethod
-    def inject_to_model(cls, model, use_triton=False, group_size=-1, use_cuda_fp16=True, desc_act=False, **kwargs):
+    def inject_to_model(
+        cls,
+        model,
+        use_triton=False,
+        group_size=-1,
+        use_cuda_fp16=True,
+        desc_act=False,
+        trainable=False,
+        **kwargs
+    ):
         """
         Replace all LlamaAttention modules with QuantLlamaAttention modules, fusing the q, k, v projections.
         """
@@ -153,7 +162,7 @@ class FusedLlamaAttentionForQuantizedModel(FusedBaseAttentionModule):
                 q_proj.outfeatures + k_proj.outfeatures + v_proj.outfeatures,
                 True if q_proj.bias is not None else False,
             )
-            qlinear_kwargs = dict()
+            qlinear_kwargs = {"trainable": trainable}
             if (not desc_act or group_size == -1) and not use_triton:
                 qlinear_kwargs["use_cuda_fp16"] = use_cuda_fp16
             qkv_layer = QuantLinear(*qlinear_args, **qlinear_kwargs)

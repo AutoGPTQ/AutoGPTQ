@@ -12,14 +12,12 @@
     <p>
         <a href="https://github.com/PanQiWei/AutoGPTQ/blob/main/README.md">English</a> |
         <b>中文</b>
-    <p>
+    </p>
 </h4>
 
 ## 新闻或更新
 
-**提前体验使用 `auto_gptq` 量化过的模型来训练适应层，你可以尝试[这个分支](https://github.com/PanQiWei/AutoGPTQ/tree/peft_integration) 并在[这里](https://github.com/PanQiWei/AutoGPTQ/issues/103)进行讨论，你也可以参考[这里](https://github.com/PanQiWei/AutoGPTQ/tree/peft_integration/examples/peft)所提供的示例脚本。**
-
-- 2023-05-25 - (开发中) - 集成 🤗 peft 来使用 gptq 量化过的模型训练适应层，支持 LoRA，AdaLoRA，AdaptionPrompt 等。
+- 2023-06-05 - (更新) - 集成 🤗 peft 来使用 gptq 量化过的模型训练适应层，支持 LoRA，AdaLoRA，AdaptionPrompt 等。
 - 2023-05-30 - (更新) - 支持从 🤗 Hub 下载量化好的模型或上次量化好的模型到 🤗 Hub。
 - 2023-05-27 - (更新) - 支持以下模型的量化和推理： `gpt_bigcode`， `codegen` 以及 `RefineWeb/RefineWebModel`（falcon）。
 - 2023-05-04 - (更新) - 支持在 `not desc_act or group_size == -1` 的情况下使用更快的 cuda 算子。
@@ -69,11 +67,7 @@ BUILD_CUDA_EXT=0 pip install auto-gptq
 ```shell
 pip uninstall autogptq_cuda -y
 ```
-#### 支持使用 LLaMa 模型
-若想要尝试 LLaMa 模型，但 `transformers` 版本不为支持该模型的最新版本，使用以下命令：
-```shell
-pip install auto-gptq[llama]
-```
+
 #### 支持使用 triton 加速
 若想使用 `triton` 加速模型推理，使用以下命令：
 > 警告：目前 triton 仅支持 linux 操作系统；当使用 triton 时 3-bit 数值类型的量化将不被支持
@@ -95,8 +89,6 @@ git clone https://github.com/PanQiWei/AutoGPTQ.git && cd AutoGPTQ
 pip install .
 ```
 正如在快速安装一节，你可以使用 `BUILD_CUDA_EXT=0` 来取消构建 cuda 拓展。
-
-如果你想要使用 LLaMa 模型，请使用 `.[llama]`。
 
 如果你想要使用 triton 加速且其能够被你的操作系统所支持，请使用 `.[triton]`。
 
@@ -303,18 +295,18 @@ print(
 > 
 > 比如， `WizardLM`，`vicuna` 和 `gpt4all` 模型的 `model_type` 皆为 `llama`， 因此这些模型皆被 `auto_gptq` 所支持。
 
-| model type                         | quantization | inference | peft-lora | peft-adaption_prompt |
-|------------------------------------|--------------|-----------|-----------|----------------------|
-| bloom                              | ✅            | ✅         |           |                      |
-| gpt2                               | ✅            | ✅         |           |                      |
-| gpt_neox                           | ✅            | ✅         |           |                      |
-| gptj                               | ✅            | ✅         |           |                      |
-| llama                              | ✅            | ✅         |           | ✅                    |
-| moss                               | ✅            | ✅         |           |                      |
-| opt                                | ✅            | ✅         |           |                      |
-| gpt_bigcode                        | ✅            | ✅         |           |                      |
-| codegen                            | ✅            | ✅         |           |                      |
-| falcon(RefinedWebModel/RefinedWeb) | ✅            | ✅         |           |                      |
+| model type                         | quantization | inference | peft-lora | peft-ada-lora | peft-adaption_prompt                                                              |
+|------------------------------------|--------------|-----------|-----------|---------------|-----------------------------------------------------------------------------------|
+| bloom                              | ✅            | ✅         | ✅         | ✅             |                                                                                   |
+| gpt2                               | ✅            | ✅         | ✅         | ✅             |                                                                                   |
+| gpt_neox                           | ✅            | ✅         | ✅         | ✅             | ✅[要求该分支的 peft](https://github.com/PanQiWei/peft/tree/multi_modal_adaption_prompt) |
+| gptj                               | ✅            | ✅         | ✅         | ✅             | ✅[要求该分支的 peft](https://github.com/PanQiWei/peft/tree/multi_modal_adaption_prompt) |
+| llama                              | ✅            | ✅         | ✅         | ✅             | ✅                                                                                 |
+| moss                               | ✅            | ✅         | ✅         | ✅             | ✅[要求该分支的 peft](https://github.com/PanQiWei/peft/tree/multi_modal_adaption_prompt) |
+| opt                                | ✅            | ✅         | ✅         | ✅             |                                                                                   |
+| gpt_bigcode                        | ✅            | ✅         | ✅         | ✅             |                                                                                   |
+| codegen                            | ✅            | ✅         | ✅         | ✅             |                                                                                   |
+| falcon(RefinedWebModel/RefinedWeb) | ✅            | ✅         | ✅         | ✅             |                                                                                   |
 
 ## 支持的评估任务
 目前， `auto_gptq` 支持以下评估任务： `LanguageModelingTask`, `SequenceClassificationTask` 和 `TextSummarizationTask`；更多的评估任务即将到来！

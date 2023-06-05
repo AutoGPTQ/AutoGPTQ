@@ -12,14 +12,12 @@
     <p>
         <b>English</b> |
         <a href="https://github.com/PanQiWei/AutoGPTQ/blob/main/README_zh.md">中文</a>
-    <p>
+    </p>
 </h4>
 
 ## News or Update
 
-**To experience adapter training using `auto_gptq` quantized model in advance, you can try [this branch](https://github.com/PanQiWei/AutoGPTQ/tree/peft_integration) and discuss [in here](https://github.com/PanQiWei/AutoGPTQ/issues/103), examples are [in here](https://github.com/PanQiWei/AutoGPTQ/tree/peft_integration/examples/peft).**
-
-- 2023-05-25 - (In Progress) - Integrate with 🤗 peft to use gptq quantized model to train adapters, support LoRA, AdaLoRA, AdaptionPrompt, etc.
+- 2023-06-05 - (Update) - Integrate with 🤗 peft to use gptq quantized model to train adapters, support LoRA, AdaLoRA, AdaptionPrompt, etc.
 - 2023-05-30 - (Update) - Support download/upload quantized model from/to 🤗 Hub.
 - 2023-05-27 - (Update) - Support quantization and inference for `gpt_bigcode`, `codegen` and `RefineWeb/RefineWebModel`(falcon) model types.
 - 2023-05-04 - (Update) - Support using faster cuda kernel when `not desc_act or group_size == -1`.
@@ -69,11 +67,7 @@ And to make sure `autogptq_cuda` is not ever in your virtual environment, run:
 ```shell
 pip uninstall autogptq_cuda -y
 ```
-#### to support LLaMa model
-For some people want to try LLaMa and whose `transformers` version not meet the newest one that supports it, using:
-```shell
-pip install auto-gptq[llama]
-```
+
 #### to support triton speedup
 To integrate with `triton`, using:
 > warning: currently triton only supports linux; 3-bit quantization is not supported when using triton
@@ -95,8 +89,6 @@ Then, install from source:
 pip install .
 ```
 Like quick installation, you can also set `BUILD_CUDA_EXT=0` to disable pytorch extension building.
-
-Use `.[llama]` if you want to try LLaMa model.
 
 Use `.[triton]` if you want to integrate with triton and it's available on your operating system.
 
@@ -304,18 +296,18 @@ print(
 > 
 > for example, model_type of `WizardLM`, `vicuna` and `gpt4all` are all `llama`, hence they are all supported by `auto_gptq`.
 
-| model type                         | quantization | inference | peft-lora | peft-adaption_prompt |
-|------------------------------------|--------------|-----------|-----------|----------------------|
-| bloom                              | ✅            | ✅         |           |                      |
-| gpt2                               | ✅            | ✅         |           |                      |
-| gpt_neox                           | ✅            | ✅         |           |                      |
-| gptj                               | ✅            | ✅         |           |                      |
-| llama                              | ✅            | ✅         |           | ✅                    |
-| moss                               | ✅            | ✅         |           |                      |
-| opt                                | ✅            | ✅         |           |                      |
-| gpt_bigcode                        | ✅            | ✅         |           |                      |
-| codegen                            | ✅            | ✅         |           |                      |
-| falcon(RefinedWebModel/RefinedWeb) | ✅            | ✅         |           |                      |
+| model type                         | quantization | inference | peft-lora | peft-ada-lora | peft-adaption_prompt                                                                            |
+|------------------------------------|--------------|-----------|-----------|---------------|-------------------------------------------------------------------------------------------------|
+| bloom                              | ✅            | ✅         | ✅         | ✅             |                                                                                                 |
+| gpt2                               | ✅            | ✅         | ✅         | ✅             |                                                                                                 |
+| gpt_neox                           | ✅            | ✅         | ✅         | ✅             | ✅[requires this peft branch](https://github.com/PanQiWei/peft/tree/multi_modal_adaption_prompt) |
+| gptj                               | ✅            | ✅         | ✅         | ✅             | ✅[requires this peft branch](https://github.com/PanQiWei/peft/tree/multi_modal_adaption_prompt) |
+| llama                              | ✅            | ✅         | ✅         | ✅             | ✅                                                                                               |
+| moss                               | ✅            | ✅         | ✅         | ✅             | ✅[requires this peft branch](https://github.com/PanQiWei/peft/tree/multi_modal_adaption_prompt) |
+| opt                                | ✅            | ✅         | ✅         | ✅             |                                                                                                 |
+| gpt_bigcode                        | ✅            | ✅         | ✅         | ✅             |                                                                                                 |
+| codegen                            | ✅            | ✅         | ✅         | ✅             |                                                                                                 |
+| falcon(RefinedWebModel/RefinedWeb) | ✅            | ✅         | ✅         | ✅             |                                                                                                 |
 
 ## Supported Evaluation Tasks
 Currently, `auto_gptq` supports: `LanguageModelingTask`, `SequenceClassificationTask` and `TextSummarizationTask`; more Tasks will come soon!

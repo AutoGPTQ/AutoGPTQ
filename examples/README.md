@@ -66,11 +66,48 @@ Use `--help` flag to see detailed descriptions for more command arguments.
 > Commands in this chapter should be run under `benchmark` folder.
 
 ### Generation Speed
-`generation_speed.py` scripts gives an example of how to benchmark the generations speed of pretrained and quantized models that `auto_gptq` supports, this benchmarks model generation speed in tokens/s metric.
+`generation_speed.py` script gives an example of how to benchmark the generations speed of pretrained and quantized models that `auto_gptq` supports, this benchmarks model generation speed in tokens/s metric.
 
-To eexcute this script, using command like this:
+To execute this script, using command like this:
 ```shell
 CUDA_VISIBLE_DEVICES=0 python generation_speed.py --model_name_pr_path PATH/TO/MODEL/DIR
 ```
 
 Use `--help` flag to see detailed descriptions for more command arguments.
+
+## PEFT
+> Commands in this chapter should be run under `peft` folder.
+
+### Lora
+`peft_lora_clm_instruction_tuning.py` script gives an example of instruction tuning gptq quantized model's lora adapter using tools in `auto_gptq.utils.peft_utils` and `🤗 peft` on alpaca dataset.
+
+To execute this script, using command like this:
+```shell
+CUDA_VISIBLE_DEVICES=0 python peft_lora_clm_instruction_tuning.py --model_name_or_path PATH/TO/MODEL/DIR
+```
+
+Use `--help` flag to see detailed descriptions for more command arguments.
+
+### AdaLora
+`peft_adalora_clm_instruction_tuning.py` script gives an example of instruction tuning gptq quantized model's adalora adapter using tools in `auto_gptq.utils.peft_utils` and `🤗 peft` on alpaca dataset.
+
+To execute this script, using command like this:
+```shell
+CUDA_VISIBLE_DEVICES=0 python peft_adalora_clm_instruction_tuning.py --model_name_or_path PATH/TO/MODEL/DIR
+```
+
+Use `--help` flag to see detailed descriptions for more command arguments.
+
+
+### AdaptionPrompt
+`peft_adaption_prompt_clm_instruction_tuning.py` script gives an example of instruction tuning gptq quantized model's adaption_prompt adapter(llama-adapter) using tools in `auto_gptq.utils.peft_utils` and `🤗 peft` on alpaca dataset.
+
+To execute this script, using command like this:
+```shell
+CUDA_VISIBLE_DEVICES=0 python peft_adaption_prompt_clm_instruction_tuning.py --model_name_or_path PATH/TO/MODEL/DIR
+```
+
+Use `--help` flag to see detailed descriptions for more command arguments.
+
+If you want to try models other than llama, you can install peft from source using [this branch](https://github.com/PanQiWei/peft/tree/multi_modal_adaption_prompt), see [here](https://github.com/PanQiWei/peft/blob/a5f8f74f07591efe5eb3d08cb1b31b981e84a069/src/peft/tuners/adaption_prompt.py#L235) 
+to check what other models are also supported, and with this branch installed, you can also use `ADAPTION_PROMPT_V2` peft type (llama-adapter-v2) by simply replace `AdaptionPromptConfig` with `AdaptionPromptV2Config` in the script.

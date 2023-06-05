@@ -73,27 +73,7 @@ logger = getLogger(__name__)
             },
             num_stages=2,
             num_warps=8
-        ),
-        triton.Config(
-            {
-                'BLOCK_SIZE_M': 64,
-                'BLOCK_SIZE_N': 64,
-                'BLOCK_SIZE_K': 64,
-                'GROUP_SIZE_M': 8
-            },
-            num_stages=3,
-            num_warps=8
-        ),
-        triton.Config(
-            {
-                'BLOCK_SIZE_M': 32,
-                'BLOCK_SIZE_N': 32,
-                'BLOCK_SIZE_K': 128,
-                'GROUP_SIZE_M': 8
-            },
-            num_stages=2,
-            num_warps=4
-        ),
+        )
     ],
     key=['M', 'N', 'K'],
     nearest_power_of_two=True,
@@ -244,27 +224,7 @@ def quant_matmul_248_kernel(
             },
             num_stages=2,
             num_warps=8
-        ),
-        triton.Config(
-            {
-                'BLOCK_SIZE_M': 64,
-                'BLOCK_SIZE_N': 64,
-                'BLOCK_SIZE_K': 64,
-                'GROUP_SIZE_M': 8
-            },
-            num_stages=3,
-            num_warps=8
-        ),
-        triton.Config(
-            {
-                'BLOCK_SIZE_M': 32,
-                'BLOCK_SIZE_N': 128,
-                'BLOCK_SIZE_K': 32,
-                'GROUP_SIZE_M': 8
-            },
-            num_stages=2,
-            num_warps=4
-        ),
+        )
     ],
     key=['M', 'N', 'K'],
     nearest_power_of_two=True
@@ -356,7 +316,6 @@ def silu(x):
     return x * tl.sigmoid(x)
 
 
-
 def quant_matmul_248(input, qweight, scales, qzeros, g_idx, bits, maxq):
     with torch.cuda.device(input.device):
         output = torch.empty((input.shape[0], qweight.shape[1]), device=input.device, dtype=input.dtype)
@@ -414,3 +373,30 @@ class QuantLinearFunction(torch.autograd.Function):
         if ctx.needs_input_grad[0]:
             grad_input = transpose_quant_matmul_248(grad_output, qweight, scales, qzeros, g_idx, bits, maxq)
         return grad_input, None, None, None, None, None, None
+
+
+def quant_matmul_inference_only_248(input, qweight, scales, qzeros, g_idx, bits, maxq):
+    with torch.cuda.device(input.device):
+        output = torch.empty((input.shape[0], qweight.shape[1]), device=input.device, dtype=torch.float16)
+        grid = lambda META: (
+            triton.cdiv(input.shape[0], META['BLOCK_SIZE_M']) * triton.cdiv(qweight.shape[1], META['BLOCK_SIZE_N']),
+        )
+        quant_matmul_248_kernel[grid](
+            input, qweight, output,
+            scales, qzeros, g_idx,
+            input.shape[0], qweight.shape[1], input.shape[1],
+            bits, maxq,
+            input.stride(0), input.stride(1),
+            qweight.stride(0), qweight.stride(1),
+            output.stride(0), output.stride(1),
+            scales.stride(0), qzeros.stride(0)
+        )
+        return output
+
+
+class QuantLinearInferenceOnlyFunction(torch.autograd.Function):
+    @staticmethod
+    @custom_fwd(cast_inputs=torch.float16)
+    def forward(ctx, input, qweight, scales, qzeros, g_idx, bits, maxq):
+        output = quant_matmul_248(input, qweight, scales, qzeros, g_idx, bits, maxq)
+        return output

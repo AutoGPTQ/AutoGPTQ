@@ -20,7 +20,7 @@ if sys.version_info < python_min_version:
 
 CUDA_VERSION = "".join(os.environ.get("CUDA_VERSION", "").split("."))
 
-version = "0.2.1" + (f"+cu{CUDA_VERSION}" if CUDA_VERSION and IN_GITHUB_ACTIONS else "")
+version = "0.3.0.dev0" + (f"+cu{CUDA_VERSION}" if CUDA_VERSION and IN_GITHUB_ACTIONS else "")
 common_setup_kwargs = {
     "version": version,
     "name": "auto_gptq",
@@ -52,11 +52,11 @@ requirements = [
     "rouge",
     "torch>=1.13.0",
     "safetensors",
-    "transformers>=4.26.1"
+    "transformers>=4.29.0",
+    "peft"
 ]
 
 extras_require = {
-    "llama": ["transformers>=4.28.0"],
     "triton": ["triton>=2.0.0"]
 }
 
@@ -69,16 +69,23 @@ if TORCH_AVAILABLE:
     if BUILD_CUDA_EXT and (torch.cuda.is_available() or IN_GITHUB_ACTIONS):
         from torch.utils import cpp_extension
         from distutils.sysconfig import get_python_lib
-        conda_cuda_include_dir=os.path.join(get_python_lib(),"nvidia/cuda_runtime/include")
+        conda_cuda_include_dir = os.path.join(get_python_lib(), "nvidia/cuda_runtime/include")
         if os.path.isdir(conda_cuda_include_dir):
             include_dirs.append(conda_cuda_include_dir)
             print(f"appending conda cuda include dir {conda_cuda_include_dir}")
         extensions = [
             cpp_extension.CUDAExtension(
-                "autogptq_cuda",
+                "autogptq_cuda_64",
                 [
-                    "autogptq_cuda/autogptq_cuda.cpp",
-                    "autogptq_cuda/autogptq_cuda_kernel.cu"
+                    "autogptq_cuda/autogptq_cuda_64.cpp",
+                    "autogptq_cuda/autogptq_cuda_kernel_64.cu"
+                ]
+            ),
+            cpp_extension.CUDAExtension(
+                "autogptq_cuda_256",
+                [
+                    "autogptq_cuda/autogptq_cuda_256.cpp",
+                    "autogptq_cuda/autogptq_cuda_kernel_256.cu"
                 ]
             )
         ]
