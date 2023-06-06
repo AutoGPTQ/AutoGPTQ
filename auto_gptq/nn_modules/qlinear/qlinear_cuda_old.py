@@ -89,6 +89,12 @@ class QuantLinear(nn.Module):
         self.trainable = trainable
 
     def pack(self, linear, scales, zeros, g_idx):
+        W = linear.weight.data.clone()
+        if isinstance(linear, nn.Conv2d):
+            W = W.flatten(1)
+        if isinstance(linear, transformers.pytorch_utils.Conv1D):
+            W = W.t()
+
         scales = scales.t().contiguous()
         zeros = zeros.t().contiguous()
         scale_zeros = zeros * scales
@@ -101,7 +107,7 @@ class QuantLinear(nn.Module):
             g_idx = idx // self.group_size
             intweight.append(
                 torch.round(
-                    (linear.weight.data[:, idx] + scale_zeros[g_idx]) / self.scales[g_idx]
+                    (W[:, idx] + scale_zeros[g_idx]) / self.scales[g_idx]
                 ).to(torch.int)[:, None]
             )
         intweight = torch.cat(intweight, dim=1)
