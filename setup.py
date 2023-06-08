@@ -88,6 +88,7 @@ if TORCH_AVAILABLE:
             "cmdclass": {'build_ext': cpp_extension.BuildExtension}
         }
     common_setup_kwargs.update(additional_setup_kwargs)
+    print(f"include dirs are: {include_dirs}")
     setup(
         packages=find_packages(),
         install_requires=requirements,
@@ -96,6 +97,7 @@ if TORCH_AVAILABLE:
         **common_setup_kwargs
     )
 else:
+    print(f"include dirs are: {include_dirs}")
     setup(
         packages=find_packages(),
         install_requires=requirements,
