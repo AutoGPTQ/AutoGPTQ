@@ -26,14 +26,14 @@ jobs:
 
       - name: Build Wheel
         run: |
-          python setup.py sdist bdist_wheel
+          python setup.py sdist
 
       - uses: actions/upload-artifact@v3
         with:
           name: 'sdist'
           path: ./dist/*.tar.gz
 
-      - uses: actions/upload-artifact@v3
-        with:
-          name: 'no-cuda-wheel'
-          path: ./dist/*.whl
+#      - uses: actions/upload-artifact@v3
+#        with:
+#          name: 'no-cuda-wheel'
+#          path: ./dist/*.whl
