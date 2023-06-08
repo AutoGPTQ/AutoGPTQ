@@ -60,7 +60,7 @@ extras_require = {
     "triton": ["triton>=2.0.0"]
 }
 
-include_dirs = ["autogptq_cuda"]
+include_dirs = [os.path.join(os.getcwd(), "autogptq_cuda")]
 
 if TORCH_AVAILABLE:
     BUILD_CUDA_EXT = int(os.environ.get('BUILD_CUDA_EXT', '1')) == 1
