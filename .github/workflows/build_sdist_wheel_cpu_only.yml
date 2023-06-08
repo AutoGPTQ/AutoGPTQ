@@ -6,7 +6,7 @@ jobs:
   build_sdist:
     if: ${{ github.repository_owner == 'PanQiWei' }}
     name: Build source distribution
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     defaults:
       run:
         shell: pwsh
