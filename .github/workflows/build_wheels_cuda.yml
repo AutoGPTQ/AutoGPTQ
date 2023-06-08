@@ -64,8 +64,3 @@ jobs:
         with:
           name: 'windows-wheels'
           path: ./dist/*.whl
-
-      - uses: actions/upload-artifact@v3
-        with:
-          name: 'sdist'
-          path: ./dist/*.tar.gz
