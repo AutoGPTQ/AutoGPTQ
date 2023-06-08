@@ -1,4 +1,4 @@
-name: Build AutoGPTQ Wheels
+name: Build AutoGPTQ Wheels with CUDA
 
 on: workflow_dispatch
 
