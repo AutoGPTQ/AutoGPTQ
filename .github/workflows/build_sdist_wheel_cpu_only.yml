@@ -26,6 +26,7 @@ jobs:
 
       - name: Build Wheel
         run: |
+          echo $(ls)
           python setup.py sdist
 
       - uses: actions/upload-artifact@v3
