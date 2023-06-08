@@ -21,7 +21,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
         with:
-          ref: 'main'
+          ref: 'v0.2.2-patch-fix'
 
       - uses: actions/setup-python@v3
         with:
@@ -51,7 +51,7 @@ jobs:
           if ($IsLinux) {$env:LD_LIBRARY_PATH = $env:CONDA_PREFIX + '/lib:' + $env:LD_LIBRARY_PATH}
           $env:TORCH_CUDA_ARCH_LIST = '6.0 6.1 7.0 7.5 8.0 8.6+PTX'
           if ([decimal]$env:CUDA_VERSION -ge 11.8) { $env:TORCH_CUDA_ARCH_LIST = '6.0 6.1 7.0 7.5 8.0 8.6 8.9 9.0+PTX' }
-          python -m build -n
+          python setup.py sdist bdist_wheel
 
       - uses: actions/upload-artifact@v3
         if: runner.os == 'Linux'
@@ -66,6 +66,7 @@ jobs:
           path: ./dist/*.whl
 
   build_sdist:
+    if: ${{ github.repository_owner == 'PanQiWei' }}
     name: Build source distribution
     runs-on: ubuntu-latest
     defaults:
@@ -75,7 +76,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
         with:
-          ref: 'main'
+          ref: 'v0.2.2-patch-fix'
 
       - uses: actions/setup-python@v3
         with:
@@ -87,7 +88,7 @@ jobs:
 
       - name: Build Wheel
         run: |
-          python -m build -n
+          python setup.py sdist bdist_wheel
 
       - uses: actions/upload-artifact@v3
         with:
