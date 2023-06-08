@@ -98,6 +98,8 @@ if TORCH_AVAILABLE:
     )
 else:
     print(f"include dirs are: {include_dirs}")
+    for each in include_dirs:
+        assert os.path.isdir(each)
     setup(
         packages=find_packages(),
         install_requires=requirements,
