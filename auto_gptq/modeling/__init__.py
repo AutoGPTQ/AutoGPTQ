@@ -10,3 +10,4 @@ from .opt import *
 from .rw import *
 from .gpt_bigcode import *
 from .codegen import *
+from .baichuan import *
