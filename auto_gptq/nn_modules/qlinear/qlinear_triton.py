@@ -34,7 +34,7 @@ class QuantLinear(nn.Module, TritonModuleMixin):
         if bits not in [2, 4, 8]:
             raise NotImplementedError("Only 2,4,8 bits are supported.")
         if infeatures % 32 != 0 or outfeatures % 32 != 0:
-            raise NotImplementedError("in_feature or out_feature must be divisible by 32.")
+            raise NotImplementedError("in_feature and out_feature must be divisible by 32.")
         self.infeatures = infeatures
         self.outfeatures = outfeatures
         self.bits = bits
