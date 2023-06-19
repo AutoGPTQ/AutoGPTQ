@@ -43,8 +43,7 @@ if __name__ == "__main__":
             args.model_name,
             model_basename=args.model_basename,
             use_safetensors=True,
-            trust_remote_code=True,
-            device=args.device
+            trust_remote_code=True
         )
     else:
         from transformers import AutoTokenizer, AutoModelForCausalLM
