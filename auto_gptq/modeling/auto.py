@@ -13,6 +13,7 @@ from .moss import MOSSGPTQForCausalLM
 from .opt import OPTGPTQForCausalLM
 from .rw import RWGPTQForCausalLM
 from .gpt_bigcode import GPTBigCodeGPTQForCausalLM
+from .baichuan import BaiChuanGPTQForCausalLM
 
 
 GPTQ_CAUSAL_LM_MODEL_MAP = {
@@ -26,7 +27,8 @@ GPTQ_CAUSAL_LM_MODEL_MAP = {
     "gpt_bigcode": GPTBigCodeGPTQForCausalLM,
     "codegen": CodeGenGPTQForCausalLM,
     "RefinedWebModel": RWGPTQForCausalLM,
-    "RefinedWeb":RWGPTQForCausalLM
+    "RefinedWeb":RWGPTQForCausalLM,
+    "baichuan":BaiChuanGPTQForCausalLM
 }
 
 
