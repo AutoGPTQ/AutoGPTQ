@@ -5,12 +5,15 @@ on: workflow_dispatch
 jobs:
   build_wheels:
     if: ${{ github.repository_owner == 'are-we-gfx1100-yet' }}
-    name: Build wheels for ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
+
     strategy:
       matrix:
         os: [ubuntu-latest]
         python: ["3.8", "3.9", "3.10"]
+
+    name: Build wheels for ${{ matrix.os }} and Python ${{ matrix.python }}
+    runs-on: ${{ matrix.os }}
+
     defaults:
       run:
         shell: bash
