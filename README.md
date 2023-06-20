@@ -15,6 +15,20 @@
     </p>
 </h4>
 
+## AutoGPTQ for ROCm
+
+This is the ROCm port of AutoGPTQ, built for nightly builds of `torch`:
+
+```
+python -m pip install --pre torch torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/rocm5.5
+```
+
+You can obtain prebuilt wheels from [artifacts](https://github.com/are-we-gfx1100-yet/AutoGPTQ-rocm/actions/workflows/build_wheels_rocm.yml) of GitHub Actions.
+
+The porting approach is greatly inspired by [WapaMario63/GPTQ-for-LLaMa-ROCm](https://github.com/WapaMario63/GPTQ-for-LLaMa-ROCm).
+
+I get `43.18 tokens/s` for 7B models on a RX 7900 XTX.
+
 ## News or Update
 
 - 2023-06-05 - (Update) - Integrate with 🤗 peft to use gptq quantized model to train adapters, support LoRA, AdaLoRA, AdaptionPrompt, etc.
