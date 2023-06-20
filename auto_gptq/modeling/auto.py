@@ -81,7 +81,11 @@ class AutoGPTQForCausalLM:
     ) -> BaseGPTQForCausalLM:
         model_type = check_and_get_model_type(save_dir or model_name_or_path, trust_remote_code)
         quant_func = GPTQ_CAUSAL_LM_MODEL_MAP[model_type].from_quantized
-        keywords = {key: kwargs[key] for key in signature(quant_func).parameters if key in kwargs}
+        allowed_parameters = signature(quant_func).parameters
+        if "kwargs" in allowed_parameters:
+            keywords = kwargs
+        else:
+            keywords = {key: kwargs[key] for key in allowed_parameters if key in kwargs}
         return quant_func(
             model_name_or_path=model_name_or_path,
             save_dir=save_dir,
