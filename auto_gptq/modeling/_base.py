@@ -17,6 +17,7 @@ from transformers import AutoConfig, AutoModelForCausalLM, PreTrainedModel
 from transformers.utils.hub import PushToHubMixin, cached_file, create_repo, create_commit, CommitOperationAdd
 from transformers.utils.generic import ContextManagers
 from transformers.modeling_utils import no_init_weights
+from transformers.generation import GenerationMixin
 
 from ._const import *
 from ._utils import *
@@ -103,7 +104,7 @@ class BaseQuantizeConfig(PushToHubMixin):
         }
 
 
-class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
+class BaseGPTQForCausalLM(nn.Module, PushToHubMixin, GenerationMixin):
     layer_type: str = None
     layers_block_name: str = None
     outside_layer_modules: List[str] = None
