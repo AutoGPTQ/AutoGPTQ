@@ -17,7 +17,7 @@ if sys.version_info < python_min_version:
     sys.exit(-1)
 
 if TORCH_AVAILABLE:
-    CUDA_VERSION = "".join(torch.version.cuda).split(".")
+    CUDA_VERSION = "".join(torch.version.cuda.split("."))
 else:
     CUDA_VERSION = "".join(os.environ.get("CUDA_VERSION", "").split("."))
 
