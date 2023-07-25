@@ -10,17 +10,18 @@ try:
 except ImportError:
     TORCH_AVAILABLE = False
 
-IN_GITHUB_ACTIONS = os.environ.get("GITHUB_ACTIONS", "false") == "true"
-
 python_min_version = (3, 8, 0)
 python_min_version_str = '.'.join(map(str, python_min_version))
 if sys.version_info < python_min_version:
     print(f"You are using Python {platform.python_version()}. Python >={python_min_version_str} is required.")
     sys.exit(-1)
 
-CUDA_VERSION = "".join(os.environ.get("CUDA_VERSION", "").split("."))
+if TORCH_AVAILABLE:
+    CUDA_VERSION = "".join(torch.cuda.version).split(".")
+else:
+    CUDA_VERSION = "".join(os.environ.get("CUDA_VERSION", "").split("."))
 
-version = "0.3.0" + (f"+cu{CUDA_VERSION}" if CUDA_VERSION and IN_GITHUB_ACTIONS else "")
+version = "0.3.0" + (f"+cu{CUDA_VERSION}" if CUDA_VERSION else "")
 common_setup_kwargs = {
     "version": version,
     "name": "auto_gptq",
@@ -52,7 +53,7 @@ requirements = [
     "rouge",
     "torch>=1.13.0",
     "safetensors",
-    "transformers>=4.29.0",
+    "transformers>=4.31.0",
     "peft"
 ]
 
@@ -66,7 +67,7 @@ if TORCH_AVAILABLE:
     BUILD_CUDA_EXT = int(os.environ.get('BUILD_CUDA_EXT', '1')) == 1
     
     additional_setup_kwargs = dict()
-    if BUILD_CUDA_EXT and (torch.cuda.is_available() or IN_GITHUB_ACTIONS):
+    if BUILD_CUDA_EXT:
         from torch.utils import cpp_extension
         from distutils.sysconfig import get_python_lib
         conda_cuda_include_dir = os.path.join(get_python_lib(), "nvidia/cuda_runtime/include")
