@@ -530,6 +530,24 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                 safetensors_metadata = {}
             elif not isinstance(safetensors_metadata, dict):
                 raise TypeError("safetensors_metadata must be a dictionary.")
+            else:
+                logger.debug(f"Received safetensors_metadata: {safetensors_metadata}")
+                new_safetensors_metadata = {}
+                converted_keys = False
+                for key, value in safetensors_metadata.items():
+                    if not isinstance(key, str) or not isinstance(value, str):
+                        converted_keys = True
+                        try:
+                            new_key = str(key)
+                            new_value = str(value)
+                        except Exception as e:
+                            raise TypeError(f"safetensors_metadata: both keys and values must be strings and an error occured when trying to convert them: {e}")
+                        if new_key in new_safetensors_metadata:
+                            logger.warning(f"After converting safetensors_metadata keys to strings, the key '{new_key}' is duplicated. Ensure that all your metadata keys are strings to avoid overwriting.")
+                        new_safetensors_metadata[new_key] = new_value
+                safetensors_metadata = new_safetensors_metadata
+                if converted_keys:
+                    logger.debug(f"One or more safetensors_metadata keys or values had to be converted to str(). Final safetensors_metadata: {safetensors_metadata}")
 
             # Format is required to enable Accelerate to load the metadata
             # otherwise it raises an OSError
