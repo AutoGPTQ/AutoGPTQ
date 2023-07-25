@@ -86,9 +86,23 @@ class AutoGPTQForCausalLM:
             save_dir or model_name_or_path, trust_remote_code
         )
         quant_func = GPTQ_CAUSAL_LM_MODEL_MAP[model_type].from_quantized
+        # A static list of kwargs needed for huggingface_hub
+        huggingface_kwargs = [
+            "cache_dir",
+            "force_download",
+            "proxies",
+            "resume_download",
+            "local_files_only",
+            "use_auth_token",
+            "revision",
+            "subfolder",
+            "_raise_exceptions_for_missing_entries",
+            "_commit_hash"
+        ]
+        # TODO: do we need this filtering of kwargs? @PanQiWei is there a reason we can't just pass all kwargs?
         keywords = {
             key: kwargs[key]
-            for key in signature(quant_func).parameters
+            for key in list(signature(quant_func).parameters.keys()) + huggingface_kwargs
             if key in kwargs
         }
         return quant_func(

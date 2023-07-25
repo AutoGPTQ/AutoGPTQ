@@ -644,6 +644,19 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         subfolder = kwargs.pop("subfolder", "")
         commit_hash = kwargs.pop("_commit_hash", None)
 
+        cached_file_kwargs = {
+            "cache_dir": cache_dir,
+            "force_download": force_download,
+            "proxies": proxies,
+            "resume_download": resume_download,
+            "local_files_only": local_files_only,
+            "use_auth_token": use_auth_token,
+            "revision": revision,
+            "subfolder": subfolder,
+            "_raise_exceptions_for_missing_entries": False,
+            "_commit_hash": commit_hash,
+        }
+            
         if use_triton and not TRITON_AVAILABLE:
             logger.warning("triton is not installed, reset use_triton to False")
             use_triton = False
@@ -657,7 +670,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         if not model_name_or_path and not save_dir:
             raise ValueError("at least one of model_name_or_path or save_dir should be specified.")
         
-        config = AutoConfig.from_pretrained(model_name_or_path, trust_remote_code=trust_remote_code)
+        config = AutoConfig.from_pretrained(model_name_or_path, trust_remote_code=trust_remote_code, **cached_file_kwargs)
 
         if config.model_type not in SUPPORTED_MODELS:
             raise TypeError(f"{config.model_type} isn't supported yet.")
@@ -686,25 +699,11 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         resolved_archive_file = None
         if is_local:
             model_save_name = join(model_name_or_path, model_basename)
-
             for ext in extensions:
                 if isfile(model_save_name + ext):
                     resolved_archive_file = model_save_name + ext
                     break
         else: # remote
-            cached_file_kwargs = {
-                "cache_dir": cache_dir,
-                "force_download": force_download,
-                "proxies": proxies,
-                "resume_download": resume_download,
-                "local_files_only": local_files_only,
-                "use_auth_token": use_auth_token,
-                "revision": revision,
-                "subfolder": subfolder,
-                "_raise_exceptions_for_missing_entries": False,
-                "_commit_hash": commit_hash,
-            }
-            
             for ext in extensions:
                 resolved_archive_file = cached_file(model_name_or_path, model_basename + ext, **cached_file_kwargs)
                 if resolved_archive_file is not None:
