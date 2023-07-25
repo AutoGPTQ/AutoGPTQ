@@ -35,32 +35,17 @@ void vecquant3matmul(
 void vecquant4matmul_cuda(
   torch::Tensor vec, torch::Tensor mat, torch::Tensor mul,
   torch::Tensor scales, torch::Tensor zeros,
-  torch::Tensor g_idx, int vec_height
+  torch::Tensor g_idx
 );
 
 void vecquant4matmul(
   torch::Tensor vec, torch::Tensor mat, torch::Tensor mul,
   torch::Tensor scales, torch::Tensor zeros,
-  torch::Tensor g_idx, int vec_height
+  torch::Tensor g_idx
 ) {
   const at::cuda::OptionalCUDAGuard device_guard(device_of(vec));
-  vecquant4matmul_cuda(vec, mat, mul, scales, zeros, g_idx, vec_height);
+  vecquant4matmul_cuda(vec, mat, mul, scales, zeros, g_idx);
 }
-
-//void vecquant4matmul_cuda(
-//  torch::Tensor vec, torch::Tensor mat, torch::Tensor mul,
-//  torch::Tensor scales, torch::Tensor zeros,
-//  torch::Tensor g_idx
-//);
-//
-//void vecquant4matmul(
-//  torch::Tensor vec, torch::Tensor mat, torch::Tensor mul,
-//  torch::Tensor scales, torch::Tensor zeros,
-//  torch::Tensor g_idx
-//) {
-//  const at::cuda::OptionalCUDAGuard device_guard(device_of(vec));
-//  vecquant4matmul_cuda(vec, mat, mul, scales, zeros, g_idx);
-//}
 
 void vecquant8matmul_cuda(
   torch::Tensor vec, torch::Tensor mat, torch::Tensor mul,
