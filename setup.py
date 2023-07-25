@@ -21,9 +21,8 @@ if TORCH_AVAILABLE:
 else:
     CUDA_VERSION = "".join(os.environ.get("CUDA_VERSION", "").split("."))
 
-version = "0.3.0" + (f"+cu{CUDA_VERSION}" if CUDA_VERSION else "")
 common_setup_kwargs = {
-    "version": version,
+    "version": "0.3.1",
     "name": "auto_gptq",
     "author": "PanQiWei",
     "description": "An easy-to-use LLMs quantization package with user-friendly apis, based on GPTQ algorithm.",
@@ -45,6 +44,9 @@ common_setup_kwargs = {
     ],
     "python_requires": f">={python_min_version_str}"
 }
+
+if CUDA_VERSION:
+    common_setup_kwargs['version'] += f"+cu{CUDA_VERSION}"
 
 requirements = [
     "accelerate>=0.19.0",
