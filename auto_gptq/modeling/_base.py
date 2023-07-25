@@ -534,7 +534,10 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             # Format is required to enable Accelerate to load the metadata
             # otherwise it raises an OSError
             safetensors_metadata['format'] = "pt"
+
             # Store the quantization configuration as safetensors metadata
+            from auto_gptq import __version__
+            safetensors_metadata['auto_gptq_version'] = str(__version__)
             safetensors_metadata['gptq_bits'] = str(self.quantize_config.bits)
             safetensors_metadata['gptq_group_size'] = str(self.quantize_config.group_size)
             safetensors_metadata['gptq_desc_act'] = str(self.quantize_config.desc_act)
