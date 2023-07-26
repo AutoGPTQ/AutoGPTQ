@@ -19,6 +19,7 @@
 
 ## 新闻或更新
 
+- 2023-07-26 - (更新) - 一个优雅的 [PPL 测评脚本](examples/benchmark/perplexity.py)以获得可以与诸如 `llama.cpp` 等代码库进行公平比较的结果。
 - 2023-06-05 - (更新) - 集成 🤗 peft 来使用 gptq 量化过的模型训练适应层，支持 LoRA，AdaLoRA，AdaptionPrompt 等。
 - 2023-05-30 - (更新) - 支持从 🤗 Hub 下载量化好的模型或上次量化好的模型到 🤗 Hub。
 - 2023-05-27 - (更新) - 支持以下模型的量化和推理： `gpt_bigcode`， `codegen` 以及 `RefineWeb/RefineWebModel`（falcon）。
