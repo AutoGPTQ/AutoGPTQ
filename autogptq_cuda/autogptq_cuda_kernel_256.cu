@@ -97,35 +97,19 @@ __global__ void VecQuant3MatMulKernel(
 	int zero_width
 );
 
-// template <typename scalar_t>
-// __global__ void VecQuant4MatMulKernel(
-//     const  scalar_t* __restrict__ vec,
-//     const       int* __restrict__ mat,
-//            scalar_t* __restrict__ mul,
-//     const  scalar_t* __restrict__ scales,
-//     const  		int* __restrict__ zeros,
-// 	const  	    int* __restrict__ g_idx,
-//     int batch,
-//     int vec_height,
-//     int height,
-//     int width,
-// 	int zero_width
-// );
-
-// referenced from https://github.com/iwalton3/GPTQ-for-LLaMa/commit/209d16b0187f149bf13318360925cc4f679cb2ea
 template <typename scalar_t>
 __global__ void VecQuant4MatMulKernel(
-    const  half2* __restrict__ vec,
-    const    int* __restrict__ mat,
+    const  scalar_t* __restrict__ vec,
+    const       int* __restrict__ mat,
            scalar_t* __restrict__ mul,
     const  scalar_t* __restrict__ scales,
-    const    int* __restrict__ zeros,
-    const    int* __restrict__ g_idx,
+    const  		int* __restrict__ zeros,
+	const  	    int* __restrict__ g_idx,
     int batch,
     int vec_height,
     int height,
     int width,
-    int zero_width
+	int zero_width
 );
 
 template <typename scalar_t>
@@ -499,204 +483,87 @@ void vecquant4matmul_cuda(
   torch::Tensor mul,
   torch::Tensor scales,
   torch::Tensor zeros,
-  torch::Tensor g_idx,
-  int vec_height
+  torch::Tensor g_idx
 ) {
   int batch = vec.size(0);
+  int vec_height = vec.size(1);
   int height = mat.size(0);
   int width = mat.size(1);
   int zero_width = zeros.size(1);
 
   dim3 blocks(
     (height + BLOCKHEIGHT4 - 1) / BLOCKHEIGHT4,
-    (width + BLOCKWIDTH - 1) / BLOCKWIDTH,
-    batch
+    (width + BLOCKWIDTH - 1) / BLOCKWIDTH
   );
   dim3 threads(BLOCKWIDTH);
 
-  AT_DISPATCH_SWITCH(vec.type(), "vecquant4matmul_cuda",
-    AT_DISPATCH_CASE(at::ScalarType::Half, ([&] {
+  AT_DISPATCH_FLOATING_TYPES(
+    vec.type(), "vecquant4matmul_cuda", ([&] {
       VecQuant4MatMulKernel<<<blocks, threads>>>(
-        (half2*) vec.data_ptr<scalar_t>(),
-        mat.data_ptr<int>(),
-        mul.data_ptr<scalar_t>(),
-        scales.data_ptr<scalar_t>(),
-        zeros.data_ptr<int>(),
-        g_idx.data_ptr<int>(),
+        vec.data<scalar_t>(), mat.data<int>(), mul.data<scalar_t>(),
+        scales.data<scalar_t>(), zeros.data<int>(), g_idx.data<int>(), 
         batch, vec_height, height, width, zero_width
       );
     })
-  ));
+  );
 }
-
-// void vecquant4matmul_cuda(
-//   torch::Tensor vec,
-//   torch::Tensor mat,
-//   torch::Tensor mul,
-//   torch::Tensor scales,
-//   torch::Tensor zeros,
-//   torch::Tensor g_idx
-// ) {
-//   int batch = vec.size(0);
-//   int vec_height = vec.size(1);
-//   int height = mat.size(0);
-//   int width = mat.size(1);
-//   int zero_width = zeros.size(1);
-//
-//   dim3 blocks(
-//     (height + BLOCKHEIGHT4 - 1) / BLOCKHEIGHT4,
-//     (width + BLOCKWIDTH - 1) / BLOCKWIDTH
-//   );
-//   dim3 threads(BLOCKWIDTH);
-//
-//   AT_DISPATCH_FLOATING_TYPES(
-//     vec.type(), "vecquant4matmul_cuda", ([&] {
-//       VecQuant4MatMulKernel<<<blocks, threads>>>(
-//         vec.data<scalar_t>(), mat.data<int>(), mul.data<scalar_t>(),
-//         scales.data<scalar_t>(), zeros.data<int>(), g_idx.data<int>(),
-//         batch, vec_height, height, width, zero_width
-//       );
-//     })
-//   );
-// }
 
 template <typename scalar_t>
 __global__ void VecQuant4MatMulKernel(
-    const     half2* __restrict__ vec,
+    const  scalar_t* __restrict__ vec,
     const       int* __restrict__ mat,
            scalar_t* __restrict__ mul,
     const  scalar_t* __restrict__ scales,
-    const  	    int* __restrict__ zeros,
-    const       int* __restrict__ g_idx,
-	int batch,
-	int vec_height,
+    const       int* __restrict__ zeros,
+    const   	int* __restrict__ g_idx,
+    int batch,
+    int vec_height,
     int height,
     int width,
-    int zero_width
+	int zero_width
 ) {
-  const int blockwidth2 = BLOCKWIDTH / 2;
-  int b = blockIdx.z;
   int h = BLOCKHEIGHT4 * blockIdx.x;
   int w = BLOCKWIDTH * blockIdx.y + threadIdx.x;
-
-  __shared__ half2 blockvec[blockwidth2];
-  if (threadIdx.x < blockwidth2)
-    blockvec[threadIdx.x] = vec[b * vec_height + blockIdx.x * blockwidth2 + threadIdx.x];
-
-  __shared__ half2 deq2[256][8];
-  int val = threadIdx.x / 8;
-  int off = threadIdx.x % 8;
-  for (; val < 256; val += BLOCKWIDTH / 8) {
-    deq2[val][off] = __halves2half2(
-       __int2half_rn(val & 0xF), __int2half_rn(val >> 4)
-    );
-  }
-
+  
+  __shared__ scalar_t blockvec[BLOCKWIDTH];
   int i = width * h + w;
   int g_h = h * 8;
-  int k = 0;
+  int k;
+  unsigned int g;
+  scalar_t w_tmp;
+  
 
-  int z_w = w / 8;
+  int z_w = w / 8; 
   int z_mod = (w % 8) * 4;
-
-  scalar_t res = 0;
-  half2 res2;
-
-  unsigned int tmp;
-
-  __syncthreads();
-
-  while (k < blockwidth2) {
-    res2 = {};
-    tmp = as_unsigned(mat[i]);
-
-    int tmp_k = 0;
-    half2 scales_tmp[4];
-    half2 zeros_tmp[4];
-    while (tmp_k < 4) {
-      int g = as_int(g_idx[g_h + (k + tmp_k) * 2]);
-      int g2 = as_int(g_idx[g_h + (k + tmp_k) * 2 + 1]);
-      scalar_t scale_f = scales[g * width + w];
-      scalar_t scale_f2 = scales[g2 * width + w];
-      half2 scale = __halves2half2(scale_f, scale_f2);
-      half2 zero = __halves2half2(
-        __hmul(-scale_f, __int2half_rn(((as_unsigned(zeros[g * zero_width + z_w]) >> z_mod) & 0xF) + 1)),
-        __hmul(-scale_f2, __int2half_rn(((as_unsigned(zeros[g2 * zero_width + z_w]) >> z_mod) & 0xF) + 1))
-      );
-      scales_tmp[tmp_k] = scale;
-      zeros_tmp[tmp_k] = zero;
-      tmp_k += 1;
-    }
-
-    res2 = __hfma2(__hfma2(deq2[(tmp >>  0) & 0xff][off], scales_tmp[0], zeros_tmp[0]), blockvec[k + 0], res2);
-    res2 = __hfma2(__hfma2(deq2[(tmp >>  8) & 0xff][off], scales_tmp[1], zeros_tmp[1]), blockvec[k + 1], res2);
-    res2 = __hfma2(__hfma2(deq2[(tmp >> 16) & 0xff][off], scales_tmp[2], zeros_tmp[2]), blockvec[k + 2], res2);
-    res2 = __hfma2(__hfma2(deq2[(tmp >> 24) & 0xff][off], scales_tmp[3], zeros_tmp[3]), blockvec[k + 3], res2);
-	i += width;
-    k += 4;
-    res = __hadd(res, __hadd(res2.x, res2.y));;
+  
+  float weight[BLOCKWIDTH];
+  
+  for (k = 0; k <  BLOCKWIDTH; ++k){	
+	int k_w = (k / 8); 
+	int k_bit = (k % 8) * 4;
+	
+    g = as_int(g_idx[g_h + k]);
+    scalar_t scale = scales[g * width + w];
+    scalar_t zero = scalar_t(((as_unsigned(zeros[g * zero_width + z_w]) >> z_mod) & 0xF) + 1);
+	
+    w_tmp = ((as_unsigned(mat[i + (k_w * width)]) >> k_bit) & 0xF);
+    
+	weight[k] = scale * (w_tmp - zero);
   }
 
-  __half* mul2 = (__half*)mul;
-  atomicAdd(&mul2[b * width + w], res);
+  scalar_t res;
+  for (int b = 0; b < batch; ++b){	
+	res = 0;
+	
+    blockvec[threadIdx.x] = vec[b * vec_height + blockIdx.x * BLOCKWIDTH + threadIdx.x];
+    __syncthreads();
+	for (k = 0; k <  BLOCKWIDTH; ++k){	
+	  res += weight[k] * blockvec[k];
+    }
+    atomicAdd(&mul[b * width + w], res);
+    __syncthreads();
+  }
 }
-
-// template <typename scalar_t>
-// __global__ void VecQuant4MatMulKernel(
-//     const  scalar_t* __restrict__ vec,
-//     const       int* __restrict__ mat,
-//            scalar_t* __restrict__ mul,
-//     const  scalar_t* __restrict__ scales,
-//     const       int* __restrict__ zeros,
-//     const   	int* __restrict__ g_idx,
-//     int batch,
-//     int vec_height,
-//     int height,
-//     int width,
-// 	int zero_width
-// ) {
-//   int h = BLOCKHEIGHT4 * blockIdx.x;
-//   int w = BLOCKWIDTH * blockIdx.y + threadIdx.x;
-//
-//   __shared__ scalar_t blockvec[BLOCKWIDTH];
-//   int i = width * h + w;
-//   int g_h = h * 8;
-//   int k;
-//   unsigned int g;
-//   scalar_t w_tmp;
-//
-//
-//   int z_w = w / 8;
-//   int z_mod = (w % 8) * 4;
-//
-//   float weight[BLOCKWIDTH];
-//
-//   for (k = 0; k <  BLOCKWIDTH; ++k){
-// 	int k_w = (k / 8);
-// 	int k_bit = (k % 8) * 4;
-//
-//     g = as_int(g_idx[g_h + k]);
-//     scalar_t scale = scales[g * width + w];
-//     scalar_t zero = scalar_t(((as_unsigned(zeros[g * zero_width + z_w]) >> z_mod) & 0xF) + 1);
-//
-//     w_tmp = ((as_unsigned(mat[i + (k_w * width)]) >> k_bit) & 0xF);
-//
-// 	weight[k] = scale * (w_tmp - zero);
-//   }
-//
-//   scalar_t res;
-//   for (int b = 0; b < batch; ++b){
-// 	res = 0;
-//
-//     blockvec[threadIdx.x] = vec[b * vec_height + blockIdx.x * BLOCKWIDTH + threadIdx.x];
-//     __syncthreads();
-// 	for (k = 0; k <  BLOCKWIDTH; ++k){
-// 	  res += weight[k] * blockvec[k];
-//     }
-//     atomicAdd(&mul[b * width + w], res);
-//     __syncthreads();
-//   }
-// }
 
 void vecquant8matmul_cuda(
   torch::Tensor vec,
