@@ -16,7 +16,7 @@ if sys.version_info < python_min_version:
     print(f"You are using Python {platform.python_version()}. Python >={python_min_version_str} is required.")
     sys.exit(-1)
 
-if TORCH_AVAILABLE:
+if TORCH_AVAILABLE and torch.version.cuda != None:
     CUDA_VERSION = "".join(torch.version.cuda.split("."))
 else:
     CUDA_VERSION = "".join(os.environ.get("CUDA_VERSION", "").split("."))
