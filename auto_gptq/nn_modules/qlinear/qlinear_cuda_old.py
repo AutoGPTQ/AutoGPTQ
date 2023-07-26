@@ -13,6 +13,8 @@ try:
     _autogptq_cuda_available = True
 except ImportError:
     logger.warning('CUDA extension not installed.')
+    autogptq_cuda_256 = None
+    autogptq_cuda_64 = None
     _autogptq_cuda_available = False
 
 
