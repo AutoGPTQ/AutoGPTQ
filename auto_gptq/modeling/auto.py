@@ -64,8 +64,7 @@ class AutoGPTQForCausalLM:
     @classmethod
     def from_quantized(
         cls,
-        model_name_or_path: Optional[str] = None,
-        save_dir: Optional[str] = None,
+        model_name_or_path: Optional[str],
         device_map: Optional[Union[str, Dict[str, Union[str, int]]]] = None,
         max_memory: Optional[dict] = None,
         device: Optional[Union[str, int]] = None,
@@ -82,9 +81,7 @@ class AutoGPTQForCausalLM:
         trainable: bool = False,
         **kwargs
     ) -> BaseGPTQForCausalLM:
-        model_type = check_and_get_model_type(
-            save_dir or model_name_or_path, trust_remote_code
-        )
+        model_type = check_and_get_model_type(model_name_or_path, trust_remote_code)
         quant_func = GPTQ_CAUSAL_LM_MODEL_MAP[model_type].from_quantized
         # A static list of kwargs needed for huggingface_hub
         huggingface_kwargs = [
@@ -107,7 +104,6 @@ class AutoGPTQForCausalLM:
         }
         return quant_func(
             model_name_or_path=model_name_or_path,
-            save_dir=save_dir,
             device_map=device_map,
             max_memory=max_memory,
             device=device,

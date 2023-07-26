@@ -165,7 +165,7 @@ def load_model_tokenizer(
         )
     else:
         model = AutoGPTQForCausalLM.from_quantized(
-            save_dir=model_name_or_path,
+            model_name_or_path,
             max_memory=max_memory,
             low_cpu_mem_usage=True,
             use_triton=use_triton,

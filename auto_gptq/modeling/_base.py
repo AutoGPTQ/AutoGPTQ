@@ -676,8 +676,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
     @classmethod
     def from_quantized(
         cls,
-        model_name_or_path: Optional[str] = None,
-        save_dir: Optional[str] = None,
+        model_name_or_path: Optional[str],
         device_map: Optional[Union[str, Dict[str, Union[int, str]]]] = None,
         max_memory: Optional[dict] = None,
         device: Optional[Union[str, int]] = None,
@@ -726,14 +725,6 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             use_triton = False
 
         # == step1: prepare configs and file names == #
-        if model_name_or_path and save_dir:
-            logger.warning("save_dir will be ignored because model_name_or_path is explicit specified.")
-        if not model_name_or_path and save_dir:
-            model_name_or_path = save_dir
-            warnings.warn("save_dir is deprecated and will be removed in version 0.3.0", PendingDeprecationWarning, stacklevel=2)
-        if not model_name_or_path and not save_dir:
-            raise ValueError("at least one of model_name_or_path or save_dir should be specified.")
-        
         config = AutoConfig.from_pretrained(model_name_or_path, trust_remote_code=trust_remote_code, **cached_file_kwargs)
 
         if config.model_type not in SUPPORTED_MODELS:
