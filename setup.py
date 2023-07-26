@@ -22,7 +22,7 @@ else:
     CUDA_VERSION = "".join(os.environ.get("CUDA_VERSION", "").split("."))
 
 common_setup_kwargs = {
-    "version": "0.3.1",
+    "version": "0.3.2",
     "name": "auto_gptq",
     "author": "PanQiWei",
     "description": "An easy-to-use LLMs quantization package with user-friendly apis, based on GPTQ algorithm.",
