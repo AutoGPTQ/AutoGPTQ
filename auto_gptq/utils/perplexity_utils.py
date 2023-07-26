@@ -5,21 +5,21 @@ from tqdm import tqdm
 from datasets import load_dataset
 from transformers import AutoTokenizer, AutoModelForCausalLM
 
+
 class Perplexity:
     """
     A class for calculating the perplexity of a language model.
     """
 
-    def __init__(self, model, tokenizer=None, device='auto', dataset_path='wikitext', 
-                 dataset_name=None, split='test', text_column='text'):
+    def __init__(self, model, tokenizer, dataset_path='wikitext', dataset_name=None, split='test', text_column='text'):
         """
         Calculate perplexity using the same method as seen in llama.cpp.
 
         Parameters
         ----------
-        model : AutoModelForCausalLM or str
+        model : AutoModelForCausalLM
             The language model for which the perplexity is calculated.
-        tokenizer : AutoTokenizer or str
+        tokenizer : AutoTokenizer
             The tokenizer corresponding to the model.
         device : str, optional
             The device to run the calculations on. If auto, the device that your model uses
@@ -33,23 +33,7 @@ class Perplexity:
         text_column : str, optional
             The name of the column in the dataset that contains the text data. Default is 'text'.
         """
-
-        if tokenizer is None and type(model) == str:
-            tokenizer = AutoTokenizer.from_pretrained(model)
-        
-        elif type(tokenizer) == str:
-            tokenizer = AutoTokenizer.from_pretrained(tokenizer)
-        
-        elif tokenizer is None and type(model) != str:
-            raise Exception('Tokenizer cannot be None if model is not a str. Please load a tokenizer first:\n' +
-                            'tokenizer = AutoTokenizer.from_pretrained(model_name)')
-
-        if type(model) == str:
-            model = AutoModelForCausalLM.from_pretrained(model)
-
-        self._device = self._get_device() if device == 'auto' else device
-        self._model = model.to(self._device)
-
+        self._model = model
         self._tokenizer = tokenizer
         self._dataset_path = dataset_path
         self._dataset_name = dataset_name
@@ -119,7 +103,7 @@ class Perplexity:
         """
         # Tokenize the text
         self._tokenizer.model_max_length = sys.maxsize
-        tokens = self._tokenizer(self._text, truncation=False, return_tensors='pt').input_ids.to(self._device)
+        tokens = self._tokenizer(self._text, truncation=False, return_tensors='pt').input_ids.to(self._model.device)
 
         nll = 0.0  # Negative log likelihood
         count = 0  # Counter for processed tokens
@@ -173,7 +157,7 @@ class Perplexity:
 
         for j in range(num_batches):
             batch_start = start + j * n_batch
-            batch_size  = min(end - batch_start, n_batch)
+            batch_size = min(end - batch_start, n_batch)
 
             token_org = tokens[0][batch_start].item()
 
