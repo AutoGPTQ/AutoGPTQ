@@ -20,10 +20,11 @@ from transformers.modeling_utils import no_init_weights
 
 from ._const import *
 from ._utils import *
+from ..nn_modules.qlinear import GeneralQuantLinear
 from ..nn_modules._fused_base import FusedBaseAttentionModule, FusedBaseMLPModule
 from ..quantization import GPTQ
 from ..utils.data_utils import collate_data
-from ..utils.import_utils import TRITON_AVAILABLE
+from ..utils.import_utils import dynamically_import_QuantLinear, TRITON_AVAILABLE, AUTOGPTQ_CUDA_AVAILABLE
 
 logger = getLogger(__name__)
 
@@ -112,7 +113,16 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
     fused_attn_module_type: Optional[FusedBaseAttentionModule] = None
     fused_mlp_module_type: Optional[FusedBaseMLPModule] = None
 
-    def __init__(self, model: PreTrainedModel, quantized: bool, quantize_config: BaseQuantizeConfig):
+    def __init__(
+        self,
+        model: PreTrainedModel,
+        quantized: bool,
+        quantize_config: BaseQuantizeConfig,
+        is_triton_backend: bool = False,
+        injected_fused_attention: bool = False,
+        injected_fused_mlp: bool = False,
+        trainable: bool = False
+    ):
         super().__init__()
 
         self.model = model
@@ -120,6 +130,11 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         self._quantized = quantized
         self.quantize_config = quantize_config
         self.config = self.model.config
+
+        self.is_triton_backend = is_triton_backend
+        self.injected_fused_attention = injected_fused_attention
+        self.injected_fused_mlp = injected_fused_mlp
+        self.trainable = trainable
 
     @property
     def quantized(self):
@@ -431,6 +446,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         repo_id: str,
         save_dir: Optional[str] = None,
         use_safetensors: Optional[bool] = True,
+        safetensors_metadata: Optional[Dict[str, str]] = None,
         commit_message: Optional[str] = "Upload of AutoGPTQ quantized model",
         use_auth_token: Optional[Union[bool, str]] = None,
         private: Optional[bool] = None,
@@ -450,6 +466,10 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             use_safetensors (`bool`, *optional*):
                 Save the model using `safetensors`.
                 If the model has already been saved, this parameter can be omitted.
+            safetensors_metadata: (`dict`, *optional*, defaults to `None`):
+                Pass optional metadata dictionary to be saved in the `safetensors` model file(s).
+                Metadata is optional and is purely for informational purposes. It does not affect inference.
+                If `None`, no metadata will be saved.
             commit_message (`str`, *optional*, defaults to `"Upload tool"`):
                 Message to commit while pushing.
             use_auth_token (`bool` or `str`, *optional*):
@@ -469,7 +489,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         
         if save_dir is not None:
             logger.info(f"Saving model to {save_dir}")
-            self.save_quantized(save_dir, use_safetensors)
+            self.save_quantized(save_dir, use_safetensors, safetensors_metadata)
 
         repo_url = create_repo(
             repo_id=repo_id, token=token, private=private, exist_ok=True, repo_type="model"
@@ -492,7 +512,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                 repo_type="model",
             )
 
-    def save_quantized(self, save_dir: str, use_safetensors: bool = False):
+    def save_quantized(self, save_dir: str, use_safetensors: bool = False, safetensors_metadata: Optional[Dict[str, str]] = None):
         """save quantized model and configs to local disk"""
         os.makedirs(save_dir, exist_ok=True)
 
@@ -506,7 +526,42 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             model_save_name = model_base_name + ".safetensors"
             state_dict = self.model.state_dict()
             state_dict = {k: v.clone().contiguous() for k, v in state_dict.items()}
-            safe_save(state_dict, join(save_dir, model_save_name))
+            if safetensors_metadata is None:
+                safetensors_metadata = {}
+            elif not isinstance(safetensors_metadata, dict):
+                raise TypeError("safetensors_metadata must be a dictionary.")
+            else:
+                logger.debug(f"Received safetensors_metadata: {safetensors_metadata}")
+                new_safetensors_metadata = {}
+                converted_keys = False
+                for key, value in safetensors_metadata.items():
+                    if not isinstance(key, str) or not isinstance(value, str):
+                        converted_keys = True
+                        try:
+                            new_key = str(key)
+                            new_value = str(value)
+                        except Exception as e:
+                            raise TypeError(f"safetensors_metadata: both keys and values must be strings and an error occured when trying to convert them: {e}")
+                        if new_key in new_safetensors_metadata:
+                            logger.warning(f"After converting safetensors_metadata keys to strings, the key '{new_key}' is duplicated. Ensure that all your metadata keys are strings to avoid overwriting.")
+                        new_safetensors_metadata[new_key] = new_value
+                safetensors_metadata = new_safetensors_metadata
+                if converted_keys:
+                    logger.debug(f"One or more safetensors_metadata keys or values had to be converted to str(). Final safetensors_metadata: {safetensors_metadata}")
+
+            # Format is required to enable Accelerate to load the metadata
+            # otherwise it raises an OSError
+            safetensors_metadata['format'] = "pt"
+
+            # Store the quantization configuration as safetensors metadata
+            from auto_gptq import __version__
+            safetensors_metadata['auto_gptq_version'] = str(__version__)
+            safetensors_metadata['gptq_bits'] = str(self.quantize_config.bits)
+            safetensors_metadata['gptq_group_size'] = str(self.quantize_config.group_size)
+            safetensors_metadata['gptq_desc_act'] = str(self.quantize_config.desc_act)
+            safetensors_metadata['gptq_damp_percent'] = str(self.quantize_config.damp_percent)
+
+            safe_save(state_dict, join(save_dir, model_save_name), safetensors_metadata)
         else:
             model_save_name = model_base_name + ".bin"
             torch.save(self.model.state_dict(), join(save_dir, model_save_name))
@@ -516,10 +571,10 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         self.quantize_config.model_name_or_path = save_dir
         self.quantize_config.model_file_base_name = model_base_name
 
-    def save_pretrained(self, save_dir: str, use_safetensors: bool = False, **kwargs):
+    def save_pretrained(self, save_dir: str, use_safetensors: bool = False, safetensors_metadata: Optional[Dict[str, str]] = None, **kwargs):
         """alias of save_quantized"""
         logger.warning("you are using save_pretrained, which will re-direct to save_quantized.")
-        self.save_quantized(save_dir, use_safetensors)
+        self.save_quantized(save_dir, use_safetensors, safetensors_metadata)
 
     @classmethod
     def from_pretrained(
@@ -543,7 +598,29 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         torch.nn.init.uniform_ = skip
         torch.nn.init.normal_ = skip
 
-        config = AutoConfig.from_pretrained(pretrained_model_name_or_path, trust_remote_code=True)
+        # Parameters related to loading from Hugging Face Hub
+        cache_dir = model_init_kwargs.pop("cache_dir", None)
+        force_download = model_init_kwargs.pop("force_download", False)
+        resume_download = model_init_kwargs.pop("resume_download", False)
+        proxies = model_init_kwargs.pop("proxies", None)
+        local_files_only = model_init_kwargs.pop("local_files_only", False)
+        use_auth_token = model_init_kwargs.pop("use_auth_token", None)
+        revision = model_init_kwargs.pop("revision", None)
+        subfolder = model_init_kwargs.pop("subfolder", "")
+        commit_hash = model_init_kwargs.pop("_commit_hash", None)
+
+        cached_file_kwargs = {
+            "cache_dir": cache_dir,
+            "force_download": force_download,
+            "proxies": proxies,
+            "resume_download": resume_download,
+            "local_files_only": local_files_only,
+            "use_auth_token": use_auth_token,
+            "revision": revision,
+            "subfolder": subfolder,
+        }
+
+        config = AutoConfig.from_pretrained(pretrained_model_name_or_path, trust_remote_code=True, **cached_file_kwargs)
         if config.model_type not in SUPPORTED_MODELS:
             raise TypeError(f"{config.model_type} isn't supported yet.")
 
@@ -579,7 +656,9 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
 
         torch.cuda.empty_cache()
 
-        model = AutoModelForCausalLM.from_pretrained(pretrained_model_name_or_path, **model_init_kwargs)
+        merged_kwargs = {**model_init_kwargs, **cached_file_kwargs}
+        model = AutoModelForCausalLM.from_pretrained(pretrained_model_name_or_path, **merged_kwargs)
+
         model_config = model.config.to_dict()
         seq_len_keys = ["max_position_embeddings", "seq_length", "n_positions"]
         if any([k in model_config for k in seq_len_keys]):
@@ -597,8 +676,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
     @classmethod
     def from_quantized(
         cls,
-        model_name_or_path: Optional[str] = None,
-        save_dir: Optional[str] = None,
+        model_name_or_path: Optional[str],
         device_map: Optional[Union[str, Dict[str, Union[int, str]]]] = None,
         max_memory: Optional[dict] = None,
         device: Optional[Union[str, int]] = None,
@@ -613,6 +691,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         use_safetensors: bool = False,
         trust_remote_code: bool = False,
         warmup_triton: bool = False,
+        trainable: bool = False,
         **kwargs
     ):
         """load quantized model from local disk"""
@@ -628,20 +707,25 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         subfolder = kwargs.pop("subfolder", "")
         commit_hash = kwargs.pop("_commit_hash", None)
 
+        cached_file_kwargs = {
+            "cache_dir": cache_dir,
+            "force_download": force_download,
+            "proxies": proxies,
+            "resume_download": resume_download,
+            "local_files_only": local_files_only,
+            "use_auth_token": use_auth_token,
+            "revision": revision,
+            "subfolder": subfolder,
+            "_raise_exceptions_for_missing_entries": False,
+            "_commit_hash": commit_hash,
+        }
+            
         if use_triton and not TRITON_AVAILABLE:
             logger.warning("triton is not installed, reset use_triton to False")
             use_triton = False
 
         # == step1: prepare configs and file names == #
-        if model_name_or_path and save_dir:
-            logger.warning("save_dir will be ignored because model_name_or_path is explicit specified.")
-        if not model_name_or_path and save_dir:
-            model_name_or_path = save_dir
-            warnings.warn("save_dir is deprecated and will be removed in version 0.3.0", PendingDeprecationWarning, stacklevel=2)
-        if not model_name_or_path and not save_dir:
-            raise ValueError("at least one of model_name_or_path or save_dir should be specified.")
-        
-        config = AutoConfig.from_pretrained(model_name_or_path, trust_remote_code=trust_remote_code)
+        config = AutoConfig.from_pretrained(model_name_or_path, trust_remote_code=trust_remote_code, **cached_file_kwargs)
 
         if config.model_type not in SUPPORTED_MODELS:
             raise TypeError(f"{config.model_type} isn't supported yet.")
@@ -670,25 +754,11 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         resolved_archive_file = None
         if is_local:
             model_save_name = join(model_name_or_path, model_basename)
-
             for ext in extensions:
                 if isfile(model_save_name + ext):
                     resolved_archive_file = model_save_name + ext
                     break
         else: # remote
-            cached_file_kwargs = {
-                "cache_dir": cache_dir,
-                "force_download": force_download,
-                "proxies": proxies,
-                "resume_download": resume_download,
-                "local_files_only": local_files_only,
-                "use_auth_token": use_auth_token,
-                "revision": revision,
-                "subfolder": subfolder,
-                "_raise_exceptions_for_missing_entries": False,
-                "_commit_hash": commit_hash,
-            }
-            
             for ext in extensions:
                 resolved_archive_file = cached_file(model_name_or_path, model_basename + ext, **cached_file_kwargs)
                 if resolved_archive_file is not None:
@@ -698,6 +768,9 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             raise FileNotFoundError(f"Could not find model in {model_name_or_path}")
                 
         model_save_name = resolved_archive_file
+
+        if not use_triton and trainable:
+            logger.warning("QuantLinear with cuda backend not support trainable mode yet, Switch to the pytorch backend.")
 
         # == step2: convert model to gptq-model (replace Linear with QuantLinear) == #
         def skip(*args, **kwargs):
@@ -734,7 +807,8 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                 quantize_config.group_size,
                 use_triton=use_triton,
                 use_cuda_fp16=use_cuda_fp16,
-                desc_act=quantize_config.desc_act
+                desc_act=quantize_config.desc_act,
+                trainable=trainable
             )
             model.tie_weights()
 
@@ -794,6 +868,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         # == step5: (optional) inject optimized module == #
         if inject_fused_attention:
             if cls.fused_attn_module_type is None:
+                inject_fused_attention = False
                 logger.warning(f"{cls.__name__} hasn't fused attention module yet, will skip inject fused attention.")
             else:
                 cls.fused_attn_module_type.inject_to_model(
@@ -801,10 +876,12 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                     use_triton=use_triton,
                     group_size=quantize_config.group_size,
                     use_cuda_fp16=use_cuda_fp16,
-                    desc_act=quantize_config.desc_act
+                    desc_act=quantize_config.desc_act,
+                    trainable=trainable
                 )
         if inject_fused_mlp:
             if cls.fused_mlp_module_type is None:
+                inject_fused_mlp = False
                 logger.warning(f"{cls.__name__} hasn't fused mlp module yet, will skip inject fused mlp.")
             else:
                 cls.fused_mlp_module_type.inject_to_model(
@@ -815,13 +892,26 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         model.eval()
         # == step6: (optional) warmup triton == #
         if use_triton and warmup_triton:
-            from ..nn_modules.qlinear_triton import QuantLinear
+            from ..nn_modules.qlinear.qlinear_triton import QuantLinear
             QuantLinear.warmup(model, seqlen=model.seqlen)
 
             if inject_fused_mlp and cls.fused_mlp_module_type is not None:
                 cls.fused_mlp_module_type.warmup(model, seqlen=model.seqlen)
 
-        return cls(model, True, quantize_config)
+        # == step7: make model compatible with peft
+        cls.make_sure_compatible_with_peft(
+            model, use_triton, quantize_config.desc_act, quantize_config.group_size
+        )
+
+        return cls(
+            model,
+            True,
+            quantize_config,
+            is_triton_backend=use_triton,
+            injected_fused_attention=inject_fused_attention,
+            injected_fused_mlp=inject_fused_mlp and use_triton,
+            trainable=trainable
+        )
 
     def warmup_triton(self, enabled: bool = True):
         if not enabled:
@@ -830,11 +920,34 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             logger.warning(f"triton is not available, skip warmup stage directly.")
             return
 
-        from ..nn_modules.qlinear_triton import QuantLinear
+        from ..nn_modules.qlinear.qlinear_triton import QuantLinear
         QuantLinear.warmup(self.model, seqlen=self.model.seqlen)
 
         if self.fused_mlp_module_type is not None:
             self.fused_mlp_module_type.warmup(self.model, seqlen=self.model.seqlen)
+
+    def enable_trainable_mode(self, enabled: bool = True):
+        if not self.is_triton_backend and enabled:
+            raise NotImplementedError("For now, trainable mode only supports triton backend.")
+        for n, m in self.model.named_modules():
+            if hasattr(m, "trainable"):
+                setattr(m, "trainable", enabled)
+
+    def disable_trainable_mode(self):
+        self.enable_trainable_mode(enabled=False)
+
+    @staticmethod
+    def make_sure_compatible_with_peft(model: PreTrainedModel, use_triton: bool, desc_act: bool, group_size: int):
+        GeneralQuantLinear.inject_to_model(
+            model,
+            dynamically_import_QuantLinear(use_triton, desc_act, group_size)
+        )
+
+    def __getattr__(self, item):
+        try:
+            return super().__getattr__(item)
+        except:
+            return getattr(self.model, item)
 
 
 __all__ = ["BaseGPTQForCausalLM", "BaseQuantizeConfig"]

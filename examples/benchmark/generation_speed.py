@@ -144,7 +144,9 @@ def load_model_tokenizer(
     trust_remote_code: bool = False,
     use_triton: bool = False,
     use_safetensors: bool = False,
-    use_fast_tokenizer: bool = False
+    use_fast_tokenizer: bool = False,
+    inject_fused_attention: bool = True,
+    inject_fused_mlp: bool = True
 ):
     tokenizer = AutoTokenizer.from_pretrained(
         pretrained_model_name_or_path=tokenizer_name_or_path or model_name_or_path,
@@ -163,12 +165,12 @@ def load_model_tokenizer(
         )
     else:
         model = AutoGPTQForCausalLM.from_quantized(
-            save_dir=model_name_or_path,
+            model_name_or_path,
             max_memory=max_memory,
             low_cpu_mem_usage=True,
             use_triton=use_triton,
-            inject_fused_attention=True,
-            inject_fused_mlp=True,
+            inject_fused_attention=inject_fused_attention,
+            inject_fused_mlp=inject_fused_mlp,
             use_cuda_fp16=True,
             quantize_config=quantize_config,
             model_basename=model_basename,
@@ -232,6 +234,8 @@ def main():
     parser.add_argument("--use_triton", action="store_true")
     parser.add_argument("--use_safetensors", action="store_true")
     parser.add_argument("--use_fast_tokenizer", action="store_true")
+    parser.add_argument("--no_inject_fused_attention", action="store_true")
+    parser.add_argument("--no_inject_fused_mlp", action="store_true")
     parser.add_argument("--num_samples", type=int, default=10)
     parser.add_argument("--per_gpu_max_memory", type=int, default=None)
     parser.add_argument("--cpu_max_memory", type=int, default=None)
@@ -269,7 +273,9 @@ def main():
         trust_remote_code=args.trust_remote_code,
         use_triton=args.use_triton,
         use_safetensors=args.use_safetensors,
-        use_fast_tokenizer=args.use_fast_tokenizer
+        use_fast_tokenizer=args.use_fast_tokenizer,
+        inject_fused_attention=not args.no_inject_fused_attention,
+        inject_fused_mlp=not args.no_inject_fused_mlp
     )
     end = time.time()
     logger.info(f"model and tokenizer loading time: {end - start:.4f}s")
@@ -282,7 +288,9 @@ def main():
         model.warmup_triton()
 
     logger.info("loading data")
-    examples = load_data("dataset/alpaca_data_cleaned.json", tokenizer, args.num_samples, args.max_new_tokens)
+    examples = load_data(
+        "../quantization/dataset/alpaca_data_cleaned.json", tokenizer, args.num_samples, args.max_new_tokens
+    )
 
     generation_config = GenerationConfig(
         num_beams=args.num_beams,
