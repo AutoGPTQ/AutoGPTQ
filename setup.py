@@ -16,7 +16,9 @@ if sys.version_info < python_min_version:
     print(f"You are using Python {platform.python_version()}. Python >={python_min_version_str} is required.")
     sys.exit(-1)
 
-if TORCH_AVAILABLE and torch.version.cuda != None:
+BUILD_CUDA_EXT = int(os.environ.get('BUILD_CUDA_EXT', '1')) == 1
+
+if TORCH_AVAILABLE and BUILD_CUDA_EXT and torch.version.cuda != None:
     CUDA_VERSION = "".join(torch.version.cuda.split("."))
 else:
     CUDA_VERSION = "".join(os.environ.get("CUDA_VERSION", "").split("."))
@@ -66,8 +68,6 @@ extras_require = {
 include_dirs = ["autogptq_cuda"]
 
 if TORCH_AVAILABLE:
-    BUILD_CUDA_EXT = int(os.environ.get('BUILD_CUDA_EXT', '1')) == 1
-    
     additional_setup_kwargs = dict()
     if BUILD_CUDA_EXT:
         from torch.utils import cpp_extension
