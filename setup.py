@@ -22,6 +22,11 @@ if BUILD_CUDA_EXT:
 else:
     CUDA_VERSION = "".join(os.environ.get("CUDA_VERSION", "").split("."))
 
+ROCM_VERSION = os.environ.get('ROCM_VERSION', False)
+if ROCM_VERSION and not torch.version.hip:
+    raise ValueError(f"Trying to compile AutoGPTQ for RoCm, but PyTorch {torch.__version__} is installed with no RoCm support.")
+CUDA_VERSION = CUDA_VERSION if not ROCM_VERSION else False
+
 common_setup_kwargs = {
     "version": "0.3.2",
     "name": "auto_gptq",
@@ -48,6 +53,14 @@ common_setup_kwargs = {
 
 if CUDA_VERSION:
     common_setup_kwargs['version'] += f"+cu{CUDA_VERSION}"
+else:
+    assert ROCM_VERSION
+    common_setup_kwargs['version'] += f"+rocm{ROCM_VERSION}"
+
+"""
+if USE_ROCM:
+    extra_compile_args["nvcc"].append("-U__HIP_NO_HALF_CONVERSIONS__")
+"""
 
 requirements = [
     "accelerate>=0.19.0",
