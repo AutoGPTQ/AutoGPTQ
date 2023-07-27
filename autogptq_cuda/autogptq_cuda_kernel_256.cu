@@ -1160,7 +1160,8 @@ __global__ void VecQuant2MatMulKernelFaster_old(
     half2 scale = __float2half2_rn(scale_f);
     half2 zero = __float2half2_rn(-(scale_f * (((as_unsigned(zeros[g * zero_width + z_w]) >> z_mod) & 0x3) + 1)));
 	
-    res2 = {};
+	// res2 = {};
+    std::memset(&res2, 0, sizeof(half2));
     tmp = as_unsigned(mat[i]);
     res2 = __hfma2(__hfma2(deq2[(tmp >>  0) & 0xf][off], scale, zero), blockvec[k + 0], res2);
     res2 = __hfma2(__hfma2(deq2[(tmp >>  4) & 0xf][off], scale, zero), blockvec[k + 1], res2);
@@ -1294,7 +1295,8 @@ __global__ void VecQuant3MatMulKernelFaster_old(
       zero = __float2half2_rn(-(scale_f * (((as_unsigned(zeros[g * zero_width + z_w]) >> z_bit) & 0x7) + 1)));
     }
 	
-    res2 = {};
+	// res2 = {};
+    std::memset(&res2, 0, sizeof(half2));
     tmp1 = as_unsigned(mat[i]);
     res2 = __hfma2(__hfma2(deq2[(tmp1 >>  0) & 0x3f][off], scale, zero), blockvec[k + 0], res2);
     res2 = __hfma2(__hfma2(deq2[(tmp1 >>  6) & 0x3f][off], scale, zero), blockvec[k + 1], res2);
@@ -1412,7 +1414,8 @@ __global__ void VecQuant4MatMulKernelFaster_old(
     half2 scale = __float2half2_rn(scale_f);
     half2 zero = __float2half2_rn(-(scale_f * (((as_unsigned(zeros[g * zero_width + z_w]) >> z_mod) & 0xF) + 1)));
 	
-    res2 = {};
+	// res2 = {};
+    std::memset(&res2, 0, sizeof(half2));
     tmp = as_unsigned(mat[i]);
     res2 = __hfma2(__hfma2(deq2[(tmp >>  0) & 0xff][off], scale, zero), blockvec[k + 0], res2);
     res2 = __hfma2(__hfma2(deq2[(tmp >>  8) & 0xff][off], scale, zero), blockvec[k + 1], res2);
