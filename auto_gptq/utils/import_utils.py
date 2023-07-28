@@ -21,7 +21,7 @@ logger = getLogger(__name__)
 def dynamically_import_QuantLinear(use_triton: bool, desc_act: bool, group_size: int):
     if use_triton:
         if torch.version.hip:
-            logger.warning("Running GPTQ triton version is untested and may result in errors or wrong predictions. Please use use_triton=False.")
+            logger.warning("Running GPTQ triton version on AMD GPUs is untested and may result in errors or wrong predictions. Please use use_triton=False.")
 
         from ..nn_modules.qlinear.qlinear_triton import QuantLinear
     else:
