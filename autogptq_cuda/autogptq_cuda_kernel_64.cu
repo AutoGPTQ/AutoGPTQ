@@ -68,7 +68,6 @@ __device__ __forceinline__ void atomicAdd(__half* address, c10::Half val) {
 #endif
 
 
-
 template <typename scalar_t>
 __global__ void VecQuant2MatMulKernel(
     const  scalar_t* __restrict__ vec,

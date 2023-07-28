@@ -52,12 +52,9 @@ common_setup_kwargs = {
     "python_requires": f">={python_min_version_str}"
 }
 
-extra_compile_args = {"nvcc": []}
-
 if BUILD_CUDA_EXT:
     if ROCM_VERSION:
         common_setup_kwargs['version'] += f"+rocm{ROCM_VERSION}"
-        # extra_compile_args["nvcc"].append("-U__HIP_NO_HALF_CONVERSIONS__")
     else:
         assert CUDA_VERSION
         common_setup_kwargs['version'] += f"+cu{CUDA_VERSION}"
@@ -98,16 +95,14 @@ if BUILD_CUDA_EXT:
             [
                 "autogptq_cuda/autogptq_cuda_64.cpp",
                 "autogptq_cuda/autogptq_cuda_kernel_64.cu"
-            ],
-            extra_compile_args=extra_compile_args,
+            ]
         ),
         cpp_extension.CUDAExtension(
             "autogptq_cuda_256",
             [
                 "autogptq_cuda/autogptq_cuda_256.cpp",
                 "autogptq_cuda/autogptq_cuda_kernel_256.cu"
-            ],
-            extra_compile_args=extra_compile_args,
+            ]
         )
     ]
 
