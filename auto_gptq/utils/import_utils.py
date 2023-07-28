@@ -1,4 +1,6 @@
 from packaging.version import parse as parse_version
+from logging import getLogger
+import torch
 
 try:
     import triton
@@ -14,9 +16,13 @@ try:
 except:
     AUTOGPTQ_CUDA_AVAILABLE = False
 
+logger = getLogger(__name__)
 
 def dynamically_import_QuantLinear(use_triton: bool, desc_act: bool, group_size: int):
     if use_triton:
+        if torch.version.hip:
+            logger.warning("Running GPTQ triton version is untested and may result in errors or wrong predictions. Please use use_triton=False.")
+
         from ..nn_modules.qlinear.qlinear_triton import QuantLinear
     else:
         if not desc_act or group_size == -1:
