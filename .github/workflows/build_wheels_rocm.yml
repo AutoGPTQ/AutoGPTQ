@@ -1,0 +1,57 @@
+name: Build AutoGPTQ Wheels with ROCm
+
+on: workflow_dispatch
+
+jobs:
+  build_wheels:
+    if: ${{ github.repository_owner == 'PanQiWei' }}
+
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+        python: ["3.8", "3.9", "3.10"]  # what's the point?
+        rocm: ["5.4.2", "5.5", "5.6"]
+
+    name: Build wheels for ${{ matrix.os }} and Python ${{ matrix.python }}
+    runs-on: ${{ matrix.os }}
+
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          ref: 'main'
+
+      - uses: actions/setup-python@v3
+        with:
+          python-version: ${{ matrix.python }}
+
+      - name: Set up environment
+        if: ${{ matrix.rocm == "5.4.2" }}
+        run: |
+            echo "ROCM_DL_FILE='amdgpu-install_5.4.50402-1_all.deb'" >> $GITHUB_ENV
+        if: ${{ matrix.rocm == "5.5" }}
+        run: |
+            echo "ROCM_DL_FILE='amdgpu-install_5.5.50500-1_all.deb'" >> $GITHUB_ENV
+        if: ${{ matrix.rocm == "5.6" }}
+        run: |
+            echo "ROCM_DL_FILE='amdgpu-install_5.6.50600-1_all.deb'" >> $GITHUB_ENV
+
+        run: |
+          echo "ROCM_VERSION=${{ matrix.rocm }}" >> $GITHUB_ENV
+          curl -O https://repo.radeon.com/amdgpu-install/$ROCM_VERSION/ubuntu/jammy/$ROCM_DL_FILE
+          sudo dpkg -i $ROCM_DL_FILE
+          sudo DEBIAN_FRONTEND=noninteractive amdgpu-install --usecase=rocm --no-dkms --no-32 -y
+      - name: Install dependencies
+        run: |
+          python -m pip install --pre torch --index-url https://download.pytorch.org/whl/nightly/rocm$ROCM_VERSION
+          python -m pip install --upgrade build setuptools wheel
+      - name: Build wheels
+        run: |
+          python setup.py sdist bdist_wheel
+      - uses: actions/upload-artifact@v3
+        with:
+          name: 'wheels'
+          path: ./dist/*.whl
