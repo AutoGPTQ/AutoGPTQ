@@ -4,7 +4,7 @@ on: workflow_dispatch
 
 jobs:
   build_wheels:
-    if: ${{ github.repository_owner == 'fxmarty' }}
+    if: ${{ github.repository_owner == 'PanQiWei' }}
 
     strategy:
       matrix:
