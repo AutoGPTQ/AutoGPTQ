@@ -57,7 +57,7 @@ extra_compile_args = {"nvcc": []}
 if BUILD_CUDA_EXT:
     if ROCM_VERSION:
         common_setup_kwargs['version'] += f"+rocm{ROCM_VERSION}"
-        extra_compile_args["nvcc"].append("-U__HIP_NO_HALF_CONVERSIONS__")
+        # extra_compile_args["nvcc"].append("-U__HIP_NO_HALF_CONVERSIONS__")
     else:
         assert CUDA_VERSION
         common_setup_kwargs['version'] += f"+cu{CUDA_VERSION}"
@@ -84,15 +84,14 @@ additional_setup_kwargs = dict()
 if BUILD_CUDA_EXT:
     from torch.utils import cpp_extension
 
-    """
-    from distutils.sysconfig import get_python_lib
-    conda_cuda_include_dir = os.path.join(get_python_lib(), "nvidia/cuda_runtime/include")
+    if not ROCM_VERSION:
+        from distutils.sysconfig import get_python_lib
+        conda_cuda_include_dir = os.path.join(get_python_lib(), "nvidia/cuda_runtime/include")
 
-    print("conda_cuda_include_dir", conda_cuda_include_dir)
-    if os.path.isdir(conda_cuda_include_dir):
-        include_dirs.append(conda_cuda_include_dir)
-        print(f"appending conda cuda include dir {conda_cuda_include_dir}")
-    """
+        print("conda_cuda_include_dir", conda_cuda_include_dir)
+        if os.path.isdir(conda_cuda_include_dir):
+            include_dirs.append(conda_cuda_include_dir)
+            print(f"appending conda cuda include dir {conda_cuda_include_dir}")
     extensions = [
         cpp_extension.CUDAExtension(
             "autogptq_cuda_64",

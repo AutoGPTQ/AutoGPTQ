@@ -30,7 +30,8 @@
 // }
 // #endif
 
-#if defined(__CUDA_ARCH__) && __CUDA_ARCH__ < 700
+
+#if (defined(__CUDA_ARCH__) && __CUDA_ARCH__ < 700) || defined(ROCM_VERSION)
 // adapted from https://github.com/torch/cutorch/blob/master/lib/THC/THCAtomics.cuh
 __device__ __forceinline__ void atomicAdd(c10::Half* address, c10::Half val) {
     unsigned int *address_as_ui = reinterpret_cast<unsigned int *>(reinterpret_cast<char *>(address) - (reinterpret_cast<size_t>(address) & 2));
@@ -65,6 +66,7 @@ __device__ __forceinline__ void atomicAdd(__half* address, c10::Half val) {
     } while (assumed != old);
 }
 #endif
+
 
 
 template <typename scalar_t>
@@ -1161,7 +1163,6 @@ __global__ void VecQuant2MatMulKernelFaster_old(
     half2 scale = __float2half2_rn(scale_f);
     half2 zero = __float2half2_rn(-(scale_f * (((as_unsigned(zeros[g * zero_width + z_w]) >> z_mod) & 0x3) + 1)));
 	
-	// res2 = {};
     std::memset(&res2, 0, sizeof(half2));
     tmp = as_unsigned(mat[i]);
     res2 = __hfma2(__hfma2(deq2[(tmp >>  0) & 0xf][off], scale, zero), blockvec[k + 0], res2);
@@ -1174,7 +1175,7 @@ __global__ void VecQuant2MatMulKernelFaster_old(
     res2 = __hfma2(__hfma2(deq2[(tmp >> 28) & 0xf][off], scale, zero), blockvec[k + 7], res2);
 	i += width;
     k += 8;
-    res += __half2float(res2.x) + __half2float(res2.y);
+    res += __low2float(res2) + __high2float(res2);
   }
 
   atomicAdd(&mul[b * width + w], res);
@@ -1296,7 +1297,6 @@ __global__ void VecQuant3MatMulKernelFaster_old(
       zero = __float2half2_rn(-(scale_f * (((as_unsigned(zeros[g * zero_width + z_w]) >> z_bit) & 0x7) + 1)));
     }
 	
-	// res2 = {};
     std::memset(&res2, 0, sizeof(half2));
     tmp1 = as_unsigned(mat[i]);
     res2 = __hfma2(__hfma2(deq2[(tmp1 >>  0) & 0x3f][off], scale, zero), blockvec[k + 0], res2);
@@ -1327,7 +1327,7 @@ __global__ void VecQuant3MatMulKernelFaster_old(
     res2 = __hfma2(__hfma2(deq2[(tmp1 >> 24) & 0x3f][off], scale, zero), blockvec[k + 4], res2);
     i += width;
     k += 5;
-    res += __half2float(res2.x) + __half2float(res2.y);
+    res += __low2float(res2) + __high2float(res2);
   }
 
   atomicAdd(&mul[b * width + w], res);
@@ -1415,7 +1415,6 @@ __global__ void VecQuant4MatMulKernelFaster_old(
     half2 scale = __float2half2_rn(scale_f);
     half2 zero = __float2half2_rn(-(scale_f * (((as_unsigned(zeros[g * zero_width + z_w]) >> z_mod) & 0xF) + 1)));
 	
-	// res2 = {};
     std::memset(&res2, 0, sizeof(half2));
     tmp = as_unsigned(mat[i]);
     res2 = __hfma2(__hfma2(deq2[(tmp >>  0) & 0xff][off], scale, zero), blockvec[k + 0], res2);
@@ -1424,7 +1423,7 @@ __global__ void VecQuant4MatMulKernelFaster_old(
     res2 = __hfma2(__hfma2(deq2[(tmp >> 24) & 0xff][off], scale, zero), blockvec[k + 3], res2);
 	i += width;
     k += 4;
-    res += __half2float(res2.x) + __half2float(res2.y);
+    res += __low2float(res2) + __high2float(res2);
   }
 
   atomicAdd(&mul[b * width + w], res);
