@@ -98,7 +98,6 @@ class TestsQ4CUDA(unittest.TestCase):
         self.assertTrue(linear.autogptq_cuda_available)
 
         inp = torch.rand(1, m, k, dtype=torch.float16).to(device)
-        print(f"\nInput: {inp.shape}, {inp.dtype}")
 
         linear = linear.eval()
         linear = linear.to(device)
