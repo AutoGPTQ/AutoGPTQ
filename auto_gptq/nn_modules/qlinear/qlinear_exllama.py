@@ -88,7 +88,7 @@ class QuantLinear(nn.Module):
             self.qweight,
             self.qzeros,
             self.scales,
-            self.g_idx.to("cpu") if self.g_idx else self.g_idx,
+            self.g_idx.to("cpu") if self.g_idx is not None else self.g_idx,
             self.qweight.device.index
         )
 
