@@ -189,7 +189,7 @@ class TestsQ4Exllama(unittest.TestCase):
 
         self.assertTrue(torch.allclose(res, reference, rtol=3e-5, atol=1e-2), get_diff(res, reference))
     
-    def test_generation(self):
+    def test_generation_no_act_order(self):
         prompt = "I am in Paris and"
         device = torch.device("cuda:0")
 
@@ -208,7 +208,30 @@ class TestsQ4Exllama(unittest.TestCase):
         predicted_text = tokenizer.decode(res[0])
 
         self.assertEqual(predicted_text, reference_output)
-    
+
+    def test_generation_with_act_order(self):
+        prompt = "I am in Paris and"
+        device = torch.device("cuda:0")
+
+        # Reference generated with the cuda-old kernel
+        reference_output = "<s> I am in Paris and I am going to the Louvre Museum. What time does it open and what is the best way to get there?\nThe Louvre Museum in Paris is open from 9:00 AM to 6:00 PM every day except for Tuesdays. The best way to get"
+
+        model_id = "TheBloke/wizardLM-7B-GPTQ"
+        model_basename = "gptq_model-4bit-128g"
+
+        model_q = AutoGPTQForCausalLM.from_quantized(model_id, revision="gptq-4bit-128g-actorder_True", device="cuda:0", use_triton=False, use_safetensors=True, inject_fused_attention=False, inject_fused_mlp=False, model_basename=model_basename, disable_exllama=True)
+        tokenizer = AutoTokenizer.from_pretrained(model_id)
+
+        inp = tokenizer(prompt, return_tensors="pt").to(device)
+
+        res = model_q.generate(**inp, num_beams=1, min_new_tokens=60, max_new_tokens=60)
+
+        predicted_text = tokenizer.decode(res[0])
+
+        print("predicted_text", predicted_text)
+
+        self.assertEqual(predicted_text, reference_output)
+
     def test_multigpu(self):
         # TODO
         pass
