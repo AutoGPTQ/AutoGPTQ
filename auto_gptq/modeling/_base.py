@@ -71,22 +71,22 @@ class BaseQuantizeConfig(PushToHubMixin):
         if os.path.isdir(save_dir):  # Local
             resolved_config_file = join(save_dir, quantize_config_filename)
         else: # Remote
-               resolved_config_file = cached_file(
-                    save_dir,
-                    quantize_config_filename,
-                    cache_dir=cache_dir,
-                    force_download=force_download,
-                    resume_download=resume_download,
-                    proxies=proxies,
-                    use_auth_token=use_auth_token,
-                    revision=revision,
-                    local_files_only=local_files_only,
-                    subfolder=subfolder,
-                    _raise_exceptions_for_missing_entries=False,
-                    _raise_exceptions_for_connection_errors=False,
-                    _commit_hash=commit_hash,
-               )
-
+            resolved_config_file = cached_file(
+                save_dir,
+                quantize_config_filename,
+                cache_dir=cache_dir,
+                force_download=force_download,
+                resume_download=resume_download,
+                proxies=proxies,
+                use_auth_token=use_auth_token,
+                revision=revision,
+                local_files_only=local_files_only,
+                subfolder=subfolder,
+                _raise_exceptions_for_missing_entries=False,
+                _raise_exceptions_for_connection_errors=False,
+                _commit_hash=commit_hash,
+            )
+        
         with open(resolved_config_file, "r", encoding="utf-8") as f:
             return cls(**json.load(f))
                 
@@ -732,7 +732,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             raise TypeError(f"{config.model_type} isn't supported yet.")
 
         if quantize_config is None:
-            quantize_config = BaseQuantizeConfig.from_pretrained(model_name_or_path, **kwargs)
+            quantize_config = BaseQuantizeConfig.from_pretrained(model_name_or_path, **cached_file_kwargs, **kwargs)
         
         if model_basename is None:
             if quantize_config.model_file_base_name:
