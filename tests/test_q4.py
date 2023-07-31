@@ -213,12 +213,13 @@ class TestsQ4Exllama(unittest.TestCase):
         device = torch.device("cuda:0")
 
         # Reference generated with the cuda-old kernel
-        reference_output = "<s> I am in Paris and I am going to the Louvre Museum. What time does it open and what is the best way to get there?\nThe Louvre Museum in Paris is open from 9:00 AM to 6:00 PM every day except for Tuesdays. The best way to get"
+        reference_output = "<s> I am in Paris and it is a beautiful day. I am sitting in a café, drinking coffee and writing this book. I am surrounded by the sights and sounds of the city, and I am filled with a sense of contentment and gratitude.\n\nI am grateful for the opportunity to live and"
 
-        model_id = "TheBloke/wizardLM-7B-GPTQ"
-        model_basename = "gptq_model-4bit-128g"
+        model_id = "TheBloke/vicuna-13B-1.1-GPTQ-4bit-128g"
+        revision = "actorder"
+        model_basename = "vicuna-13B-1.1-GPTQ-4bit-128g.latest"
 
-        model_q = AutoGPTQForCausalLM.from_quantized(model_id, revision="gptq-4bit-128g-actorder_True", device="cuda:0", use_triton=False, use_safetensors=True, inject_fused_attention=False, inject_fused_mlp=False, model_basename=model_basename, disable_exllama=True)
+        model_q = AutoGPTQForCausalLM.from_quantized(model_id, revision=revision, device="cuda:0", use_triton=False, use_safetensors=True, inject_fused_attention=False, inject_fused_mlp=True, model_basename=model_basename, disable_exllama=True)
         tokenizer = AutoTokenizer.from_pretrained(model_id)
 
         inp = tokenizer(prompt, return_tensors="pt").to(device)
@@ -226,8 +227,6 @@ class TestsQ4Exllama(unittest.TestCase):
         res = model_q.generate(**inp, num_beams=1, min_new_tokens=60, max_new_tokens=60)
 
         predicted_text = tokenizer.decode(res[0])
-
-        print("predicted_text", predicted_text)
 
         self.assertEqual(predicted_text, reference_output)
 

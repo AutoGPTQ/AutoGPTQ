@@ -83,14 +83,14 @@ class QuantLinear(nn.Module):
         
         self.width = self.qweight.shape[1]
 
+        # make_q4 segfaults if g_idx is not on cpu
         self.q4 = ext_make_q4(
             self.qweight,
             self.qzeros,
             self.scales,
-            self.g_idx,
+            self.g_idx.to("cpu") if self.g_idx else self.g_idx,
             self.qweight.device.index
         )
-
 
     def pack(self, linear, scales, zeros, g_idx=None):
         raise NotImplementedError("Pack is not supported for the exllama implementation. Please open an issue.")
