@@ -56,12 +56,13 @@ def make_quant(
     bits,
     group_size,
     name='',
-    use_triton=False,
-    use_cuda_fp16=True,
-    desc_act=False,
-    trainable=False
+    use_triton: bool = False,
+    disable_exllama: bool = False,
+    use_cuda_fp16: bool = True,
+    desc_act: bool = False,
+    trainable: bool = False
 ):
-    QuantLinear = dynamically_import_QuantLinear(use_triton=use_triton, desc_act=desc_act, group_size=group_size, bits=bits)
+    QuantLinear = dynamically_import_QuantLinear(use_triton=use_triton, desc_act=desc_act, group_size=group_size, bits=bits, disable_exllama=disable_exllama)
 
     if isinstance(module, QuantLinear):
         return
@@ -98,7 +99,8 @@ def make_quant(
             use_triton=use_triton,
             use_cuda_fp16=use_cuda_fp16,
             desc_act=desc_act,
-            trainable=trainable
+            trainable=trainable,
+            disable_exllama=disable_exllama,
         )
 
 
@@ -185,14 +187,12 @@ def simple_dispatch_model(model, device_map):
     return model
 
 
-def autogptq_post_init(model):
+def autogptq_post_init(model, use_act_order: bool):
     device_to_buffers_size = {}
 
-    use_act_order = False
     model_uses_exllama = False
     for name, submodule in model.named_modules():
-        if hasattr(submodule, "exllama_qlinear") and submodule.exllama_qlinear:
-            submodule.post_init()
+        if hasattr(submodule, "QUANT_TYPE") and submodule.QUANT_TYPE == "exllama":
             model_uses_exllama = True
             device = submodule.qweight.device
             if device not in device_to_buffers_size:
@@ -200,15 +200,25 @@ def autogptq_post_init(model):
                     "max_dq_buffer_size": 1,
                     "max_inner_outer_dim": 1
                 }
+            
+            if not use_act_order:
+                submodule.g_idx = None
+
+            # Disable this heuristic for detecting act_order, but it could be used instead of the config.
+            """
+            if submodule.g_idx is None:
+                submodule.act_order = False
+            elif submodule.g_idx is not None and ((submodule.g_idx == 0).all() or torch.equal(submodule.g_idx.cpu(), torch.tensor([i // submodule.group_size for i in range(submodule.g_idx.shape[0])], dtype=torch.int32))):
+                submodule.g_idx = None
+                submodule.act_order = False
+            else:
+                submodule.act_order = True
+            """
 
             device_to_buffers_size[device]["max_dq_buffer_size"] = max(device_to_buffers_size[device]["max_dq_buffer_size"], submodule.qweight.numel() * 8)
 
-            if submodule.act_order:
+            if use_act_order:
                 device_to_buffers_size[device]["max_inner_outer_dim"] = max(device_to_buffers_size[device]["max_inner_outer_dim"], submodule.infeatures, submodule.outfeatures)
-
-                use_act_order = True
-            elif not submodule.act_order and use_act_order:
-                raise ValueError("GPTQ with mixed act-order/not act-order is not supported with exllama.")
 
     if model_uses_exllama:
         # To be honest this is quite ugly, not proud of this.
@@ -241,6 +251,11 @@ def autogptq_post_init(model):
         matmul_fused_remap = False
         matmul_no_half2 = False
         set_tuning_params(matmul_recons_thd, matmul_fused_remap, matmul_no_half2)
+
+        # The buffers need to have been initialized first before calling make_q4.
+        for name, submodule in model.named_modules():
+            if hasattr(submodule, "QUANT_TYPE") and submodule.QUANT_TYPE == "exllama":
+                submodule.post_init()
 
         torch.cuda.empty_cache()
     

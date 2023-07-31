@@ -15,11 +15,11 @@ except:
     AUTOGPTQ_CUDA_AVAILABLE = False
 
 
-def dynamically_import_QuantLinear(use_triton: bool, desc_act: bool, group_size: int, bits: int):
+def dynamically_import_QuantLinear(use_triton: bool, desc_act: bool, group_size: int, bits: int, disable_exllama: bool = False):
     if use_triton:
         from ..nn_modules.qlinear.qlinear_triton import QuantLinear
     else:
-        if bits == 4:
+        if bits == 4 and not disable_exllama:
             from ..nn_modules.qlinear.qlinear_exllama import QuantLinear
         elif not desc_act or group_size == -1:
             from ..nn_modules.qlinear.qlinear_cuda_old import QuantLinear

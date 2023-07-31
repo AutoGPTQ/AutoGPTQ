@@ -692,6 +692,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         trust_remote_code: bool = False,
         warmup_triton: bool = False,
         trainable: bool = False,
+        disable_exllama: bool = False,
         **kwargs
     ):
         """load quantized model from local disk"""
@@ -806,6 +807,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                 quantize_config.bits,
                 quantize_config.group_size,
                 use_triton=use_triton,
+                disable_exllama=disable_exllama,
                 use_cuda_fp16=use_cuda_fp16,
                 desc_act=quantize_config.desc_act,
                 trainable=trainable
@@ -853,9 +855,6 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         )
         model = simple_dispatch_model(model, device_map)
 
-        # Any post-initialization that require device information, for example buffers initialization on device.
-        model = autogptq_post_init(model)
-
         # == step4: set seqlen == #
         model_config = model.config.to_dict()
         seq_len_keys = ["max_position_embeddings", "seq_length", "n_positions"]
@@ -892,6 +891,9 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                     model,
                     use_triton=use_triton
                 )
+
+        # Any post-initialization that require device information, for example buffers initialization on device.
+        model = autogptq_post_init(model, use_act_order=quantize_config.desc_act)
 
         model.eval()
         # == step6: (optional) warmup triton == #

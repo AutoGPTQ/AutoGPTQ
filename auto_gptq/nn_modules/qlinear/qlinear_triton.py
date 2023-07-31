@@ -21,6 +21,8 @@ except ImportError:
 
 
 class QuantLinear(nn.Module, TritonModuleMixin):
+    QUANT_TYPE = "triton"
+
     def __init__(
         self,
         bits,

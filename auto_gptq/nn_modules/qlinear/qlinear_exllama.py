@@ -28,6 +28,8 @@ def ext_q4_matmul(x, q4, q4_width):
 
 
 class QuantLinear(nn.Module):
+    QUANT_TYPE = "exllama"
+
     """Linear layer implementation with per-group 4-bit quantization of the weights"""
     def __init__(self,
         bits,
@@ -47,7 +49,6 @@ class QuantLinear(nn.Module):
         self.bits = bits
         self.group_size = group_size if group_size != -1 else infeatures
         self.trainable = trainable
-        self.exllama_qlinear = True
         self.maxq = 2 ** self.bits - 1
 
         assert infeatures % 32 == 0
@@ -79,14 +80,6 @@ class QuantLinear(nn.Module):
     def post_init(self):
         assert self.qweight.device.type == "cuda"
         assert self.qweight.device.index is not None
-
-        if self.g_idx is None:
-            self.act_order = False
-        elif self.g_idx is not None and ((self.g_idx == 0).all() or torch.equal(self.g_idx.cpu(), torch.tensor([i // self.group_size for i in range(self.g_idx.shape[0])], dtype=torch.int32))):
-            self.g_idx = None
-            self.act_order = False
-        else:
-            self.act_order = True
         
         self.width = self.qweight.shape[1]
 

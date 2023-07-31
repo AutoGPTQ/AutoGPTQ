@@ -6,7 +6,7 @@ from transformers.models.llama.modeling_llama import LlamaAttention, apply_rotar
 
 from ._fused_base import FusedBaseAttentionModule
 from ..utils.import_utils import compare_pytorch_version, dynamically_import_QuantLinear
-
+import inspect
 
 class FusedLlamaAttentionForQuantizedModel(FusedBaseAttentionModule):
     """Multi-headed attention from 'Attention Is All You Need' paper"""
@@ -153,7 +153,18 @@ class FusedLlamaAttentionForQuantizedModel(FusedBaseAttentionModule):
             qweights = torch.cat([q_proj.qweight, k_proj.qweight, v_proj.qweight], dim=1)
             qzeros = torch.cat([q_proj.qzeros, k_proj.qzeros, v_proj.qzeros], dim=1)
             scales = torch.cat([q_proj.scales, k_proj.scales, v_proj.scales], dim=1)
-            g_idx = torch.cat([q_proj.g_idx, k_proj.g_idx, v_proj.g_idx], dim=0)
+
+            if QuantLinear.QUANT_TYPE == "exllama":
+                if desc_act:
+                    # TODO: support it. The issue lies maybe in the line:
+                    # int groups = qzeros.size(0);
+                    # in exllama_ext.cpp
+                    raise ValueError("Exllama kernel does not support query/key/value fusion with act-order. Please either use inject_fused_attention=False or disable_exllama=True.")
+                else:
+                    g_idx = None
+            else:
+                g_idx = torch.cat([q_proj.g_idx, k_proj.g_idx, v_proj.g_idx], dim=0)
+            
             bias = torch.cat([q_proj.bias, k_proj.bias, v_proj.bias], dim=0) if q_proj.bias is not None else None
 
             qlinear_args = (

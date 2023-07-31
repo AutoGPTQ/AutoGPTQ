@@ -19,6 +19,8 @@ except ImportError:
 
 
 class QuantLinear(nn.Module):
+    QUANT_TYPE = "cuda-old"
+
     def __init__(
         self,
         bits,
