@@ -7,6 +7,7 @@ from auto_gptq.nn_modules.qlinear.qlinear_exllama import QuantLinear
 
 from exllama_kernels import prepare_buffers, set_tuning_params
 from auto_gptq import AutoGPTQForCausalLM
+from auto_gptq.modeling._utils import autogptq_post_init
 
 from transformers import AutoTokenizer
 
@@ -160,9 +161,7 @@ class TestsQ4Exllama(unittest.TestCase):
         linear = linear.eval()
         linear = linear.to(device)
 
-        linear.post_init()
-
-        torch.set_printoptions(threshold=10_000)
+        linear = autogptq_post_init(linear, use_act_order=False)
 
         max_inner_outer_dim = max(k, n)
         max_dq_buffer_size = linear.infeatures * linear.outfeatures
