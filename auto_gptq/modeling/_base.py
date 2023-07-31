@@ -842,7 +842,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             )
 
         if low_cpu_mem_usage:
-            make_sure_no_tensor_in_meta_device(model, use_triton, quantize_config.desc_act, quantize_config.group_size)
+            make_sure_no_tensor_in_meta_device(model, use_triton, quantize_config.desc_act, quantize_config.group_size, bits=quantize_config.bits)
 
         accelerate.utils.modeling.load_checkpoint_in_model(
             model,
@@ -852,6 +852,9 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             offload_buffers=True
         )
         model = simple_dispatch_model(model, device_map)
+
+        # Any post-initialization that require device information, for example buffers initialization on device.
+        model = autogptq_post_init(model)
 
         # == step4: set seqlen == #
         model_config = model.config.to_dict()
@@ -877,7 +880,8 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                     group_size=quantize_config.group_size,
                     use_cuda_fp16=use_cuda_fp16,
                     desc_act=quantize_config.desc_act,
-                    trainable=trainable
+                    trainable=trainable,
+                    bits=quantize_config.bits,
                 )
         if inject_fused_mlp:
             if cls.fused_mlp_module_type is None:
@@ -900,7 +904,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
 
         # == step7: make model compatible with peft
         cls.make_sure_compatible_with_peft(
-            model, use_triton, quantize_config.desc_act, quantize_config.group_size
+            model, use_triton, quantize_config.desc_act, quantize_config.group_size, bits=quantize_config.bits
         )
 
         return cls(
@@ -937,10 +941,10 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         self.enable_trainable_mode(enabled=False)
 
     @staticmethod
-    def make_sure_compatible_with_peft(model: PreTrainedModel, use_triton: bool, desc_act: bool, group_size: int):
+    def make_sure_compatible_with_peft(model: PreTrainedModel, use_triton: bool, desc_act: bool, group_size: int, bits: int):
         GeneralQuantLinear.inject_to_model(
             model,
-            dynamically_import_QuantLinear(use_triton, desc_act, group_size)
+            dynamically_import_QuantLinear(use_triton, desc_act, group_size, bits=bits)
         )
 
     def __getattr__(self, item):

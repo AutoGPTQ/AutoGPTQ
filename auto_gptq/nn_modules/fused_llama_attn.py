@@ -134,12 +134,13 @@ class FusedLlamaAttentionForQuantizedModel(FusedBaseAttentionModule):
         use_cuda_fp16=True,
         desc_act=False,
         trainable=False,
+        bits: int = 4,
         **kwargs
     ):
         """
         Replace all LlamaAttention modules with QuantLlamaAttention modules, fusing the q, k, v projections.
         """
-        QuantLinear = dynamically_import_QuantLinear(use_triton=use_triton, desc_act=desc_act, group_size=group_size)
+        QuantLinear = dynamically_import_QuantLinear(use_triton=use_triton, desc_act=desc_act, group_size=group_size, bits=bits)
 
         for name, m in model.named_modules():
             if not isinstance(m, LlamaAttention):

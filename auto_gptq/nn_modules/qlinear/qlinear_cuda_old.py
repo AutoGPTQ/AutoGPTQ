@@ -90,6 +90,9 @@ class QuantLinear(nn.Module):
 
         self.trainable = trainable
 
+    def post_init(self):
+        pass
+
     def pack(self, linear, scales, zeros, g_idx):
         W = linear.weight.data.clone()
         if isinstance(linear, nn.Conv2d):
