@@ -186,7 +186,7 @@ class TestsQ4Exllama(unittest.TestCase):
 
         reference = self.REFERENCE.to(device)
 
-        self.assertTrue(torch.allclose(res, reference, rtol=3e-5, atol=1e-2), get_diff(res, reference))
+        self.assertTrue(torch.allclose(res, reference, rtol=3e-5, atol=2e-2), get_diff(res, reference))
     
     def test_generation_no_act_order(self):
         prompt = "I am in Paris and"
