@@ -90,13 +90,6 @@ class QuantLinear(nn.Module):
         
         self.width = self.qweight.shape[1]
 
-        # TODO: remove
-        groupsize = None
-        if self.qzeros.shape[0] > 1:
-            groupsize = (self.qweight.shape[0] * 8) // (self.qzeros.shape[0])
-        if groupsize is not None:
-            assert groupsize == self.group_size
-
         self.q4 = ext_make_q4(
             self.qweight,
             self.qzeros,
