@@ -35,12 +35,17 @@ class FusedLlamaAttentionForQuantizedModel(FusedBaseAttentionModule):
             raise NotImplementedError(f"pretraining_tp of 2 or more is currently not supported.")
             
         if len(qkv_proj) == 1:
-            self.qkv_mode = True
+            self.qkv_mode = 'qkv'
             self.qkv_proj = qkv_proj[0]
-        else:
-            self.qkv_mode = False
+        elif len(qkv_proj) == 2:
+            self.qkv_mode = 'q,kv'
             self.q_proj = qkv_proj[0]
             self.kv_proj = qkv_proj[1]
+        else:
+            self.qkv_mode = 'q,k,v'
+            self.q_proj = qkv_proj[0]
+            self.k_proj = qkv_proj[1]
+            self.v_proj = qkv_proj[2]
         self.o_proj = o_proj
         self.rotary_emb = rotary_emb
 
@@ -61,14 +66,17 @@ class FusedLlamaAttentionForQuantizedModel(FusedBaseAttentionModule):
 
         bsz, q_len, _ = hidden_states.size()
         
-        if self.qkv_mode:
+        if self.qkv_mode == 'qkv':
             qkv_states = self.qkv_proj(hidden_states)
             query_states, key_states, value_states = torch.split(qkv_states, self.hidden_size, dim=2)
-        else:
+        elif self.qkv_mode == 'q,kv':
             query_states = self.q_proj(hidden_states)
             kv_states = self.kv_proj(hidden_states)
             key_states, value_states = torch.split(kv_states, self.hidden_size, dim=2)
-        
+        else:
+            query_states = self.q_proj(hidden_states)
+            key_states = self.k_proj(hidden_states)
+            value_states = self.v_proj(hidden_states)
         query_states = query_states.view(bsz, q_len, self.num_heads, self.head_dim).transpose(1, 2)
         key_states = key_states.view(bsz, q_len, self.num_key_value_heads, self.head_dim).transpose(1, 2)
         value_states = value_states.view(bsz, q_len, self.num_key_value_heads, self.head_dim).transpose(1, 2)
@@ -169,18 +177,14 @@ class FusedLlamaAttentionForQuantizedModel(FusedBaseAttentionModule):
             k_proj = m.k_proj
             v_proj = m.v_proj
 
-            if m.num_heads == m.num_key_value_heads:
+            if QuantLinear.QUANT_TYPE == "exllama" and desc_act:
+                qkv_layers = [q_proj,k_proj,v_proj]
+            elif m.num_heads == m.num_key_value_heads:
                 qweights = torch.cat([q_proj.qweight, k_proj.qweight, v_proj.qweight], dim=1)
                 qzeros = torch.cat([q_proj.qzeros, k_proj.qzeros, v_proj.qzeros], dim=1)
                 scales = torch.cat([q_proj.scales, k_proj.scales, v_proj.scales], dim=1)
                 if QuantLinear.QUANT_TYPE == "exllama":
-                    if desc_act:
-                        # TODO: support it. The issue lies maybe in the line:
-                        # int groups = qzeros.size(0);
-                        # in exllama_ext.cpp
-                        raise ValueError("Exllama kernel does not support query/key/value fusion with act-order. Please either use inject_fused_attention=False or disable_exllama=True.")
-                    else:
-                        g_idx = None
+                    g_idx = None
                 else:
                     g_idx = torch.cat([q_proj.g_idx, k_proj.g_idx, v_proj.g_idx], dim=0)
                 bias = torch.cat([q_proj.bias, k_proj.bias, v_proj.bias], dim=0) if q_proj.bias is not None else None
@@ -207,13 +211,7 @@ class FusedLlamaAttentionForQuantizedModel(FusedBaseAttentionModule):
                 qzeros = torch.cat([k_proj.qzeros, v_proj.qzeros], dim=1)
                 scales = torch.cat([k_proj.scales, v_proj.scales], dim=1)
                 if QuantLinear.QUANT_TYPE == "exllama":
-                    if desc_act:
-                        # TODO: support it. The issue lies maybe in the line:
-                        # int groups = qzeros.size(0);
-                        # in exllama_ext.cpp
-                        raise ValueError("Exllama kernel does not support query/key/value fusion with act-order. Please either use inject_fused_attention=False or disable_exllama=True.")
-                    else:
-                        g_idx = None
+                    g_idx = None
                 else:
                     g_idx = torch.cat([k_proj.g_idx, v_proj.g_idx], dim=0)
                 bias = torch.cat([k_proj.bias, v_proj.bias], dim=0) if q_proj.bias is not None else None
