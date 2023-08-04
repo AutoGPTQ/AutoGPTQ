@@ -6,7 +6,7 @@ from transformers.models.llama.modeling_llama import LlamaAttention, apply_rotar
 
 from ._fused_base import FusedBaseAttentionModule
 from ..utils.import_utils import compare_pytorch_version, dynamically_import_QuantLinear
-import inspect
+
 
 class FusedLlamaAttentionForQuantizedModel(FusedBaseAttentionModule):
     """Multi-headed attention from 'Attention Is All You Need' paper"""

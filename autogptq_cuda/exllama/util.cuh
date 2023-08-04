@@ -8,7 +8,11 @@
 #include <cstdint>
 #include <cstdio>
 
+#if defined(ROCM_VERSION)
+#define cudaUnspecified hipErrorUnknown
+#else
 #define cudaUnspecified cudaErrorApiFailureBase
+#endif
 
 // React to failure on return code != cudaSuccess
 
