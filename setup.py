@@ -54,7 +54,10 @@ requirements = [
     "datasets",
     "numpy",
     "rouge",
-    "torch>=1.13.0",
+    "torch>=2.0.1",
+    "functorch",
+    "xformers>=0.0.20",
+    "vllm",
     "safetensors",
     "transformers>=4.31.0",
     "peft"
