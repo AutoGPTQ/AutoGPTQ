@@ -770,7 +770,11 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                 
         model_save_name = resolved_archive_file
 
-        if not use_triton and trainable:
+        if not disable_exllama and trainable:
+            logger.warning("QuantLinear with exllama backend not support trainable mode yet, Switch to the pytorch backend.")
+            disable_exllama = True
+            
+        elif not use_triton and trainable:
             logger.warning("QuantLinear with cuda backend not support trainable mode yet, Switch to the pytorch backend.")
 
         # == step2: convert model to gptq-model (replace Linear with QuantLinear) == #
