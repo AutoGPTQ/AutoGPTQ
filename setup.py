@@ -18,9 +18,15 @@ if BUILD_CUDA_EXT:
     except:
         print("torch is not installed, please install torch first!")
         sys.exit(-1)
-    CUDA_VERSION = "".join(torch.version.cuda.split("."))
-else:
-    CUDA_VERSION = "".join(os.environ.get("CUDA_VERSION", "").split("."))
+
+    CUDA_VERSION = False
+    ROCM_VERSION = os.environ.get('ROCM_VERSION', False)
+    if ROCM_VERSION and not torch.version.hip:
+        raise ValueError(f"Trying to compile AutoGPTQ for RoCm, but PyTorch {torch.__version__} is installed with no RoCm support.")
+
+    if not ROCM_VERSION:
+        default_cuda_version = "".join(torch.version.cuda.split("."))
+        CUDA_VERSION = os.environ.get("CUDA_VERSION", default_cuda_version)
 
 common_setup_kwargs = {
     "version": "0.3.2",
@@ -46,8 +52,13 @@ common_setup_kwargs = {
     "python_requires": f">={python_min_version_str}"
 }
 
-if CUDA_VERSION:
-    common_setup_kwargs['version'] += f"+cu{CUDA_VERSION}"
+if BUILD_CUDA_EXT:
+    if ROCM_VERSION:
+        common_setup_kwargs['version'] += f"+rocm{ROCM_VERSION}"
+    else:
+        assert CUDA_VERSION
+        common_setup_kwargs['version'] += f"+cu{CUDA_VERSION}"
+
 
 requirements = [
     "accelerate>=0.19.0",
@@ -69,11 +80,15 @@ include_dirs = ["autogptq_cuda"]
 additional_setup_kwargs = dict()
 if BUILD_CUDA_EXT:
     from torch.utils import cpp_extension
-    from distutils.sysconfig import get_python_lib
-    conda_cuda_include_dir = os.path.join(get_python_lib(), "nvidia/cuda_runtime/include")
-    if os.path.isdir(conda_cuda_include_dir):
-        include_dirs.append(conda_cuda_include_dir)
-        print(f"appending conda cuda include dir {conda_cuda_include_dir}")
+
+    if not ROCM_VERSION:
+        from distutils.sysconfig import get_python_lib
+        conda_cuda_include_dir = os.path.join(get_python_lib(), "nvidia/cuda_runtime/include")
+
+        print("conda_cuda_include_dir", conda_cuda_include_dir)
+        if os.path.isdir(conda_cuda_include_dir):
+            include_dirs.append(conda_cuda_include_dir)
+            print(f"appending conda cuda include dir {conda_cuda_include_dir}")
     extensions = [
         cpp_extension.CUDAExtension(
             "autogptq_cuda_64",
