@@ -31,7 +31,7 @@
 // #endif
 
 
-#if (defined(__CUDA_ARCH__) && __CUDA_ARCH__ < 700) || defined(ROCM_VERSION)
+#if (defined(__CUDA_ARCH__) && __CUDA_ARCH__ < 700) || defined(USE_ROCM)
 // adapted from https://github.com/torch/cutorch/blob/master/lib/THC/THCAtomics.cuh
 __device__ __forceinline__ void atomicAdd(c10::Half* address, c10::Half val) {
     unsigned int *address_as_ui = reinterpret_cast<unsigned int *>(reinterpret_cast<char *>(address) - (reinterpret_cast<size_t>(address) & 2));

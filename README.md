@@ -105,6 +105,8 @@ To install from source for AMD GPUs supporting RoCm, please specify the `ROCM_VE
 ROCM_VERSION=5.6 pip install .
 ```
 
+For RoCm systems, the packages `rocsparse-dev`, `hipsparse-dev`, `rocthrust-dev`, `rocblas-dev` and `hipblas-dev` are required to build.
+
 </details>
 
 ## Quick Tour

@@ -13,7 +13,7 @@
 #include "../tuning.h"
 
 // Workaround for hipify_python using rocblas instead of hipblas.
-#if defined(ROCM_VERSION)
+#if defined(USE_ROCM)
 #include <hipblas/hipblas.h>
 #define rocblas_handle hipblasHandle_t
 #endif

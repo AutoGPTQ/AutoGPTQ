@@ -8,7 +8,7 @@
 #include <cstdint>
 #include <cstdio>
 
-#if defined(ROCM_VERSION)
+#if defined(USE_ROCM)
 #define cudaUnspecified hipErrorUnknown
 #else
 #define cudaUnspecified cudaErrorApiFailureBase
