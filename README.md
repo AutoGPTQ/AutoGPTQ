@@ -19,7 +19,7 @@
 
 ## News or Update
 
-- 2023-07-XX - (Update) - Support RoCm
+- 2023-08-04 - (Update) - Support RoCm so that AMD GPU users can use auto-gptq with CUDA extensions.
 - 2023-07-26 - (Update) - An elegant [PPL benchmark script](examples/benchmark/perplexity.py) to get results that can be fairly compared with other libraries such as `llama.cpp`.
 - 2023-06-05 - (Update) - Integrate with 🤗 peft to use gptq quantized model to train adapters, support LoRA, AdaLoRA, AdaptionPrompt, etc.
 - 2023-05-30 - (Update) - Support download/upload quantized model from/to 🤗 Hub.
@@ -63,14 +63,6 @@ Start from v0.2.0, you can download pre-build wheel that satisfied your environm
 ```shell
 # firstly, cd the directory where the wheel saved, then execute command below
 pip install auto_gptq-0.2.0+cu118-cp310-cp310-linux_x86_64.whl # install v0.2.0 auto_gptq pre-build wheel for linux in an environment whose python=3.10 and cuda=11.8
-```
-
-For AMD GPUs, you need to specify the RoCm version you are using, typically set the same as the one used by PyTorch:
-
-```shell
-pip install auto-gptq+rocm5.4.2  # or:
-pip install auto-gptq+rocm5.5  # or:
-pip install auto-gptq+rocm5.6
 ```
 
 #### disable cuda extensions
