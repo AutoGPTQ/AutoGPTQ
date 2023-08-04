@@ -1,0 +1,82 @@
+name: Build AutoGPTQ Wheels with ROCm
+
+on: workflow_dispatch
+
+jobs:
+  build_wheels:
+    if: ${{ github.repository_owner == 'PanQiWei' }}
+
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+        python: ["3.8", "3.9", "3.10"]  # what's the point?
+        rocm: ["5.4.2", "5.5", "5.6"]
+
+    name: Build wheels for ${{ matrix.os }} and Python ${{ matrix.python }} and RoCm ${{ matrix.rocm }}
+    runs-on: ${{ matrix.os }}
+
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          ref: 'main'
+
+      - uses: actions/setup-python@v3
+        with:
+          python-version: ${{ matrix.python }}
+
+      - name: Free disk space
+        run: |
+          df -h
+          echo "Removing large packages"
+          sudo apt-get remove -y '^dotnet-.*'
+          sudo apt-get remove -y 'php.*'
+          sudo apt-get remove -y azure-cli google-cloud-sdk google-chrome-stable firefox powershell mono-devel
+          df -h
+          sudo apt-get autoremove -y >/dev/null 2>&1
+          sudo apt-get clean
+          sudo apt-get autoremove -y >/dev/null 2>&1
+          sudo apt-get autoclean -y >/dev/null 2>&1
+          df -h
+          echo "https://github.com/actions/virtual-environments/issues/709"
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+          df -h
+          echo "remove big /usr/local"
+          sudo rm -rf "/usr/local/share/boost"
+          sudo rm -rf /usr/local/lib/android >/dev/null 2>&1
+          df -h
+          sudo rm -rf /usr/share/dotnet/sdk > /dev/null 2>&1
+          sudo rm -rf /usr/share/dotnet/shared > /dev/null 2>&1
+          sudo rm -rf /usr/share/swift > /dev/null 2>&1
+          df -h
+
+      - name: Set up environment
+        run: |
+          if [[ "${{ matrix.rocm }}" == "5.4.2" ]]; then
+            export ROCM_DL_FILE=amdgpu-install_5.4.50402-1_all.deb
+          elif [[ "${{ matrix.rocm }}" == "5.5" ]]; then
+            export ROCM_DL_FILE=amdgpu-install_5.5.50500-1_all.deb
+          else
+            export ROCM_DL_FILE=amdgpu-install_5.6.50600-1_all.deb
+          fi
+
+          curl -O https://repo.radeon.com/amdgpu-install/${{ matrix.rocm }}/ubuntu/jammy/$ROCM_DL_FILE
+          sudo dpkg -i $ROCM_DL_FILE
+          sudo DEBIAN_FRONTEND=noninteractive amdgpu-install --usecase=rocm --no-dkms --no-32 -y
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends rocthrust-dev
+
+          python -m pip install --pre torch --index-url https://download.pytorch.org/whl/nightly/rocm${{ matrix.rocm }}
+          python -m pip install --upgrade build setuptools wheel ninja
+      - name: Build wheels
+        run: |
+          ROCM_VERSION=${{ matrix.rocm }} python setup.py sdist bdist_wheel
+      - uses: actions/upload-artifact@v3
+        with:
+          name: 'wheels'
+          path: ./dist/*.whl
