@@ -28,12 +28,15 @@ class FusedGeneralQuantLinear(GeneralQuantLinear):
                 bias.append(module.bias)
                 outfeatures += module.outfeatures
 
+        if bias[0] is None:
+            bias = None
+
         if len(qweights) > 1:
             qweights = torch.cat(qweights, dim=1)
             qzeros = torch.cat(qzeros, dim=1)
             scales = torch.cat(scales, dim=1)
             g_idx = torch.cat(g_idx, dim=0)
-            if bias[0] is not None:
+            if bias is not None:
                 bias = torch.cat(bias, dim=0)
 
         qlinear_args = (
@@ -59,7 +62,7 @@ class FusedGeneralQuantLinear(GeneralQuantLinear):
         fused_proj.qzeros = qzeros
         fused_proj.scales = scales
         fused_proj.g_idx = g_idx
-        fused_proj.bais = bias
+        fused_proj.bias = bias
 
         del q_proj, k_proj, v_proj
 
