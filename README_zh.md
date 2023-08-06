@@ -19,11 +19,11 @@
 
 ## 新闻或更新
 
+- 2023-08-06 - (更新) - 支持 exllama 的 q4 CUDA 算子使得 int4 量化模型能够获得至少1.3倍的推理速度提升.
+- 2023-08-04 - (更新) - 支持 RoCm 使得 AMD GPU 的用户能够使用 auto-gptq 的 CUDA 拓展.
 - 2023-07-26 - (更新) - 一个优雅的 [PPL 测评脚本](examples/benchmark/perplexity.py)以获得可以与诸如 `llama.cpp` 等代码库进行公平比较的结果。
 - 2023-06-05 - (更新) - 集成 🤗 peft 来使用 gptq 量化过的模型训练适应层，支持 LoRA，AdaLoRA，AdaptionPrompt 等。
 - 2023-05-30 - (更新) - 支持从 🤗 Hub 下载量化好的模型或上次量化好的模型到 🤗 Hub。
-- 2023-05-27 - (更新) - 支持以下模型的量化和推理： `gpt_bigcode`， `codegen` 以及 `RefineWeb/RefineWebModel`（falcon）。
-- 2023-05-04 - (更新) - 支持在 `not desc_act or group_size == -1` 的情况下使用更快的 cuda 算子。
 
 *获取更多的历史信息，请转至[这里](docs/NEWS_OR_UPDATE.md)*
 
@@ -94,6 +94,14 @@ pip install .
 正如在快速安装一节，你可以使用 `BUILD_CUDA_EXT=0` 来取消构建 cuda 拓展。
 
 如果你想要使用 triton 加速且其能够被你的操作系统所支持，请使用 `.[triton]`。
+
+对应 AMD GPUs，为了从源码安装以支持 RoCm，请设置 `ROCM_VERSION` 环境变量。同时通过设置 `PYTORCH_ROCM_ARCH` ([reference](https://github.com/pytorch/pytorch/blob/7b73b1e8a73a1777ebe8d2cd4487eb13da55b3ba/setup.py#L132)) 可提升编译速度，例如：对于 MI200 系列设备，该变量可设为 `gfx90a`。例子：
+
+```
+ROCM_VERSION=5.6 pip install .
+```
+
+对于 RoCm 系统，在从源码安装时额外需要提前安装以下包：`rocsparse-dev`, `hipsparse-dev`, `rocthrust-dev`, `rocblas-dev` and `hipblas-dev`。
 
 </details>
 
