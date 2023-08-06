@@ -87,30 +87,29 @@ def load_data(data_path, tokenizer, n_samples, max_new_tokens):
         outputs = examples["output"]
 
         prompts = []
-        texts = []
+        outs = []
         input_ids = []
         attention_mask = []
         for istr, inp, opt in zip(instructions, inputs, outputs):
             if inp:
                 prompt = f"Instruction:\n{istr}\nInput:\n{inp}\nOutput:\n"
-                text = prompt + opt
             else:
                 prompt = f"Instruction:\n{istr}\nOutput:\n"
-                text = prompt + opt
             if len(tokenizer(prompt)["input_ids"]) >= tokenizer.model_max_length - max_new_tokens:
                 continue
 
-            tokenized_data = tokenizer(text)
+            tokenized_data = tokenizer(prompt)
 
             input_ids.append(tokenized_data["input_ids"][: tokenizer.model_max_length])
             attention_mask.append(tokenized_data["attention_mask"][: tokenizer.model_max_length])
             prompts.append(prompt)
-            texts.append(text)
+            outs.append(opt)
 
         return {
             "input_ids": input_ids,
             "attention_mask": attention_mask,
-            "prompt": prompts
+            "prompt": prompts,
+            "output": outs
         }
 
     dataset = Dataset.from_generator(dummy_gen)
@@ -285,7 +284,7 @@ def main():
 
     if args.use_triton:
         logger.info("warmup triton, this may take a while.")
-        model.warmup_triton()
+        model.warmup_triton(model)
 
     logger.info("loading data")
     examples = load_data(
