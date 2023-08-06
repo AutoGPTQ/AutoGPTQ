@@ -34,8 +34,7 @@ class QuantLinear(nn.Module):
         global _autogptq_cuda_available
         if bits not in [2, 3, 4, 8]:
             raise NotImplementedError("Only 2,3,4,8 bits are supported.")
-        if trainable:
-            _autogptq_cuda_available = False
+
         self.infeatures = infeatures
         self.outfeatures = outfeatures
         self.bits = bits
@@ -193,7 +192,7 @@ class QuantLinear(nn.Module):
         x = x.reshape(-1, x.shape[-1])
         if self.autogptq_cuda_available is True and (
             self.kernel_switch_threshold is False or x.shape[0] < self.kernel_switch_threshold
-        ):
+        ) and not self.trainable:
             out = torch.zeros(x.shape[0], out_shape[-1], dtype=torch.float, device=x.device)
             if self.use_cuda_fp16:
                 x = x.half()
