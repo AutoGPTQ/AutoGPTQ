@@ -21,7 +21,7 @@ class FusedGeneralQuantLinear(GeneralQuantLinear):
         outfeatures = 0
         for module in [q_proj, k_proj, v_proj]:
             if module is not None:
-                qweights.append(module.qweights)
+                qweights.append(module.qweight)
                 qzeros.append(module.qzeros)
                 scales.append(module.scales)
                 g_idx.append(module.g_idx)

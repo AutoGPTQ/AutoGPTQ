@@ -48,7 +48,7 @@ class GPTJGPTQForCausalLM(BaseGPTQForCausalLM):
 
         for layer in layers:
             old_attn = layer.attn
-            attn_device = old_attn.q_proj.weight.data.device
+            attn_device = old_attn.q_proj.qweight.data.device
             new_qkv_proj = FusedGeneralQuantLinear.fuse(
                 old_attn.q_proj,
                 old_attn.k_proj,
