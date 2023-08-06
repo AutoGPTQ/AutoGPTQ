@@ -41,7 +41,8 @@ class NVFusedActDropoutRes(nn.Module):
         self,
         activation: Optional[Union[Callable, nn.Module]] = None,
         dropout: float = 0.0,
-        residual: bool = False
+        residual: bool = False,
+        is_cuda: bool = False
     ):
         super(NVFusedActDropoutRes, self).__init__()
 
@@ -54,21 +55,16 @@ class NVFusedActDropoutRes(nn.Module):
             fn = partial(dropout_res, dropout=dropout)
 
         self.fn = fn
+        if is_cuda:
+            self.fn = memory_efficient_fusion(self.fn)
+
         self.residual = residual
 
     def forward(self, hidden_states: torch.Tensor, residual: Optional[torch.Tensor] = None):
-        if isinstance(self.fn, nn.Dropout):
+        if self.residual:
+            return self.fn(hidden_states, residual)
+        else:
             return self.fn(hidden_states)
-
-        inputs = {"hidden_states": hidden_states}
-        if residual is not None and self.residual:
-            inputs["residual"] = residual
-
-        if hidden_states.device.type != "cuda":
-            return self.fn(**inputs)
-
-        aot_fn = memory_efficient_fusion(self.fn)
-        return aot_fn(**inputs)
 
 
 class FusedMLP(nn.Module):
@@ -87,17 +83,21 @@ class FusedMLP(nn.Module):
         if activation is None:
             activation = nn.Identity()
 
+        is_cuda = input_proj.weight.data.device.type == "cuda"
+
         self.input_proj = input_proj
         self.fused_op1 = NVFusedActDropoutRes(
             activation=activation,
             dropout=in_dropout if training else 0.0,
-            residual=False
+            residual=False,
+            is_cuda=is_cuda
         )
         self.out_proj = out_proj
         self.fused_op2 = NVFusedActDropoutRes(
             activation=None,
             dropout=out_dropout if training else 0.0,
-            residual=residual
+            residual=residual,
+            is_cuda=is_cuda
         )
 
     def forward(self, hidden_states: torch.Tensor, residual: Optional[torch.Tensor] = None):
@@ -119,6 +119,7 @@ class NVFusedGatedActDropout(nn.Module):
         self,
         activation: Optional[Union[Callable, nn.Module]] = None,
         dropout: float = 0.0,
+        is_cuda: bool = False
     ):
         super(NVFusedGatedActDropout, self).__init__()
 
@@ -127,16 +128,13 @@ class NVFusedGatedActDropout(nn.Module):
             fn = partial(gated_act_dropout, activation=activation, dropout=dropout)
 
         self.fn = fn
+        if is_cuda:
+            self.fn = memory_efficient_fusion(self.fn)
 
     def forward(self, gate_states: torch.Tensor, up_states):
         if isinstance(self.fn, nn.Dropout):
             return self.fn(gate_states * up_states)
-
-        if gate_states.device.type != "cuda":
-            return self.fn(gate_states, up_states)
-
-        aot_fn = memory_efficient_fusion(self.fn)
-        return aot_fn(gate_states, up_states)
+        return self.fn(gate_states, up_states)
 
 
 class FusedGatedMLP(nn.Module):
@@ -155,7 +153,11 @@ class FusedGatedMLP(nn.Module):
             activation = nn.Identity()
 
         self.input_proj = input_proj
-        self.fused_op = NVFusedGatedActDropout(activation=activation, dropout=in_dropout if training else 0.0)
+        self.fused_op = NVFusedGatedActDropout(
+            activation=activation,
+            dropout=in_dropout if training else 0.0,
+            is_cuda=input_proj.weight.data.device.type == "cuda"
+        )
         self.out_proj = out_proj
         self.out_dropout = nn.Dropout(out_dropout)
 
