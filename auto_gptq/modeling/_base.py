@@ -914,7 +914,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         # == step5: (optional) inject optimized module == #
         if inject_fused_attention:
             try:
-                cls._fuse_attention(model, attn_op)
+                cls._fuse_attention(model, attn_op, trainable)
             except NotImplementedError:
                 inject_fused_attention = False
                 logger.warning(
@@ -928,7 +928,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                 raise
         if inject_fused_mlp:
             try:
-                cls._fuse_mlp(model)
+                cls._fuse_mlp(model, trainable)
             except NotImplementedError:
                 inject_fused_mlp = False
                 logger.warning(
@@ -968,11 +968,18 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         )
 
     @staticmethod
-    def _fuse_attention(model: PreTrainedModel, attn_op: Optional[AttentionOp] = None) -> None:
+    def _fuse_attention(
+        model: PreTrainedModel,
+        attn_op: Optional[AttentionOp] = None,
+        trainable: bool = False
+    ) -> None:
         raise NotImplementedError()
 
     @staticmethod
-    def _fuse_mlp(model: PreTrainedModel) -> None:
+    def _fuse_mlp(
+        model: PreTrainedModel,
+        trainable: bool = False
+    ) -> None:
         raise NotImplementedError()
 
     @staticmethod
