@@ -1,47 +1,63 @@
-import math
-from logging import getLogger
+# Adapted from turboderp exllama: https://github.com/turboderp/exllama
 
-import numpy as np
+from exllama_kernels import make_q4, q4_matmul
 import torch
 import torch.nn as nn
+import math
+import numpy as np
 import transformers
 
-from ..triton_utils.mixin import TritonModuleMixin
+# Dummy tensor to pass instead of g_idx since there is no way to pass "None" to a C++ extension
+none_tensor = torch.empty((1, 1), device = "meta")
 
-logger = getLogger(__name__)
+def ext_make_q4(qweight, qzeros, scales, g_idx, device):
+    """Construct Q4Matrix, return handle"""
+    return make_q4(qweight,
+                   qzeros,
+                   scales,
+                   g_idx if g_idx is not None else none_tensor,
+                   device)
 
-try:
-    from ..triton_utils.kernels import (
-        quant_matmul_248, transpose_quant_matmul_248, quant_matmul_inference_only_248,
-        QuantLinearFunction, QuantLinearInferenceOnlyFunction
-    )
-except ImportError:
-    logger.error('triton not installed.')
-    raise
+def ext_q4_matmul(x, q4, q4_width):
+    """Matrix multiplication, returns x @ q4"""
+    outshape = x.shape[:-1] + (q4_width,)
+    x = x.view(-1, x.shape[-1])
+    output = torch.empty((x.shape[0], q4_width), dtype = torch.float16, device = x.device)
+
+    q4_matmul(x, q4, output)
+
+    return output.view(outshape)
 
 
-class QuantLinear(nn.Module, TritonModuleMixin):
-    QUANT_TYPE = "triton"
+class QuantLinear(nn.Module):
+    QUANT_TYPE = "exllama"
 
-    def __init__(
-        self,
+    """Linear layer implementation with per-group 4-bit quantization of the weights"""
+    def __init__(self,
         bits,
         group_size,
         infeatures,
         outfeatures,
         bias,
-        trainable=False
+        trainable=False,
+        **kwargs,
     ):
         super().__init__()
-        if bits not in [2, 4, 8]:
-            raise NotImplementedError("Only 2,4,8 bits are supported.")
-        if infeatures % 32 != 0 or outfeatures % 32 != 0:
-            raise NotImplementedError("in_feature and out_feature must be divisible by 32.")
+        if bits != 4:
+            raise ValueError(f"Exllama kernel supports only bits=4, requested bits={bits}. Something is wrong in the model initialization.")
+        if trainable:
+            raise NotImplementedError("Exllama kernel does not support training.")
+        
         self.infeatures = infeatures
         self.outfeatures = outfeatures
         self.bits = bits
         self.group_size = group_size if group_size != -1 else infeatures
+        self.trainable = trainable
         self.maxq = 2 ** self.bits - 1
+
+        assert infeatures % 32 == 0
+        assert infeatures % self.group_size == 0
+        assert outfeatures % 32 == 0
 
         self.register_buffer(
             'qweight',
@@ -59,15 +75,26 @@ class QuantLinear(nn.Module, TritonModuleMixin):
             'g_idx',
             torch.tensor([i // self.group_size for i in range(infeatures)], dtype=torch.int32)
         )
+
         if bias:
             self.register_buffer('bias', torch.zeros((outfeatures), dtype=torch.float16))
         else:
             self.bias = None
 
-        self.trainable = trainable
-
     def post_init(self):
-        pass
+        assert self.qweight.device.type == "cuda"
+        assert self.qweight.device.index is not None
+        
+        self.width = self.qweight.shape[1]
+
+        # make_q4 segfaults if g_idx is not on cpu
+        self.q4 = ext_make_q4(
+            self.qweight,
+            self.qzeros,
+            self.scales,
+            self.g_idx.to("cpu") if self.g_idx is not None else self.g_idx,
+            self.qweight.device.index
+        )
 
     def pack(self, linear, scales, zeros, g_idx=None):
         W = linear.weight.data.clone()
@@ -75,7 +102,7 @@ class QuantLinear(nn.Module, TritonModuleMixin):
             W = W.flatten(1)
         if isinstance(linear, transformers.pytorch_utils.Conv1D):
             W = W.t()
-    
+
         self.g_idx = g_idx.clone() if g_idx is not None else self.g_idx
 
         scales = scales.t().contiguous()
@@ -103,13 +130,13 @@ class QuantLinear(nn.Module, TritonModuleMixin):
             (intweight.shape[0] // 32 * self.bits, intweight.shape[1]), dtype=np.uint32
         )
         while row < qweight.shape[0]:
-            if self.bits in [2, 4, 8]:
+            if self.bits in [4]:
                 for j in range(i, i + (32 // self.bits)):
                     qweight[row] |= intweight[j] << (self.bits * (j - i))
                 i += 32 // self.bits
                 row += 1
             else:
-                raise NotImplementedError("Only 2,4,8 bits are supported.")
+                raise NotImplementedError("Only 4 bits are supported.")
 
         qweight = qweight.astype(np.int32)
         self.qweight = torch.from_numpy(qweight)
@@ -120,67 +147,20 @@ class QuantLinear(nn.Module, TritonModuleMixin):
         i = 0
         col = 0
         while col < qzeros.shape[1]:
-            if self.bits in [2, 4, 8]:
+            if self.bits in [4]:
                 for j in range(i, i + (32 // self.bits)):
                     qzeros[:, col] |= zeros[:, j] << (self.bits * (j - i))
                 i += 32 // self.bits
                 col += 1
             else:
-                raise NotImplementedError("Only 2,4,8 bits are supported.")
+                raise NotImplementedError("Only 4 bits are supported.")
 
         qzeros = qzeros.astype(np.int32)
         self.qzeros = torch.from_numpy(qzeros)
 
     def forward(self, x):
-        out_shape = x.shape[:-1] + (self.outfeatures,)
-        quant_linear_fn = QuantLinearFunction if self.trainable else QuantLinearInferenceOnlyFunction
-        out = quant_linear_fn.apply(
-            x.reshape(-1, x.shape[-1]),
-            self.qweight,
-            self.scales,
-            self.qzeros,
-            self.g_idx,
-            self.bits,
-            self.maxq
-        )
-        out = out.half().reshape(out_shape)
-        out = out + self.bias if self.bias is not None else out
+        out = ext_q4_matmul(x.half(), self.q4, self.width)
+
+        if self.bias is not None:
+            out.add_(self.bias)
         return out
-
-    @classmethod
-    def warmup(cls, model, transpose=False, seqlen=2048):
-        """
-        Pre-tunes the quantized kernel
-        """
-        from tqdm import tqdm
-
-        kn_values = {}
-
-        for _, m in model.named_modules():
-            if not isinstance(m, cls):
-                continue
-
-            k = m.infeatures
-            n = m.outfeatures
-
-            if (k, n) not in kn_values:
-                kn_values[(k, n)] = (m.qweight, m.scales, m.qzeros, m.g_idx, m.bits, m.maxq)
-
-        logger.info(f'Found {len(kn_values)} unique KN Linear values.')
-        logger.info('Warming up autotune cache ...')
-        with torch.no_grad():
-            for m in tqdm(range(0, math.ceil(math.log2(seqlen)) + 1)):
-                m = 2 ** m
-                for (k, n), (qweight, scales, qzeros, g_idx, bits, maxq) in kn_values.items():
-                    if transpose:
-                        a = torch.randn(m, k, dtype=torch.float16, device=model.device)
-                        quant_matmul_248(a, qweight, scales, qzeros, g_idx, bits, maxq)
-                        a = torch.randn(m, n, dtype=torch.float16, device=model.device)
-                        transpose_quant_matmul_248(a, qweight, scales, qzeros, g_idx, bits, maxq)
-                    else:
-                        a = torch.randn(m, k, dtype=torch.float16, device=model.device)
-                        quant_matmul_inference_only_248(a, qweight, scales, qzeros, g_idx, bits, maxq)
-        del kn_values
-
-
-__all__ = ["QuantLinear"]

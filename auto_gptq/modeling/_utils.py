@@ -56,12 +56,13 @@ def make_quant(
     bits,
     group_size,
     name='',
-    use_triton=False,
-    use_cuda_fp16=True,
-    desc_act=False,
-    trainable=False
+    use_triton: bool = False,
+    disable_exllama: bool = False,
+    use_cuda_fp16: bool = True,
+    desc_act: bool = False,
+    trainable: bool = False
 ):
-    QuantLinear = dynamically_import_QuantLinear(use_triton=use_triton, desc_act=desc_act, group_size=group_size)
+    QuantLinear = dynamically_import_QuantLinear(use_triton=use_triton, desc_act=desc_act, group_size=group_size, bits=bits, disable_exllama=disable_exllama)
 
     if isinstance(module, QuantLinear):
         return
@@ -98,7 +99,8 @@ def make_quant(
             use_triton=use_triton,
             use_cuda_fp16=use_cuda_fp16,
             desc_act=desc_act,
-            trainable=trainable
+            trainable=trainable,
+            disable_exllama=disable_exllama,
         )
 
 
@@ -113,7 +115,7 @@ def pack_model(
     warmup_triton: bool = False,
     force_layer_back_to_cpu: bool = False
 ):
-    QuantLinear = dynamically_import_QuantLinear(use_triton=use_triton, desc_act=desc_act, group_size=group_size)
+    QuantLinear = dynamically_import_QuantLinear(use_triton=use_triton, desc_act=desc_act, group_size=group_size, bits=bits)
 
     if force_layer_back_to_cpu:
         model.to(CPU)
@@ -185,8 +187,83 @@ def simple_dispatch_model(model, device_map):
     return model
 
 
-def make_sure_no_tensor_in_meta_device(model, use_triton, desc_act, group_size):
-    QuantLinear = dynamically_import_QuantLinear(use_triton, desc_act, group_size)
+def autogptq_post_init(model, use_act_order: bool):
+    device_to_buffers_size = {}
+
+    model_uses_exllama = False
+    for name, submodule in model.named_modules():
+        if hasattr(submodule, "QUANT_TYPE") and submodule.QUANT_TYPE == "exllama":
+            model_uses_exllama = True
+            device = submodule.qweight.device
+            if device not in device_to_buffers_size:
+                device_to_buffers_size[device] = {
+                    "max_dq_buffer_size": 1,
+                    "max_inner_outer_dim": 1
+                }
+            
+            if not use_act_order:
+                submodule.g_idx = None
+
+            # Disable this heuristic for detecting act_order, but it could be used instead of the config.
+            """
+            if submodule.g_idx is None:
+                submodule.act_order = False
+            elif submodule.g_idx is not None and ((submodule.g_idx == 0).all() or torch.equal(submodule.g_idx.cpu(), torch.tensor([i // submodule.group_size for i in range(submodule.g_idx.shape[0])], dtype=torch.int32))):
+                submodule.g_idx = None
+                submodule.act_order = False
+            else:
+                submodule.act_order = True
+            """
+
+            device_to_buffers_size[device]["max_dq_buffer_size"] = max(device_to_buffers_size[device]["max_dq_buffer_size"], submodule.qweight.numel() * 8)
+
+            if use_act_order:
+                device_to_buffers_size[device]["max_inner_outer_dim"] = max(device_to_buffers_size[device]["max_inner_outer_dim"], submodule.infeatures, submodule.outfeatures)
+
+    if model_uses_exllama:
+        # To be honest this is quite ugly, not proud of this.
+        from exllama_kernels import prepare_buffers, set_tuning_params
+        
+        device_to_buffers = {}
+
+        if use_act_order:
+            # TODO: initialize this properly
+            max_input_len = 2048
+        else:
+            max_input_len = 1
+
+        for device, buffers_size in device_to_buffers_size.items():
+            # The temp_state buffer is required to reorder X in the act-order case.
+            # The temp_dq buffer is required to dequantize weights when using cuBLAS, typically for the prefill.
+            device_to_buffers[device] = {
+                "temp_state": torch.zeros((max_input_len, buffers_size["max_inner_outer_dim"]), dtype=torch.float16, device=device),
+                "temp_dq": torch.zeros((1, buffers_size["max_dq_buffer_size"]), dtype=torch.float16, device=device)
+            }
+        
+        # Buffers need to be persistent to avoid any bug.
+        model.device_to_buffers = device_to_buffers
+    
+        for device, buffers in model.device_to_buffers.items():
+            prepare_buffers(device, buffers["temp_state"], buffers["temp_dq"])
+
+        # Using the default from exllama repo here.
+        matmul_recons_thd = 8
+        matmul_fused_remap = False
+        matmul_no_half2 = False
+        set_tuning_params(matmul_recons_thd, matmul_fused_remap, matmul_no_half2)
+
+        # The buffers need to have been initialized first before calling make_q4.
+        for name, submodule in model.named_modules():
+            if hasattr(submodule, "QUANT_TYPE") and submodule.QUANT_TYPE == "exllama":
+                submodule.post_init()
+
+        torch.cuda.empty_cache()
+    
+    return model
+
+
+def make_sure_no_tensor_in_meta_device(model, use_triton, desc_act, group_size, bits: int):
+    QuantLinear = dynamically_import_QuantLinear(use_triton, desc_act, group_size, bits=bits)
     for n, m in model.named_modules():
         if isinstance(m, QuantLinear) and m.bias.device == torch.device("meta"):
             m.register_buffer('bias', torch.zeros((m.outfeatures), dtype=torch.float16, device="cpu"))
@@ -200,6 +277,7 @@ __all__ = [
     "get_module_by_name_suffix",
     "make_quant",
     "pack_model",
+    "autogptq_post_init",
     "check_and_get_model_type",
     "simple_dispatch_model",
     "make_sure_no_tensor_in_meta_device"

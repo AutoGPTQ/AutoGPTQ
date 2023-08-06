@@ -71,22 +71,22 @@ class BaseQuantizeConfig(PushToHubMixin):
         if os.path.isdir(save_dir):  # Local
             resolved_config_file = join(save_dir, quantize_config_filename)
         else: # Remote
-               resolved_config_file = cached_file(
-                    save_dir,
-                    quantize_config_filename,
-                    cache_dir=cache_dir,
-                    force_download=force_download,
-                    resume_download=resume_download,
-                    proxies=proxies,
-                    use_auth_token=use_auth_token,
-                    revision=revision,
-                    local_files_only=local_files_only,
-                    subfolder=subfolder,
-                    _raise_exceptions_for_missing_entries=False,
-                    _raise_exceptions_for_connection_errors=False,
-                    _commit_hash=commit_hash,
-               )
-
+            resolved_config_file = cached_file(
+                save_dir,
+                quantize_config_filename,
+                cache_dir=cache_dir,
+                force_download=force_download,
+                resume_download=resume_download,
+                proxies=proxies,
+                use_auth_token=use_auth_token,
+                revision=revision,
+                local_files_only=local_files_only,
+                subfolder=subfolder,
+                _raise_exceptions_for_missing_entries=False,
+                _raise_exceptions_for_connection_errors=False,
+                _commit_hash=commit_hash,
+            )
+        
         with open(resolved_config_file, "r", encoding="utf-8") as f:
             return cls(**json.load(f))
                 
@@ -692,6 +692,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         trust_remote_code: bool = False,
         warmup_triton: bool = False,
         trainable: bool = False,
+        disable_exllama: bool = False,
         **kwargs
     ):
         """load quantized model from local disk"""
@@ -769,7 +770,11 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                 
         model_save_name = resolved_archive_file
 
-        if not use_triton and trainable:
+        if not disable_exllama and trainable:
+            logger.warning("QuantLinear with exllama backend not support trainable mode yet, Switch to the pytorch backend.")
+            disable_exllama = True
+            
+        elif not use_triton and trainable:
             logger.warning("QuantLinear with cuda backend not support trainable mode yet, Switch to the pytorch backend.")
 
         # == step2: convert model to gptq-model (replace Linear with QuantLinear) == #
@@ -806,6 +811,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                 quantize_config.bits,
                 quantize_config.group_size,
                 use_triton=use_triton,
+                disable_exllama=disable_exllama,
                 use_cuda_fp16=use_cuda_fp16,
                 desc_act=quantize_config.desc_act,
                 trainable=trainable
@@ -842,7 +848,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             )
 
         if low_cpu_mem_usage:
-            make_sure_no_tensor_in_meta_device(model, use_triton, quantize_config.desc_act, quantize_config.group_size)
+            make_sure_no_tensor_in_meta_device(model, use_triton, quantize_config.desc_act, quantize_config.group_size, bits=quantize_config.bits)
 
         accelerate.utils.modeling.load_checkpoint_in_model(
             model,
@@ -877,7 +883,8 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                     group_size=quantize_config.group_size,
                     use_cuda_fp16=use_cuda_fp16,
                     desc_act=quantize_config.desc_act,
-                    trainable=trainable
+                    trainable=trainable,
+                    bits=quantize_config.bits,
                 )
         if inject_fused_mlp:
             if cls.fused_mlp_module_type is None:
@@ -888,6 +895,9 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                     model,
                     use_triton=use_triton
                 )
+
+        # Any post-initialization that require device information, for example buffers initialization on device.
+        model = autogptq_post_init(model, use_act_order=quantize_config.desc_act)
 
         model.eval()
         # == step6: (optional) warmup triton == #
@@ -900,7 +910,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
 
         # == step7: make model compatible with peft
         cls.make_sure_compatible_with_peft(
-            model, use_triton, quantize_config.desc_act, quantize_config.group_size
+            model, use_triton, quantize_config.desc_act, quantize_config.group_size, bits=quantize_config.bits
         )
 
         return cls(
@@ -937,10 +947,10 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         self.enable_trainable_mode(enabled=False)
 
     @staticmethod
-    def make_sure_compatible_with_peft(model: PreTrainedModel, use_triton: bool, desc_act: bool, group_size: int):
+    def make_sure_compatible_with_peft(model: PreTrainedModel, use_triton: bool, desc_act: bool, group_size: int, bits: int):
         GeneralQuantLinear.inject_to_model(
             model,
-            dynamically_import_QuantLinear(use_triton, desc_act, group_size)
+            dynamically_import_QuantLinear(use_triton, desc_act, group_size, bits=bits)
         )
 
     def __getattr__(self, item):

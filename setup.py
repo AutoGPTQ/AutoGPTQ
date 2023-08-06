@@ -103,6 +103,16 @@ if BUILD_CUDA_EXT:
                 "autogptq_cuda/autogptq_cuda_256.cpp",
                 "autogptq_cuda/autogptq_cuda_kernel_256.cu"
             ]
+        ),
+        cpp_extension.CUDAExtension(
+            "exllama_kernels",
+            [
+                "autogptq_cuda/exllama/exllama_ext.cpp",
+                "autogptq_cuda/exllama/cuda_buffers.cu",
+                "autogptq_cuda/exllama/cuda_func/column_remap.cu",
+                "autogptq_cuda/exllama/cuda_func/q4_matmul.cu",
+                "autogptq_cuda/exllama/cuda_func/q4_matrix.cu"
+            ]
         )
     ]
 
