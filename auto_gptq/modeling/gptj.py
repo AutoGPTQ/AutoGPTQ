@@ -36,9 +36,6 @@ class GPTJGPTQForCausalLM(BaseGPTQForCausalLM):
         scale = (model_config.hidden_size // num_heads) ** -0.5
         layers = get_module_by_name_prefix(model, "transformer.h")
 
-        if attn_op is None:
-            attn_op = MemoryEfficientAttentionCutlassOp if trainable else (CutlassFwOp, None)
-
         rope_cache = build_rope_cache(
             rotary_dim=model_config.rotary_dim or model_config.hidden_size,
             max_position=model_config.max_position_embeddings,
