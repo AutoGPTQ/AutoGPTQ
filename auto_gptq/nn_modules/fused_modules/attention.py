@@ -91,7 +91,8 @@ class FusedAttention(nn.Module):
         scale: Optional[float] = None,
         attention_ops: Optional[xop.AttentionOp] = (xop.fmha.cutlass.FwOp(), None),
         attention_bias: Optional[xop.AttentionBias] = LowerTriangularMask(),
-        outputs_handler: Optional[Callable] = None
+        outputs_handler: Optional[Callable] = None,
+        training: bool = False,
     ):
         super(FusedAttention, self).__init__()
 
@@ -102,7 +103,7 @@ class FusedAttention(nn.Module):
         self.num_key_heads = num_key_heads
         self.num_value_heads = num_value_heads
 
-        self.dropout = dropout
+        self.dropout = dropout if training else 0.0
         self.scale = scale
 
         self.attention_ops = attention_ops
@@ -184,7 +185,8 @@ class FusedAttentionWithRoPE(FusedAttention):
         scale: Optional[float] = None,
         attention_ops: Optional[xop.AttentionOp] = (xop.fmha.cutlass.FwOp(), None),
         attention_bias: Optional[xop.AttentionBias] = LowerTriangularMask(),
-        outputs_handler: Optional[Callable] = None
+        outputs_handler: Optional[Callable] = None,
+        training: bool = False,
     ):
         super(FusedAttentionWithRoPE, self).__init__(
             qkv_proj=qkv_proj,
@@ -196,7 +198,8 @@ class FusedAttentionWithRoPE(FusedAttention):
             scale=scale,
             attention_ops=attention_ops,
             attention_bias=attention_bias,
-            outputs_handler=outputs_handler
+            outputs_handler=outputs_handler,
+            training=training
         )
 
         self.register_buffer("cos_sin_cache", cos_sin_cache, persistent=False)
@@ -247,7 +250,8 @@ class FusedAttentionWithALiBi(FusedAttention):
         dropout: float = 0.0,
         scale: Optional[float] = None,
         attention_ops: Optional[xop.AttentionOp] = (xop.fmha.flash.FwOp(), None),
-        outputs_handler: Optional[Callable] = None
+        outputs_handler: Optional[Callable] = None,
+        training: bool = False,
     ):
         super(FusedAttentionWithALiBi, self).__init__(
             qkv_proj=qkv_proj,
@@ -258,7 +262,8 @@ class FusedAttentionWithALiBi(FusedAttention):
             dropout=dropout,
             scale=scale,
             attention_ops=attention_ops,
-            outputs_handler=outputs_handler
+            outputs_handler=outputs_handler,
+            training=training
         )
 
         self.register_buffer("alibi_slopes", alibi_slopes, persistent=False)
