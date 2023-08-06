@@ -714,8 +714,8 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         low_cpu_mem_usage: bool = False,
         use_triton: bool = False,
         torch_dtype: torch.dtype = torch.float16,
-        inject_fused_attention: bool = True,
-        inject_fused_mlp: bool = True,
+        inject_fused_attention: bool = False,
+        inject_fused_mlp: bool = False,
         use_cuda_fp16: bool = True,
         quantize_config: Optional[BaseQuantizeConfig] = None,
         model_basename: Optional[str] = None,
@@ -940,6 +940,13 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                     f"bypass the error for now and report it on github."
                 )
                 raise
+        if inject_fused_attention or inject_fused_mlp:
+            logger.warning(
+                "You are using at least one of 'inject_fused_attention' and 'inject_fused_mlp' "
+                "modes, which are now marked as experiment features, feel free to open an issue "
+                "or ask any question about those two features on github if you encounter unexpected "
+                "behaviors and errors."
+            )
 
         # == step6: (optional) warmup triton == #
         if use_triton and warmup_triton:
