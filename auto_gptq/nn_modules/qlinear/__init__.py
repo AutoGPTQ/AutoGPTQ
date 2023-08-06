@@ -39,7 +39,7 @@ class GeneralQuantLinear(nn.Linear):
         self.forward = quant_linear_module.forward
 
     @classmethod
-    def inject_to_model(cls, model, target_module_type):
+    def convert_to_torch_linear(cls, model: nn.Module, target_module_type: "QuantLinear"):
         for name, m in model.named_modules():
             if not isinstance(m, target_module_type):
                 continue
