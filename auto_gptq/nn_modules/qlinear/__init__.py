@@ -20,9 +20,6 @@ class GeneralQuantLinear(nn.Linear):
         self.register_buffer('qweight', quant_linear_module.qweight)
         self.bias.data = quant_linear_module.bias
 
-        self.qweight.requires_grad = False
-        self.bias.requires_grad = False
-
         self.register_buffer('qzeros', quant_linear_module.qzeros)
         self.register_buffer('scales', quant_linear_module.scales)
         self.register_buffer('g_idx', quant_linear_module.g_idx)
