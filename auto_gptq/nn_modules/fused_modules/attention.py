@@ -89,8 +89,8 @@ class FusedAttention(nn.Module):
         num_value_heads: int,
         dropout: float = 0.0,
         scale: Optional[float] = None,
-        attention_ops: Optional[xop.AttentionOp] = (xop.fmha.cutlass.FwOp(), None),
-        attention_bias: Optional[xop.AttentionBias] = LowerTriangularMask(),
+        attention_ops: Optional[xop.AttentionOp] = None,
+        attention_bias: Optional[xop.AttentionBias] = None,
         outputs_handler: Optional[Callable] = None,
         training: bool = False,
     ):
@@ -183,8 +183,8 @@ class FusedAttentionWithRoPE(FusedAttention):
         num_value_heads: int,
         dropout: float = 0.0,
         scale: Optional[float] = None,
-        attention_ops: Optional[xop.AttentionOp] = (xop.fmha.cutlass.FwOp(), None),
-        attention_bias: Optional[xop.AttentionBias] = LowerTriangularMask(),
+        attention_ops: Optional[xop.AttentionOp] = None,
+        attention_bias: Optional[xop.AttentionBias] = None,
         outputs_handler: Optional[Callable] = None,
         training: bool = False,
     ):
@@ -218,9 +218,8 @@ class FusedAttentionWithRoPE(FusedAttention):
         k = k.view(bsz * seq_len, -1)
 
         if position_ids is not None:
-            position_ids = position_ids.view(-1).to(q.device)
             vllm_pos_encoding_ops.rotary_embedding_neox(
-                position_ids,
+                position_ids.view(-1).to(q.device),
                 q,
                 k,
                 q.shape[-1] // self.num_query_heads,
@@ -249,7 +248,7 @@ class FusedAttentionWithALiBi(FusedAttention):
         num_value_heads: int,
         dropout: float = 0.0,
         scale: Optional[float] = None,
-        attention_ops: Optional[xop.AttentionOp] = (xop.fmha.flash.FwOp(), None),
+        attention_ops: Optional[xop.AttentionOp] = None,
         outputs_handler: Optional[Callable] = None,
         training: bool = False,
     ):
