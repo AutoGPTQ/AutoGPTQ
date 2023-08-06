@@ -17,11 +17,11 @@ from transformers import AutoConfig, AutoModelForCausalLM, PreTrainedModel
 from transformers.utils.hub import PushToHubMixin, cached_file, create_repo, create_commit, CommitOperationAdd
 from transformers.utils.generic import ContextManagers
 from transformers.modeling_utils import no_init_weights
+from xformers.ops.fmha import AttentionOp
 
 from ._const import *
 from ._utils import *
 from ..nn_modules.qlinear import GeneralQuantLinear
-from ..nn_modules._fused_base import FusedBaseAttentionModule, FusedBaseMLPModule
 from ..quantization import GPTQ
 from ..utils.data_utils import collate_data
 from ..utils.import_utils import dynamically_import_QuantLinear, TRITON_AVAILABLE, AUTOGPTQ_CUDA_AVAILABLE
@@ -109,8 +109,6 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
     outside_layer_modules: List[str] = None
     inside_layer_modules: List[List[str]] = None
     lm_head_name: str = "lm_head"
-
-    fused_mlp_module_type: Optional[FusedBaseMLPModule] = None
 
     def __init__(
         self,
@@ -725,6 +723,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         trust_remote_code: bool = False,
         warmup_triton: bool = False,
         trainable: bool = False,
+        attn_op: Optional[AttentionOp] = None,
         **kwargs
     ):
         """load quantized model from local disk"""
@@ -815,7 +814,8 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
 
         if not use_triton and trainable:
             logger.warning(
-                "QuantLinear with cuda backend not support trainable mode yet, Switch to the pytorch backend."
+                "QuantLinear with cuda backend not support trainable mode yet, will switch to pytorch backend, "
+                "this may cause very slow inference speed, disable trainable if you are not training model."
             )
 
         # == step2: convert model to gptq-model (replace Linear with QuantLinear) == #
@@ -914,7 +914,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         # == step5: (optional) inject optimized module == #
         if inject_fused_attention:
             try:
-                cls._fuse_attention(model)
+                cls._fuse_attention(model, attn_op)
             except NotImplementedError:
                 inject_fused_attention = False
                 logger.warning(
@@ -968,7 +968,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         )
 
     @staticmethod
-    def _fuse_attention(model: PreTrainedModel) -> None:
+    def _fuse_attention(model: PreTrainedModel, attn_op: Optional[AttentionOp] = None) -> None:
         raise NotImplementedError()
 
     @staticmethod
@@ -985,15 +985,6 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
 
         from ..nn_modules.qlinear.qlinear_triton import QuantLinear
         QuantLinear.warmup(model, seqlen=model.seqlen)
-
-    def enable_trainable_mode(self, enabled: bool = True) -> None:
-        self.trainable = enabled
-        for n, m in self.model.named_modules():
-            if hasattr(m, "trainable"):
-                setattr(m, "trainable", enabled)
-
-    def disable_trainable_mode(self) -> None:
-        self.enable_trainable_mode(enabled=False)
 
     def __getattr__(self, item):
         try:
