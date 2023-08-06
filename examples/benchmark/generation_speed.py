@@ -234,8 +234,8 @@ def main():
     parser.add_argument("--use_triton", action="store_true")
     parser.add_argument("--use_safetensors", action="store_true")
     parser.add_argument("--use_fast_tokenizer", action="store_true")
-    parser.add_argument("--no_inject_fused_attention", action="store_true")
-    parser.add_argument("--no_inject_fused_mlp", action="store_true")
+    parser.add_argument("--inject_fused_attention", action="store_true")
+    parser.add_argument("--inject_fused_mlp", action="store_true")
     parser.add_argument("--num_samples", type=int, default=10)
     parser.add_argument("--per_gpu_max_memory", type=int, default=None)
     parser.add_argument("--cpu_max_memory", type=int, default=None)
@@ -274,8 +274,8 @@ def main():
         use_triton=args.use_triton,
         use_safetensors=args.use_safetensors,
         use_fast_tokenizer=args.use_fast_tokenizer,
-        inject_fused_attention=not args.no_inject_fused_attention,
-        inject_fused_mlp=not args.no_inject_fused_mlp
+        inject_fused_attention=args.inject_fused_attention,
+        inject_fused_mlp=args.inject_fused_mlp
     )
     end = time.time()
     logger.info(f"model and tokenizer loading time: {end - start:.4f}s")
