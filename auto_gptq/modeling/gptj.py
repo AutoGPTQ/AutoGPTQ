@@ -4,14 +4,16 @@ from typing import Optional
 from torch.cuda import empty_cache
 from transformers import PreTrainedModel
 from transformers.activations import ACT2FN
-from xformers.ops.fmha import AttentionOp, MemoryEfficientAttentionCutlassOp, LowerTriangularMask
-from xformers.ops.fmha.cutlass import FwOp as CutlassFwOp
+from xformers.ops.fmha import AttentionOp
 
 from ._base import *
-from ._utils import get_module_by_name_prefix
 from ..nn_modules.fused_modules.linear import FusedGeneralQuantLinear
 from ..nn_modules.fused_modules.attention import build_rope_cache, FusedAttentionWithRoPE
 from ..nn_modules.fused_modules.mlp import FusedMLP
+
+
+class GPTJFusedAttentionWithRoPE(FusedAttentionWithRoPE):
+    pass
 
 
 class GPTJGPTQForCausalLM(BaseGPTQForCausalLM):
@@ -34,7 +36,7 @@ class GPTJGPTQForCausalLM(BaseGPTQForCausalLM):
         model_config = model.config
         num_heads = model_config.n_head
         scale = (model_config.hidden_size // num_heads) ** -0.5
-        layers = get_module_by_name_prefix(model, "transformer.h")
+        layers = model.transformer.h
 
         rope_cache = build_rope_cache(
             rotary_dim=model_config.rotary_dim or model_config.hidden_size,
@@ -52,17 +54,17 @@ class GPTJGPTQForCausalLM(BaseGPTQForCausalLM):
                 old_attn.v_proj
             )
             new_out_proj = FusedGeneralQuantLinear(old_attn.out_proj)
-            new_attn = FusedAttentionWithRoPE(
+            new_attn = GPTJFusedAttentionWithRoPE(
                 qkv_proj=new_qkv_proj,
                 out_proj=new_out_proj,
                 cos_sin_cache=rope_cache if attn_device == model.device else deepcopy(rope_cache).to(attn_device),
                 num_query_heads=num_heads,
                 num_key_heads=num_heads,
                 num_value_heads=num_heads,
-                dropout=model_config.attn_pdrop,
+                attn_dropout=model_config.attn_pdrop,
+                resid_dropout=model_config.resid_pdrop,
                 scale=scale,
                 attention_ops=attn_op,
-                attention_bias=LowerTriangularMask(),
                 outputs_handler=None,
                 training=trainable
             )
@@ -81,7 +83,7 @@ class GPTJGPTQForCausalLM(BaseGPTQForCausalLM):
         model_config = model.config
         act = ACT2FN[model_config.activation_function]
         out_dropout = model_config.resid_pdrop
-        layers = get_module_by_name_prefix(model, "transformer.h")
+        layers = model.transformer.h
 
         for layer in layers:
             old_mlp = layer.mlp

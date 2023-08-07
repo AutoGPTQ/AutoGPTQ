@@ -3,12 +3,16 @@ from typing import Optional
 
 from torch.cuda import empty_cache
 from transformers import PreTrainedModel
-from xformers.ops.fmha import AttentionOp, LowerTriangularMask
+from xformers.ops.fmha import AttentionOp
 
 from ._base import *
 from ..nn_modules.fused_modules.attention import build_rope_cache, FusedAttentionWithRoPE
 from ..nn_modules.fused_modules.linear import FusedGeneralQuantLinear
 from ..nn_modules.fused_modules.mlp import FusedGatedMLP
+
+
+class LlamaFusedAttentionWithRoPE(FusedAttentionWithRoPE):
+    pass
 
 
 class LlamaGPTQForCausalLM(BaseGPTQForCausalLM):
@@ -49,17 +53,16 @@ class LlamaGPTQForCausalLM(BaseGPTQForCausalLM):
                 old_attn.v_proj
             )
             new_out_proj = FusedGeneralQuantLinear(old_attn.o_proj)
-            new_attn = FusedAttentionWithRoPE(
+            new_attn = LlamaFusedAttentionWithRoPE(
                 qkv_proj=new_qkv_proj,
                 out_proj=new_out_proj,
                 cos_sin_cache=rope_cache if attn_device == model.device else deepcopy(rope_cache).to(attn_device),
                 num_query_heads=num_heads,
                 num_key_heads=num_heads,
                 num_value_heads=num_heads,
-                dropout=0.0,
+                attn_dropout=0.0,
                 scale=scale,
                 attention_ops=attn_op,
-                attention_bias=LowerTriangularMask(),
                 outputs_handler=(lambda x, y, z: (x, z, y)),
                 training=trainable
             )

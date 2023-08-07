@@ -1,11 +1,26 @@
 import math
-from typing import Callable, Optional
+from typing import Callable, Optional, Tuple
 
 import torch
 import torch.nn as nn
 import xformers.ops as xop
 from vllm import pos_encoding_ops as vllm_pos_encoding_ops
 from xformers.ops.fmha.attn_bias import LowerTriangularMask, LowerTriangularMaskWithTensorBias
+
+
+POTENTIAL_KV_CACHE_NAMES = (
+    "past_key_value",
+    "layer_past",
+    "kv_cache"
+)
+
+
+def _try_to_get_kv_cache(**kwargs) -> Optional[Tuple[torch.Tensor, torch.Tensor]]:
+    kv_cache = None
+    for name in POTENTIAL_KV_CACHE_NAMES:
+        if name in kwargs:
+            return kwargs[name]
+    return kv_cache
 
 
 def build_rope_cache(
@@ -87,10 +102,10 @@ class FusedAttention(nn.Module):
         num_query_heads: int,
         num_key_heads: int,
         num_value_heads: int,
-        dropout: float = 0.0,
+        attn_dropout: float = 0.0,
+        resid_dropout: float = 0.0,
         scale: Optional[float] = None,
         attention_ops: Optional[xop.AttentionOp] = None,
-        attention_bias: Optional[xop.AttentionBias] = None,
         outputs_handler: Optional[Callable] = None,
         training: bool = False,
     ):
@@ -103,13 +118,21 @@ class FusedAttention(nn.Module):
         self.num_key_heads = num_key_heads
         self.num_value_heads = num_value_heads
 
-        self.dropout = dropout if training else 0.0
+        self.attn_dropout = attn_dropout if training else 0.0
         self.scale = scale
 
         self.attention_ops = attention_ops
-        self.attention_bias = attention_bias
 
         self.outputs_handler = outputs_handler
+
+        self.resid_dropout = nn.Dropout(resid_dropout if training else 0.0)
+
+    def _build_attn_bias(
+        self,
+        hidden_states: torch.Tensor,
+        attention_mask: Optional[torch.Tensor] = None
+    ) -> Optional[xop.AttentionBias]:
+        return None
 
     def _attn(
         self,
@@ -119,34 +142,29 @@ class FusedAttention(nn.Module):
         k: torch.Tensor,
         v: torch.Tensor,
         attention_bias: Optional[xop.AttentionBias] = None,
-        attention_ops: Optional[xop.AttentionOp] = None,
-        **kwargs
+        use_cache: bool = False,
+        kv_cache: Optional[Tuple[torch.Tensor, torch.Tensor]] = None
     ):
-        use_cache = kwargs.get("use_cache", False)
-        kv_cache = kwargs.get("layer_past", kwargs.get("past_key_value", kwargs.get("kv_cache", None)))
-
-        q = q.view(batch_size, seq_len, self.num_query_heads, -1)
-        k = k.view(batch_size, seq_len, self.num_key_heads, -1)
-        v = v.view(batch_size, seq_len, self.num_value_heads, -1)
+        q = q.view(batch_size, seq_len, self.num_query_heads, -1).transpose(1, 2)
+        k = k.view(batch_size, seq_len, self.num_key_heads, -1).transpose(1, 2)
+        v = v.view(batch_size, seq_len, self.num_value_heads, -1).transpose(1, 2)
 
         if kv_cache is not None:
             k_cache, v_cache = kv_cache
-            k = torch.cat((k_cache, k), dim=1)
-            v = torch.cat((v_cache, v), dim=1)
+            k = torch.cat((k_cache, k), dim=2)
+            v = torch.cat((v_cache, v), dim=2)
 
         present = None
         if use_cache:
             present = (k, v)
 
-        attn_ops = attention_ops if attention_ops is not None else self.attention_ops
-        attn_bias = attention_bias if attention_bias is not None else self.attention_bias
         attn_out = attention(
-            query=q,
-            key=k,
-            value=v,
-            attention_ops=attn_ops,
-            attention_bias=attn_bias if kv_cache is None else None,
-            p=self.dropout,
+            query=q.transpose(1, 2),
+            key=k.transpose(1, 2),
+            value=v.transpose(1, 2),
+            attention_ops=self.attention_ops,
+            attention_bias=attention_bias,
+            p=self.attn_dropout,
             scale=self.scale
         ).view(batch_size, seq_len, -1)
 
@@ -155,15 +173,29 @@ class FusedAttention(nn.Module):
     def forward(
         self,
         hidden_states: torch.Tensor,
+        attention_mask: Optional[torch.Tensor] = None,
         **kwargs
     ):
         bsz, seq_len = hidden_states.shape[:2]
+        use_cache = kwargs.get("use_cache", False)
+        kv_cache = _try_to_get_kv_cache(**kwargs)
 
         q, k, v = self.qkv_proj(hidden_states).chunk(chunks=3, dim=-1)
 
-        attn_out, present = self._attn(bsz, seq_len, q, k, v, **kwargs)
+        attn_bias = self._build_attn_bias(hidden_states, attention_mask)
+        attn_out, present = self._attn(
+            bsz,
+            seq_len,
+            q,
+            k,
+            v,
+            attn_bias,
+            use_cache,
+            kv_cache
+        )
 
         out = self.out_proj(attn_out)
+        out = self.resid_dropout(out)
 
         outputs = (out, present, None)
         if self.outputs_handler:
@@ -181,10 +213,10 @@ class FusedAttentionWithRoPE(FusedAttention):
         num_query_heads: int,
         num_key_heads: int,
         num_value_heads: int,
-        dropout: float = 0.0,
+        attn_dropout: float = 0.0,
+        resid_dropout: float = 0.0,
         scale: Optional[float] = None,
         attention_ops: Optional[xop.AttentionOp] = None,
-        attention_bias: Optional[xop.AttentionBias] = None,
         outputs_handler: Optional[Callable] = None,
         training: bool = False,
     ):
@@ -194,24 +226,33 @@ class FusedAttentionWithRoPE(FusedAttention):
             num_query_heads=num_query_heads,
             num_key_heads=num_key_heads,
             num_value_heads=num_value_heads,
-            dropout=dropout,
+            attn_dropout=attn_dropout,
+            resid_dropout=resid_dropout,
             scale=scale,
             attention_ops=attention_ops,
-            attention_bias=attention_bias,
             outputs_handler=outputs_handler,
             training=training
         )
 
         self.register_buffer("cos_sin_cache", cos_sin_cache, persistent=False)
 
+    def _build_attn_bias(
+        self,
+        hidden_states: torch.Tensor,
+        attention_mask: Optional[torch.Tensor] = None
+    ) -> Optional[xop.AttentionBias]:
+        return LowerTriangularMask()
+
     def forward(
         self,
         hidden_states: torch.Tensor,
+        attention_mask: Optional[torch.Tensor] = None,
         **kwargs
     ):
-        position_ids = kwargs.get("position_ids", None)
-
         bsz, seq_len = hidden_states.shape[:2]
+        position_ids = kwargs.get("position_ids", None)
+        use_cache = kwargs.get("use_cache", False)
+        kv_cache = _try_to_get_kv_cache(**kwargs)
 
         q, k, v = self.qkv_proj(hidden_states).chunk(chunks=3, dim=-1)
         q = q.view(bsz * seq_len, -1)
@@ -226,9 +267,20 @@ class FusedAttentionWithRoPE(FusedAttention):
                 self.cos_sin_cache,
             )
 
-        attn_out, present = self._attn(bsz, seq_len, q, k, v, **kwargs)
+        attn_bias = self._build_attn_bias(hidden_states, attention_mask) if kv_cache is None else None
+        attn_out, present = self._attn(
+            bsz,
+            seq_len,
+            q,
+            k,
+            v,
+            attn_bias,
+            use_cache,
+            kv_cache
+        )
 
         out = self.out_proj(attn_out)
+        out = self.resid_dropout(out)
 
         outputs = (out, present, None)
         if self.outputs_handler:
@@ -246,7 +298,8 @@ class FusedAttentionWithALiBi(FusedAttention):
         num_query_heads: int,
         num_key_heads: int,
         num_value_heads: int,
-        dropout: float = 0.0,
+        attn_dropout: float = 0.0,
+        resid_dropout: float = 0.0,
         scale: Optional[float] = None,
         attention_ops: Optional[xop.AttentionOp] = None,
         outputs_handler: Optional[Callable] = None,
@@ -258,7 +311,8 @@ class FusedAttentionWithALiBi(FusedAttention):
             num_query_heads=num_query_heads,
             num_key_heads=num_key_heads,
             num_value_heads=num_value_heads,
-            dropout=dropout,
+            attn_dropout=attn_dropout,
+            resid_dropout=resid_dropout,
             scale=scale,
             attention_ops=attention_ops,
             outputs_handler=outputs_handler,
@@ -267,7 +321,11 @@ class FusedAttentionWithALiBi(FusedAttention):
 
         self.register_buffer("alibi_slopes", alibi_slopes, persistent=False)
 
-    def _build_attention_bias(self, hidden_states: torch.Tensor):  # adopt from vllm
+    def _build_attn_bias(
+        self,
+        hidden_states: torch.Tensor,
+        attention_mask: Optional[torch.Tensor] = None
+    ) -> Optional[xop.AttentionBias]:  # adopt from vllm
         bsz, seq_len = hidden_states.shape[:2]
 
         bias = torch.arange(seq_len)
@@ -291,17 +349,29 @@ class FusedAttentionWithALiBi(FusedAttention):
     def forward(
         self,
         hidden_states: torch.Tensor,
+        attention_mask: Optional[torch.Tensor] = None,
         **kwargs
     ):
         bsz, seq_len = hidden_states.shape[:2]
+        use_cache = kwargs.get("use_cache", False)
+        kv_cache = _try_to_get_kv_cache(**kwargs)
 
         q, k, v = self.qkv_proj(hidden_states).chunk(chunks=3, dim=-1)
 
-        kv_cache = kwargs.get("layer_past", kwargs.get("past_key_value", kwargs.get("kv_cache", None)))
-        attn_bias = self._build_attention_bias(hidden_states) if kv_cache is None else None
-        attn_out, present = self._attn(bsz, seq_len, q, k, v, attention_bias=attn_bias, **kwargs)
+        attn_bias = self._build_attn_bias(hidden_states, attention_mask) if kv_cache is None else None
+        attn_out, present = self._attn(
+            bsz,
+            seq_len,
+            q,
+            k,
+            v,
+            attn_bias,
+            use_cache,
+            kv_cache
+        )
 
         out = self.out_proj(attn_out)
+        out = self.resid_dropout(out)
 
         outputs = (out, present, None)
         if self.outputs_handler:
