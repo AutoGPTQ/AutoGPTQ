@@ -135,12 +135,13 @@ class FusedLlamaAttentionForQuantizedModel(FusedBaseAttentionModule):
         desc_act=False,
         trainable=False,
         bits: int = 4,
+        disable_exllama=False,
         **kwargs
     ):
         """
         Replace all LlamaAttention modules with QuantLlamaAttention modules, fusing the q, k, v projections.
         """
-        QuantLinear = dynamically_import_QuantLinear(use_triton=use_triton, desc_act=desc_act, group_size=group_size, bits=bits)
+        QuantLinear = dynamically_import_QuantLinear(use_triton=use_triton, desc_act=desc_act, group_size=group_size, bits=bits, disable_exllama=disable_exllama)
 
         for name, m in model.named_modules():
             if not isinstance(m, LlamaAttention):
