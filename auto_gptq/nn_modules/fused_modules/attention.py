@@ -167,7 +167,7 @@ class FusedAttention(nn.Module):
 
         outputs = (out, present, None)
         if self.outputs_handler:
-            outputs = self.outputs_handler(outputs)
+            outputs = self.outputs_handler(*outputs)
 
         return outputs
 
@@ -232,7 +232,7 @@ class FusedAttentionWithRoPE(FusedAttention):
 
         outputs = (out, present, None)
         if self.outputs_handler:
-            outputs = self.outputs_handler(outputs)
+            outputs = self.outputs_handler(*outputs)
 
         return outputs
 
@@ -305,6 +305,6 @@ class FusedAttentionWithALiBi(FusedAttention):
 
         outputs = (out, present, None)
         if self.outputs_handler:
-            outputs = self.outputs_handler(outputs)
+            outputs = self.outputs_handler(*outputs)
 
         return outputs
