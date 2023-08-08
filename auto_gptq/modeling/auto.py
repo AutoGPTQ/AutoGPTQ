@@ -31,7 +31,7 @@ GPTQ_CAUSAL_LM_MODEL_MAP = {
     "RefinedWeb": RWGPTQForCausalLM,
     "baichuan": BaiChuanGPTQForCausalLM,
     "internlm": InternLMGPTQForCausalLM,
-    "qwen": QwenGPTQForCausalLM
+    "qwen": QwenGPTQForCausalLM,
 }
 
 
