@@ -35,6 +35,7 @@ class BaseQuantizeConfig(PushToHubMixin):
     group_size: int = field(default=-1)
     damp_percent: float = field(default=0.01)
     desc_act: bool = field(default=True)
+    static_groups: bool = field(default=False)
     sym: bool = field(default=True)
     true_sequential: bool = field(default=True)
     model_name_or_path: Optional[str] = field(default=None)
@@ -96,6 +97,7 @@ class BaseQuantizeConfig(PushToHubMixin):
             "group_size": self.group_size,
             "damp_percent": self.damp_percent,
             "desc_act": self.desc_act,
+            "static_groups": self.static_groups,
             "sym": self.sym,
             "true_sequential": self.true_sequential,
             "model_name_or_path": self.model_name_or_path,
@@ -361,7 +363,8 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                     scale, zero, g_idx = gptq[name].fasterquant(
                         percdamp=self.quantize_config.damp_percent,
                         group_size=self.quantize_config.group_size,
-                        actorder=self.quantize_config.desc_act
+                        actorder=self.quantize_config.desc_act,
+                        static_groups=self.quantize_config.static_groups
                     )
                     quantizers[f'{self.layers_block_name}.{i}.{name}'] = (
                         gptq[name].quantizer.to(CPU if force_layer_back_to_cpu else cur_layer_device),
@@ -885,6 +888,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                     desc_act=quantize_config.desc_act,
                     trainable=trainable,
                     bits=quantize_config.bits,
+                    disable_exllama=disable_exllama,
                 )
         if inject_fused_mlp:
             if cls.fused_mlp_module_type is None:
