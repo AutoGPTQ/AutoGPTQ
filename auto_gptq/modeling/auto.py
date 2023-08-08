@@ -15,6 +15,7 @@ from .rw import RWGPTQForCausalLM
 from .gpt_bigcode import GPTBigCodeGPTQForCausalLM
 from .baichuan import BaiChuanGPTQForCausalLM
 from .internlm import InternLMGPTQForCausalLM
+from .qwen import QwenGPTQForCausalLM
 
 GPTQ_CAUSAL_LM_MODEL_MAP = {
     "bloom": BloomGPTQForCausalLM,
@@ -30,6 +31,7 @@ GPTQ_CAUSAL_LM_MODEL_MAP = {
     "RefinedWeb": RWGPTQForCausalLM,
     "baichuan": BaiChuanGPTQForCausalLM,
     "internlm": InternLMGPTQForCausalLM,
+    "qwen": QwenGPTQForCausalLM,
 }
 
 
