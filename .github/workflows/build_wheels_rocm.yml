@@ -10,7 +10,7 @@ jobs:
       matrix:
         os: [ubuntu-latest]
         python: ["3.8", "3.9", "3.10", "3.11"]
-        rocm: ["5.4.2", "5.5", "5.6"]
+        rocm: ["5.4.2"]  # , "5.5", "5.6"]
 
     name: Build wheels for ${{ matrix.os }} and Python ${{ matrix.python }} and RoCm ${{ matrix.rocm }}
     runs-on: ${{ matrix.os }}
@@ -71,7 +71,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends rocsparse-dev rocthrust-dev rocblas-dev hipblas-dev hipsparse-dev
 
-          python -m pip install --pre torch --index-url https://download.pytorch.org/whl/nightly/rocm${{ matrix.rocm }}
+          python -m pip install torch --index-url https://download.pytorch.org/whl/rocm5.4.2${{ matrix.rocm }}
           python -m pip install --upgrade build setuptools wheel ninja
       - name: Build wheels
         run: |
