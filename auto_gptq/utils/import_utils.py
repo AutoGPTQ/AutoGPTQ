@@ -10,13 +10,23 @@ except ImportError:
     TRITON_AVAILABLE = False
 
 try:
-    import autogptq_cuda
+    import autogptq_cuda_256
+    import autogptq_cuda_64
 
     AUTOGPTQ_CUDA_AVAILABLE = True
 except:
     AUTOGPTQ_CUDA_AVAILABLE = False
 
+
+try:
+    import exllama_kernels
+
+    EXLLAMA_KERNELS_AVAILABLE = True
+except:
+    EXLLAMA_KERNELS_AVAILABLE = False
+
 logger = getLogger(__name__)
+
 
 def dynamically_import_QuantLinear(use_triton: bool, desc_act: bool, group_size: int, bits: int, disable_exllama: bool = False):
     if use_triton:
@@ -25,7 +35,7 @@ def dynamically_import_QuantLinear(use_triton: bool, desc_act: bool, group_size:
 
         from ..nn_modules.qlinear.qlinear_triton import QuantLinear
     else:
-        if bits == 4 and not disable_exllama:
+        if bits == 4 and not disable_exllama and EXLLAMA_KERNELS_AVAILABLE:
             from ..nn_modules.qlinear.qlinear_exllama import QuantLinear
         elif not desc_act or group_size == -1:
             from ..nn_modules.qlinear.qlinear_cuda_old import QuantLinear

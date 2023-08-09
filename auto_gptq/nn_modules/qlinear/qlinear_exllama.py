@@ -1,14 +1,24 @@
 # Adapted from turboderp exllama: https://github.com/turboderp/exllama
 
-from exllama_kernels import make_q4, q4_matmul
+from logging import getLogger
+
 import torch
 import torch.nn as nn
 import math
 import numpy as np
 import transformers
 
+logger = getLogger(__name__)
+
+try:
+    from exllama_kernels import make_q4, q4_matmul
+except ImportError:
+    logger.error('exllama_kernels not installed.')
+    raise
+
 # Dummy tensor to pass instead of g_idx since there is no way to pass "None" to a C++ extension
-none_tensor = torch.empty((1, 1), device = "meta")
+none_tensor = torch.empty((1, 1), device="meta")
+
 
 def ext_make_q4(qweight, qzeros, scales, g_idx, device):
     """Construct Q4Matrix, return handle"""
@@ -18,11 +28,12 @@ def ext_make_q4(qweight, qzeros, scales, g_idx, device):
                    g_idx if g_idx is not None else none_tensor,
                    device)
 
+
 def ext_q4_matmul(x, q4, q4_width):
     """Matrix multiplication, returns x @ q4"""
     outshape = x.shape[:-1] + (q4_width,)
     x = x.view(-1, x.shape[-1])
-    output = torch.empty((x.shape[0], q4_width), dtype = torch.float16, device = x.device)
+    output = torch.empty((x.shape[0], q4_width), dtype=torch.float16, device=x.device)
 
     q4_matmul(x, q4, output)
 
@@ -33,21 +44,15 @@ class QuantLinear(nn.Module):
     QUANT_TYPE = "exllama"
 
     """Linear layer implementation with per-group 4-bit quantization of the weights"""
-    def __init__(self,
-        bits,
-        group_size,
-        infeatures,
-        outfeatures,
-        bias,
-        trainable=False,
-        **kwargs,
-    ):
+
+    def __init__(self, bits, group_size, infeatures, outfeatures, bias, trainable=False, **kwargs):
         super().__init__()
         if bits != 4:
-            raise ValueError(f"Exllama kernel supports only bits=4, requested bits={bits}. Something is wrong in the model initialization.")
+            raise ValueError(
+                f"Exllama kernel supports only bits=4, requested bits={bits}. Something is wrong in the model initialization.")
         if trainable:
             raise NotImplementedError("Exllama kernel does not support training.")
-        
+
         self.infeatures = infeatures
         self.outfeatures = outfeatures
         self.bits = bits
@@ -84,7 +89,7 @@ class QuantLinear(nn.Module):
     def post_init(self):
         assert self.qweight.device.type == "cuda"
         assert self.qweight.device.index is not None
-        
+
         self.width = self.qweight.shape[1]
 
         # make_q4 segfaults if g_idx is not on cpu
