@@ -10,7 +10,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest]
-        pyver: ["3.8", "3.9", "3.10"]
+        pyver: ["3.8", "3.9", "3.10", "3.11"]
         cuda: ["11.7", "11.8"]
     defaults:
       run:
@@ -42,7 +42,7 @@ jobs:
       - name: Install Dependencies
         run: |
           mamba install -y "pytorch[version=2.0.0,build=py*_cuda${env:CUDA_VERSION}*]" "pytorch-cuda=${env:CUDA_VERSION}" 'sentencepiece' 'cuda' 'ninja' -c 'pytorch' -c "nvidia/label/cuda-${env:CUDA_VERSION}.0" -c 'nvidia' -c 'conda-forge' -c 'defaults'
-          python -m pip install --upgrade build setuptools wheel
+          python -m pip install --upgrade build setuptools wheel ninja
 
       - name: Build Wheel
         run: |
@@ -56,11 +56,11 @@ jobs:
       - uses: actions/upload-artifact@v3
         if: runner.os == 'Linux'
         with:
-          name: 'linux-wheels'
+          name: 'linux-cuda-wheels'
           path: ./dist/*.whl
 
       - uses: actions/upload-artifact@v3
         if: runner.os == 'Windows'
         with:
-          name: 'windows-wheels'
+          name: 'windows-cuda-wheels'
           path: ./dist/*.whl

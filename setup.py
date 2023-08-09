@@ -1,62 +1,65 @@
 import os
-import platform
 import sys
 from pathlib import Path
 from setuptools import setup, find_packages
 
-python_min_version = (3, 8, 0)
-python_min_version_str = '.'.join(map(str, python_min_version))
-if sys.version_info < python_min_version:
-    print(f"You are using Python {platform.python_version()}. Python >={python_min_version_str} is required.")
-    sys.exit(-1)
-
-BUILD_CUDA_EXT = int(os.environ.get('BUILD_CUDA_EXT', '1')) == 1
-
-if BUILD_CUDA_EXT:
-    try:
-        import torch
-    except:
-        print("torch is not installed, please install torch first!")
-        sys.exit(-1)
-
-    CUDA_VERSION = False
-    ROCM_VERSION = os.environ.get('ROCM_VERSION', False)
-    if ROCM_VERSION and not torch.version.hip:
-        raise ValueError(f"Trying to compile AutoGPTQ for RoCm, but PyTorch {torch.__version__} is installed with no RoCm support.")
-
-    if not ROCM_VERSION:
-        default_cuda_version = "".join(torch.version.cuda.split("."))
-        CUDA_VERSION = os.environ.get("CUDA_VERSION", default_cuda_version)
 
 common_setup_kwargs = {
-    "version": "0.3.2",
+    "version": "0.4.0",
     "name": "auto_gptq",
     "author": "PanQiWei",
     "description": "An easy-to-use LLMs quantization package with user-friendly apis, based on GPTQ algorithm.",
     "long_description": (Path(__file__).parent / "README.md").read_text(encoding="UTF-8"),
     "long_description_content_type": "text/markdown",
     "url": "https://github.com/PanQiWei/AutoGPTQ",
-    "keywords": ["gptq", "quantization", "large-language-models", "pytorch", "transformers"],
+    "keywords": ["gptq", "quantization", "large-language-models", "transformers"],
     "platforms": ["windows", "linux"],
     "classifiers": [
         "Environment :: GPU :: NVIDIA CUDA :: 11.7",
         "Environment :: GPU :: NVIDIA CUDA :: 11.8",
+        "Environment :: GPU :: NVIDIA CUDA :: 12.0",
         "License :: OSI Approved :: MIT License",
         "Natural Language :: Chinese (Simplified)",
         "Natural Language :: English",
         "Programming Language :: Python :: 3.8",
         "Programming Language :: Python :: 3.9",
         "Programming Language :: Python :: 3.10",
+        "Programming Language :: Python :: 3.11",
         "Programming Language :: C++",
-    ],
-    "python_requires": f">={python_min_version_str}"
+    ]
 }
 
+
+BUILD_CUDA_EXT = int(os.environ.get('BUILD_CUDA_EXT', '1')) == 1
 if BUILD_CUDA_EXT:
+    try:
+        import torch
+    except:
+        print("Building cuda extension requires PyTorch(>=1.13.0) been installed, please install PyTorch first!")
+        sys.exit(-1)
+
+    CUDA_VERSION = None
+    ROCM_VERSION = os.environ.get('ROCM_VERSION', None)
+    if ROCM_VERSION and not torch.version.hip:
+        print(
+            f"Trying to compile auto-gptq for RoCm, but PyTorch {torch.__version__} "
+            "is installed without RoCm support."
+        )
+        sys.exit(-1)
+
+    if not ROCM_VERSION:
+        default_cuda_version = torch.version.cuda
+        CUDA_VERSION = "".join(os.environ.get("CUDA_VERSION", default_cuda_version).split("."))
+
     if ROCM_VERSION:
         common_setup_kwargs['version'] += f"+rocm{ROCM_VERSION}"
     else:
-        assert CUDA_VERSION
+        if not CUDA_VERSION:
+            print(
+                f"Trying to compile auto-gptq for CUDA, byt Pytorch {torch.__version__} "
+                "is installed without CUDA support."
+            )
+            sys.exit(-1)
         common_setup_kwargs['version'] += f"+cu{CUDA_VERSION}"
 
 
@@ -72,7 +75,8 @@ requirements = [
 ]
 
 extras_require = {
-    "triton": ["triton>=2.0.0"]
+    "triton": ["triton==2.0.0"],
+    "test": ["parameterized"]
 }
 
 include_dirs = ["autogptq_cuda"]
@@ -126,5 +130,6 @@ setup(
     install_requires=requirements,
     extras_require=extras_require,
     include_dirs=include_dirs,
+    python_requires=">=3.8.0",
     **common_setup_kwargs
 )
