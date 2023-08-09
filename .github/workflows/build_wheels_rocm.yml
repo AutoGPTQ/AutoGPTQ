@@ -54,16 +54,16 @@ jobs:
           df -h
 
       - name: Setup Miniconda
-          uses: conda-incubator/setup-miniconda@v2.2.0
-          with:
-            activate-environment: "build"
-            python-version: ${{ matrix.python }}
-            mamba-version: "*"
-            use-mamba: false
-            channels: conda-forge,defaults
-            channel-priority: true
-            add-pip-as-python-dependency: true
-            auto-activate-base: false
+        uses: conda-incubator/setup-miniconda@v2.2.0
+        with:
+          activate-environment: "build"
+          python-version: ${{ matrix.python }}
+          mamba-version: "*"
+          use-mamba: false
+          channels: conda-forge,defaults
+          channel-priority: true
+          add-pip-as-python-dependency: true
+          auto-activate-base: false
 
       - name: Set up environment
         run: |
