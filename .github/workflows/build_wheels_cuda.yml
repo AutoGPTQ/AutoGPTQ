@@ -65,3 +65,8 @@ jobs:
         with:
           name: 'windows-cuda-wheels'
           path: ./dist/*.whl
+
+      - uses: actions/upload-artifact@v3
+        with:
+          name: 'sdist'
+          path: ./dist/*.tar.gz
