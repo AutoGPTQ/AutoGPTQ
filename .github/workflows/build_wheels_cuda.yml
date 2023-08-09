@@ -27,13 +27,13 @@ jobs:
         with:
           python-version: ${{ matrix.pyver }}
 
-      - name: Setup Mamba
+      - name: Setup Miniconda
         uses: conda-incubator/setup-miniconda@v2.2.0
         with:
           activate-environment: "build"
           python-version: ${{ matrix.pyver }}
           mamba-version: "*"
-          use-mamba: true
+          use-mamba: false
           channels: conda-forge,defaults
           channel-priority: true
           add-pip-as-python-dependency: true
@@ -41,7 +41,8 @@ jobs:
 
       - name: Install Dependencies
         run: |
-          mamba install -y "pytorch[version=2.0.0,build=py*_cuda${env:CUDA_VERSION}*]" "pytorch-cuda=${env:CUDA_VERSION}" 'sentencepiece' 'cuda' 'ninja' -c 'pytorch' -c "nvidia/label/cuda-${env:CUDA_VERSION}.0" -c 'nvidia' -c 'conda-forge' -c 'defaults'
+          conda install cuda-toolkit -c "nvidia/label/cuda-${env:CUDA_VERSION}.0"
+          conda install pytorch "pytorch-cuda=${env:CUDA_VERSION}" -c pytorch -c nvidia
           python -m pip install --upgrade build setuptools wheel ninja
 
       - name: Build Wheel
