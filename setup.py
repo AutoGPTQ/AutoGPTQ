@@ -1,8 +1,12 @@
 import os
 import sys
 from pathlib import Path
-from setuptools import setup, find_packages
+from setuptools import setup, Extension, find_packages
+import subprocess
+import math
 
+os.environ["CC"] = "g++"
+os.environ["CXX"] = "g++"
 
 common_setup_kwargs = {
     "version": "0.4.0",
@@ -66,12 +70,15 @@ if BUILD_CUDA_EXT:
 requirements = [
     "accelerate>=0.19.0",
     "datasets",
+    "sentencepiece",
     "numpy",
     "rouge",
+    "gekko",
     "torch>=1.13.0",
     "safetensors",
     "transformers>=4.31.0",
-    "peft"
+    "peft",
+    "tqdm",
 ]
 
 extras_require = {
@@ -85,6 +92,9 @@ additional_setup_kwargs = dict()
 if BUILD_CUDA_EXT:
     from torch.utils import cpp_extension
 
+    p = int(subprocess.run("cat /proc/cpuinfo | grep cores | head -1", shell=True, check=True, text=True, stdout=subprocess.PIPE).stdout.split(" ")[2])
+
+    subprocess.call(["python", "./autogptq_extension/qigen/generate.py", "--module", "--search", "--p", str(p)])
     if not ROCM_VERSION:
         from distutils.sysconfig import get_python_lib
         conda_cuda_include_dir = os.path.join(get_python_lib(), "nvidia/cuda_runtime/include")
@@ -97,16 +107,23 @@ if BUILD_CUDA_EXT:
         cpp_extension.CUDAExtension(
             "autogptq_cuda_64",
             [
-                "autogptq_cuda/autogptq_cuda_64.cpp",
-                "autogptq_cuda/autogptq_cuda_kernel_64.cu"
+                "autogptq_extension/cuda_64/autogptq_cuda_64.cpp",
+                "autogptq_extension/cuda_64/autogptq_cuda_kernel_64.cu"
             ]
         ),
         cpp_extension.CUDAExtension(
             "autogptq_cuda_256",
             [
-                "autogptq_cuda/autogptq_cuda_256.cpp",
-                "autogptq_cuda/autogptq_cuda_kernel_256.cu"
+                "autogptq_extension/cuda_256/autogptq_cuda_256.cpp",
+                "autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu"
             ]
+        ),
+        cpp_extension.CppExtension(
+            "cQIGen",
+            [
+                'autogptq_extension/qigen/backend.cpp'
+            ],
+            extra_compile_args = ["-O3", "-mavx", "-mavx2", "-mfma", "-march=native", "-ffast-math", "-ftree-vectorize", "-faligned-new", "-std=c++17", "-fopenmp", "-fno-signaling-nans", "-fno-trapping-math"]
         )
     ]
 
@@ -115,11 +132,11 @@ if BUILD_CUDA_EXT:
             cpp_extension.CUDAExtension(
                 "exllama_kernels",
                 [
-                    "autogptq_cuda/exllama/exllama_ext.cpp",
-                    "autogptq_cuda/exllama/cuda_buffers.cu",
-                    "autogptq_cuda/exllama/cuda_func/column_remap.cu",
-                    "autogptq_cuda/exllama/cuda_func/q4_matmul.cu",
-                    "autogptq_cuda/exllama/cuda_func/q4_matrix.cu"
+                    "autogptq_extension/exllama/exllama_ext.cpp",
+                    "autogptq_extension/exllama/cuda_buffers.cu",
+                    "autogptq_extension/exllama/cuda_func/column_remap.cu",
+                    "autogptq_extension/exllama/cuda_func/q4_matmul.cu",
+                    "autogptq_extension/exllama/cuda_func/q4_matrix.cu"
                 ]
             )
         )
