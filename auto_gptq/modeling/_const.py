@@ -16,7 +16,8 @@ SUPPORTED_MODELS = [
     "RefinedWeb",
     "baichuan",
     "internlm",
-    "llama"
+    "llama",
+    "qwen",
 ]
 
 __all__ = ["CPU", "CUDA_0", "SUPPORTED_MODELS"]

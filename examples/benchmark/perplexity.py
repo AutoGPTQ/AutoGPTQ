@@ -39,6 +39,7 @@ if __name__ == "__main__":
     parser.add_argument("--trust_remote_code", action="store_true", help="Whether to use remote code")
     parser.add_argument("--inject_fused_attention", action="store_true", help="Whether to inject fused attention")
     parser.add_argument("--inject_fused_mlp", action="store_true", help="Whether to inject fused mlp")
+    parser.add_argument("--disable_exllama", action="store_true", help="Whether to use disable exllama kernel")
     args = parser.parse_args()
 
     os.environ["TOKENIZERS_PARALLELISM"] = "false"
@@ -70,7 +71,8 @@ if __name__ == "__main__":
             use_safetensors=args.use_safetensors,
             trust_remote_code=args.trust_remote_code,
             inject_fused_mlp=args.inject_fused_mlp,
-            inject_fused_attention=args.inject_fused_attention
+            inject_fused_attention=args.inject_fused_attention,
+            disable_exllama=args.disable_exllama
         )
     else:
         from transformers import AutoModelForCausalLM

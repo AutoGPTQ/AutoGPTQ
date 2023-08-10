@@ -20,6 +20,8 @@ except ImportError:
 
 
 class QuantLinear(nn.Module):
+    QUANT_TYPE = "cuda"
+
     def __init__(
         self,
         bits,
@@ -85,6 +87,9 @@ class QuantLinear(nn.Module):
             self.autogptq_cuda_available = False
 
         self.trainable = trainable
+    
+    def post_init(self):
+        pass
 
     def pack(self, linear, scales, zeros, g_idx=None):
         W = linear.weight.data.clone()
