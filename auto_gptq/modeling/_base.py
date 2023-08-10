@@ -990,6 +990,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                 use_triton,
                 quantize_config.desc_act,
                 quantize_config.group_size,
+                quantize_config.bits,
                 disable_exllama
             )
         )
