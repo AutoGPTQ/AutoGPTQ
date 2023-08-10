@@ -243,7 +243,9 @@ def autogptq_post_init(model, use_act_order: bool):
                 }
             
             if not use_act_order:
-                submodule.g_idx = None
+                submodule._use_act_order = False
+            else:
+                submodule._use_act_order = True
 
             # Disable this heuristic for detecting act_order, but it could be used instead of the config.
             """

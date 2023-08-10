@@ -92,12 +92,12 @@ class QuantLinear(nn.Module):
 
         self.width = self.qweight.shape[1]
 
-        # make_q4 segfaults if g_idx is not on cpu
+        # make_q4 segfaults if g_idx is not on cpu in the act-order case. In the non act-order case, None needs to be passed for g_idx.
         self.q4 = ext_make_q4(
             self.qweight,
             self.qzeros,
             self.scales,
-            self.g_idx.to("cpu") if self.g_idx is not None else self.g_idx,
+            self.g_idx.to("cpu") if self._use_act_order else None,
             self.qweight.device.index
         )
 
