@@ -3,7 +3,14 @@ import torch
 from ..qlinear import GeneralQuantLinear
 from ..qlinear.qlinear_cuda import QuantLinear as CudaQuantLinear
 from ..qlinear.qlinear_cuda_old import QuantLinear as OldCudaQuantLinear
-from ..qlinear.qlinear_triton import QuantLinear as TritonQuantLinear
+try:
+    from ..qlinear.qlinear_triton import QuantLinear as TritonQuantLinear
+except:
+    TritonQuantLinear = None
+try:
+    from ..qlinear.qlinear_exllama import QuantLinear as ExllamaQuantLinear
+except:
+    ExllamaQuantLinear = None
 
 
 class FusedGeneralQuantLinear(GeneralQuantLinear):
@@ -47,15 +54,17 @@ class FusedGeneralQuantLinear(GeneralQuantLinear):
             bias is not None
         )
         qlinear_kwargs = {"trainable": q_proj.trainable}
-        if not isinstance(q_proj, TritonQuantLinear):
+        if isinstance(q_proj, (OldCudaQuantLinear, CudaQuantLinear)):
             qlinear_kwargs["kernel_switch_threshold"] = q_proj.kernel_switch_threshold
             if isinstance(q_proj, OldCudaQuantLinear):
                 qlinear_kwargs["use_cuda_fp16"] = q_proj.use_cuda_fp16
                 QuantLinear = OldCudaQuantLinear
             else:
                 QuantLinear = CudaQuantLinear
-        else:
+        elif isinstance(q_proj, TritonQuantLinear):
             QuantLinear = TritonQuantLinear
+        else:
+            QuantLinear = ExllamaQuantLinear
         fused_proj = QuantLinear(*qlinear_args, **qlinear_kwargs)
 
         fused_proj.qweight = qweights
