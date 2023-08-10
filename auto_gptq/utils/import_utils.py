@@ -28,19 +28,22 @@ except:
 logger = getLogger(__name__)
 
 
-def dynamically_import_QuantLinear(use_triton: bool, desc_act: bool, group_size: int, bits: int, disable_exllama: bool = False):
-    if use_triton:
-        if torch.version.hip:
-            logger.warning("Running GPTQ triton version on AMD GPUs is untested and may result in errors or wrong predictions. Please use use_triton=False.")
-
-        from ..nn_modules.qlinear.qlinear_triton import QuantLinear
+def dynamically_import_QuantLinear(use_triton: bool, desc_act: bool, group_size: int, bits: int, disable_exllama: bool = False, use_cpu: bool = False):
+    if use_cpu:
+        from ..nn_modules.qlinear.qlinear_qigen import QuantLinear
     else:
-        if bits == 4 and not disable_exllama and EXLLAMA_KERNELS_AVAILABLE:
-            from ..nn_modules.qlinear.qlinear_exllama import QuantLinear
-        elif not desc_act or group_size == -1:
-            from ..nn_modules.qlinear.qlinear_cuda_old import QuantLinear
+        if use_triton:
+            if torch.version.hip:
+                logger.warning("Running GPTQ triton version on AMD GPUs is untested and may result in errors or wrong predictions. Please use use_triton=False.")
+
+            from ..nn_modules.qlinear.qlinear_triton import QuantLinear
         else:
-            from ..nn_modules.qlinear.qlinear_cuda import QuantLinear
+            if bits == 4 and not disable_exllama and EXLLAMA_KERNELS_AVAILABLE:
+                from ..nn_modules.qlinear.qlinear_exllama import QuantLinear
+            elif not desc_act or group_size == -1:
+                from ..nn_modules.qlinear.qlinear_cuda_old import QuantLinear
+            else:
+                from ..nn_modules.qlinear.qlinear_cuda import QuantLinear
 
     return QuantLinear
 

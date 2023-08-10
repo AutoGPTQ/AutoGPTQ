@@ -13,6 +13,7 @@ import torch.nn as nn
 import transformers
 from accelerate.hooks import remove_hook_from_module
 from safetensors.torch import save_file as safe_save
+from safetensors.torch import load_file as safe_load
 from transformers import AutoConfig, AutoModelForCausalLM, PreTrainedModel
 from transformers.utils.hub import PushToHubMixin, cached_file, create_repo, create_commit, CommitOperationAdd
 from transformers.utils.generic import ContextManagers
@@ -687,6 +688,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         device: Optional[Union[str, int]] = None,
         low_cpu_mem_usage: bool = False,
         use_triton: bool = False,
+        use_cpu: bool = False,
         torch_dtype: torch.dtype = torch.float16,
         inject_fused_attention: bool = True,
         inject_fused_mlp: bool = True,
@@ -725,6 +727,11 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             "_raise_exceptions_for_missing_entries": False,
             "_commit_hash": commit_hash,
         }
+        if use_cpu:
+            logger.warning("cpu is active. Ignores all settings related to cuda.")
+            inject_fused_attention = False
+            inject_fused_mlp = False
+            use_triton = False
             
         if use_triton and not TRITON_AVAILABLE:
             logger.warning("Triton is not installed, reset use_triton to False.")
@@ -802,18 +809,88 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         # == step2: convert model to gptq-model (replace Linear with QuantLinear) == #
         def skip(*args, **kwargs):
             pass
+            
+        if not use_cpu:
+            torch.nn.init.kaiming_uniform_ = skip
+            torch.nn.init.uniform_ = skip
+            torch.nn.init.normal_ = skip
 
-        torch.nn.init.kaiming_uniform_ = skip
-        torch.nn.init.uniform_ = skip
-        torch.nn.init.normal_ = skip
+            transformers.modeling_utils._init_weights = False
 
-        transformers.modeling_utils._init_weights = False
+            init_contexts = [no_init_weights()]
+            if low_cpu_mem_usage:
+                init_contexts.append(accelerate.init_empty_weights(include_buffers=False))
 
-        init_contexts = [no_init_weights()]
-        if low_cpu_mem_usage:
-            init_contexts.append(accelerate.init_empty_weights(include_buffers=False))
+            with ContextManagers(init_contexts):
+                model = AutoModelForCausalLM.from_config(
+                    config,
+                    trust_remote_code=trust_remote_code,
+                    torch_dtype=torch_dtype
+                )
 
-        with ContextManagers(init_contexts):
+                layers = find_layers(model)
+                ignore_layers = [cls.lm_head_name] + cls.outside_layer_modules
+                for name in list(layers.keys()):
+                    if any([name.startswith(ignore_layer) for ignore_layer in ignore_layers]):
+                        logger.info(f"{name} not been quantized, will be ignored when make_quant.")
+                        del layers[name]
+
+                make_quant(
+                    model,
+                    layers,
+                    quantize_config.bits,
+                    quantize_config.group_size,
+                    use_triton=use_triton,
+                    disable_exllama=disable_exllama,
+                    use_cuda_fp16=use_cuda_fp16,
+                    desc_act=quantize_config.desc_act,
+                    trainable=trainable
+                )
+                model.tie_weights()
+
+            # == step3: load checkpoint and dispatch == #
+            if isinstance(device_map, str) and device_map not in ["auto", "balanced", "balanced_low_0", "sequential"]:
+                raise ValueError(
+                    "If passing a string for `device_map`, please choose 'auto', 'balanced', 'balanced_low_0' or "
+                    "'sequential'."
+                )
+            if isinstance(device_map, dict):
+                max_memory = None
+            else:
+                if device is None and not device_map and not max_memory:
+                    device_map = "auto"
+                if device is not None:
+                    device = torch.device(device)
+                    if not max_memory and not device_map:
+                        device_map = {"": device.index if device.type == "cuda" else device.type}
+                if not isinstance(device_map, dict) and device_map != "sequential":
+                    max_memory = accelerate.utils.get_balanced_memory(
+                        model=model,
+                        max_memory=max_memory,
+                        no_split_module_classes=[cls.layer_type],
+                        low_zero=(device_map == "balanced_low_0")
+                    )
+            if not isinstance(device_map, dict):
+                device_map = accelerate.infer_auto_device_map(
+                    model,
+                    max_memory=max_memory,
+                    no_split_module_classes=[cls.layer_type]
+                )
+
+            if low_cpu_mem_usage:
+                make_sure_no_tensor_in_meta_device(model, use_triton, quantize_config.desc_act, quantize_config.group_size, bits=quantize_config.bits)
+
+            accelerate.utils.modeling.load_checkpoint_in_model(
+                model,
+                checkpoint=model_save_name,
+                device_map=device_map,
+                offload_state_dict=True,
+                offload_buffers=True
+            )
+            model = simple_dispatch_model(model, device_map)
+        else:
+            if quantize_config.desc_act:
+                NotImplementedError('desc_act=True is not yet supported.')
             model = AutoModelForCausalLM.from_config(
                 config,
                 trust_remote_code=trust_remote_code,
@@ -826,62 +903,21 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                 if any([name.startswith(ignore_layer) for ignore_layer in ignore_layers]):
                     logger.info(f"{name} not been quantized, will be ignored when make_quant.")
                     del layers[name]
-
-            make_quant(
+            
+            if model_save_name.endswith('.safetensors'):
+                checkpoint = safe_load(model_save_name)
+            else:
+                checkpoint = torch.load(model_save_name)
+            model.load_state_dict(checkpoint,strict=False)
+            make_quant_cpu(
                 model,
                 layers,
                 quantize_config.bits,
                 quantize_config.group_size,
-                use_triton=use_triton,
-                disable_exllama=disable_exllama,
-                use_cuda_fp16=use_cuda_fp16,
-                desc_act=quantize_config.desc_act,
-                trainable=trainable
+                checkpoint=checkpoint,
             )
-            model.tie_weights()
-
-        # == step3: load checkpoint and dispatch == #
-        if isinstance(device_map, str) and device_map not in ["auto", "balanced", "balanced_low_0", "sequential"]:
-            raise ValueError(
-                "If passing a string for `device_map`, please choose 'auto', 'balanced', 'balanced_low_0' or "
-                "'sequential'."
-            )
-        if isinstance(device_map, dict):
-            max_memory = None
-        else:
-            if device is None and not device_map and not max_memory:
-                device_map = "auto"
-            if device is not None:
-                device = torch.device(device)
-                if not max_memory and not device_map:
-                    device_map = {"": device.index if device.type == "cuda" else device.type}
-            if not isinstance(device_map, dict) and device_map != "sequential":
-                max_memory = accelerate.utils.get_balanced_memory(
-                    model=model,
-                    max_memory=max_memory,
-                    no_split_module_classes=[cls.layer_type],
-                    low_zero=(device_map == "balanced_low_0")
-                )
-        if not isinstance(device_map, dict):
-            device_map = accelerate.infer_auto_device_map(
-                model,
-                max_memory=max_memory,
-                no_split_module_classes=[cls.layer_type]
-            )
-
-        if low_cpu_mem_usage:
-            make_sure_no_tensor_in_meta_device(model, use_triton, quantize_config.desc_act, quantize_config.group_size, bits=quantize_config.bits)
-
-        accelerate.utils.modeling.load_checkpoint_in_model(
-            model,
-            checkpoint=model_save_name,
-            device_map=device_map,
-            offload_state_dict=True,
-            offload_buffers=True
-        )
-        model = simple_dispatch_model(model, device_map)
-
-        # == step4: set seqlen == #
+            
+            # == step4: set seqlen == #
         model_config = model.config.to_dict()
         seq_len_keys = ["max_position_embeddings", "seq_length", "n_positions"]
         if any([k in model_config for k in seq_len_keys]):

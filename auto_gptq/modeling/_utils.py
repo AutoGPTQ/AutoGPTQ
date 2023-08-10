@@ -10,7 +10,6 @@ import transformers
 from ._const import SUPPORTED_MODELS, CPU, CUDA_0
 from ..utils.import_utils import dynamically_import_QuantLinear
 
-
 logger = getLogger(__name__)
 
 
@@ -103,6 +102,48 @@ def make_quant(
             disable_exllama=disable_exllama,
         )
 
+def make_quant_cpu(
+    module,
+    names,
+    bits,
+    group_size,
+    checkpoint,
+    name='',
+):
+    QuantLinear = dynamically_import_QuantLinear(use_triton=False, desc_act=False, group_size=group_size, bits=bits, use_cpu=True)
+
+    if isinstance(module, QuantLinear):
+        return
+    for attr in dir(module):
+        tmp = getattr(module, attr)
+        name1 = name + '.' + attr if name != '' else attr
+        if name1 in names:
+            delattr(module, attr)
+            if isinstance(tmp,nn.Linear):
+                in_features = tmp.in_features
+                out_features = tmp.out_features
+            elif isinstance(tmp,nn.Conv2d):
+                in_features = tmp.in_channels
+                out_features = tmp.out_channels
+            elif isinstance(tmp,transformers.pytorch_utils.Conv1D):            
+                in_features = tmp.weight.shape[0]
+                out_features = tmp.weight.shape[1]
+                
+            new_layer = QuantLinear(bits=bits, group_size=group_size, N=in_features, M=out_features, 
+                                    qweights=checkpoint[name1 + '.qweight'].contiguous(), 
+                                    zeros=checkpoint[name1 + '.qzeros'],
+                                    scales=checkpoint[name1 + '.scales'].float(),
+                                    bias = checkpoint[name1 + '.bias'].float() if name1 + '.bias' in checkpoint else None)
+            setattr(module, attr, new_layer )
+    for name1, child in module.named_children():
+        make_quant_cpu(
+            child,
+            names,
+            bits,
+            group_size,
+            checkpoint,
+            name + '.' + name1 if name != '' else name1,
+        )
 
 def pack_model(
     model,
@@ -276,6 +317,7 @@ __all__ = [
     "get_module_by_name_prefix",
     "get_module_by_name_suffix",
     "make_quant",
+    "make_quant_cpu",
     "pack_model",
     "autogptq_post_init",
     "check_and_get_model_type",
