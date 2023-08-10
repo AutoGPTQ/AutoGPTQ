@@ -945,6 +945,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                 inject_fused_attention = False
                 logger.warning(
                     f"{cls.__name__} doesn't support fusing attention yet, will skip inject fused attention."
+                )
             except:
                 logger.error(
                     f"Inject fused attention failed, you can set 'inject_fused_attention' to False to "
@@ -988,7 +989,8 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             dynamically_import_QuantLinear(
                 use_triton,
                 quantize_config.desc_act,
-                quantize_config.group_size
+                quantize_config.group_size,
+                disable_exllama
             )
         )
 
