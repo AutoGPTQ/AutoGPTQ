@@ -44,7 +44,11 @@ if __name__ == "__main__":
 
     os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
-    tokenizer = AutoTokenizer.from_pretrained(args.model_name, use_fast=args.use_fast_tokenizer)
+    tokenizer = AutoTokenizer.from_pretrained(
+        args.model_name,
+        use_fast=args.use_fast_tokenizer,
+        trust_remote_code=args.trust_remote_code
+    )
     if not tokenizer.pad_token_id:
         tokenizer.pad_token_id = tokenizer.eos_token_id
 
