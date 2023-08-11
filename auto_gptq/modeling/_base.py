@@ -688,8 +688,8 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         device: Optional[Union[str, int]] = None,
         low_cpu_mem_usage: bool = False,
         use_triton: bool = False,
-        use_cpu: bool = False,
-        torch_dtype: torch.dtype = torch.float16,
+        use_qigen: bool = False,
+        torch_dtype: Optional[torch.dtype] = None,
         inject_fused_attention: bool = True,
         inject_fused_mlp: bool = True,
         use_cuda_fp16: bool = True,
@@ -727,8 +727,8 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             "_raise_exceptions_for_missing_entries": False,
             "_commit_hash": commit_hash,
         }
-        if use_cpu:
-            logger.warning("cpu is active. Ignores all settings related to cuda.")
+        if use_qigen:
+            logger.warning("QIgen is active. Ignores all settings related to cuda.")
             inject_fused_attention = False
             inject_fused_mlp = False
             use_triton = False
@@ -810,7 +810,13 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         def skip(*args, **kwargs):
             pass
             
-        if not use_cpu:
+        if torch_dtype is None:
+            if not use_qigen:
+                torch_dtype = torch.float16
+            else:
+                torch_dtype = torch.float32
+            
+        if not use_qigen:
             torch.nn.init.kaiming_uniform_ = skip
             torch.nn.init.uniform_ = skip
             torch.nn.init.normal_ = skip
