@@ -915,7 +915,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             else:
                 checkpoint = torch.load(model_save_name)
             model.load_state_dict(checkpoint,strict=False)
-            make_quant_cpu(
+            make_quant_qigen(
                 model,
                 layers,
                 quantize_config.bits,

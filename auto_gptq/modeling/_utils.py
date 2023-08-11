@@ -102,7 +102,7 @@ def make_quant(
             disable_exllama=disable_exllama,
         )
 
-def make_quant_cpu(
+def make_quant_qigen(
     module,
     names,
     bits,
