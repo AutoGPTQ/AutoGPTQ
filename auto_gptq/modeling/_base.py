@@ -925,7 +925,11 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         )
         model = simple_dispatch_model(model, device_map)
 
-        # == step4: set seqlen == #
+        # == step4: post init model == #
+        # Any post-initialization that require device information, for example buffers initialization on device.
+        model = autogptq_post_init(model, use_act_order=quantize_config.desc_act)
+
+        # == step5: set seqlen == #
         model_config = model.config.to_dict()
         seq_len_keys = ["max_position_embeddings", "seq_length", "n_positions"]
         if any([k in model_config for k in seq_len_keys]):
@@ -937,7 +941,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             logger.warning("Can't get model's sequence length from model config, will set to 4096.")
             model.seqlen = 4096
 
-        # == step5: (optional) inject optimized module == #
+        # == step6: (optional) inject optimized module == #
         if inject_fused_attention:
             try:
                 cls._fuse_attention(model, attn_op, trainable)
@@ -974,14 +978,11 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                 "behaviors and errors."
             )
 
-        # Any post-initialization that require device information, for example buffers initialization on device.
-        model = autogptq_post_init(model, use_act_order=quantize_config.desc_act)
-
-        # == step6: (optional) warmup triton == #
+        # == step7: (optional) warmup triton == #
         if use_triton and warmup_triton:
             cls.warmup_triton(model)
 
-        # == step7: convert all QuantLinear to sub-class of torch.nn.Linear
+        # == step8: convert all QuantLinear to sub-class of torch.nn.Linear
         # note if _fuse_attention() and _fuse_mlp() is implemented,
         # all QuantLinear will be converted to sub-class of torch.nn.Linear at injection stage
         GeneralQuantLinear.convert_to_torch_linear(

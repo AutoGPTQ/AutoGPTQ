@@ -73,6 +73,25 @@ class FusedGeneralQuantLinear(GeneralQuantLinear):
         fused_proj.g_idx = g_idx
         fused_proj.bias = bias
 
+        if isinstance(q_proj, ExllamaQuantLinear):
+            if not hasattr(q_proj, "_use_act_order"):
+                raise AttributeError(
+                    "q_proj doesn't have attribute _use_act_order, please execute "
+                    "auto_gptq.modeling._utils.autogptq_post_init function before "
+                    "fuse quant linears."
+                )
+            if q_proj._use_act_order:
+                # TODO: support it. The issue lies maybe in the line:
+                # int groups = qzeros.size(0);
+                # in exllama_ext.cpp
+                raise ValueError(
+                    "Exllama kernel does not support layer fusion with act-order. "
+                    "Please either use inject_fused_attention=False or disable_exllama=True."
+                )
+            fused_proj._use_act_order = q_proj._use_act_order
+            fused_proj.g_idx = None
+            fused_proj.post_init()
+
         del q_proj, k_proj, v_proj
 
         return cls(fused_proj)
