@@ -7,48 +7,13 @@ import xformers.ops as xop
 from torch.cuda import empty_cache
 from transformers import PreTrainedModel
 from transformers.activations import ACT2FN
+from transformers.models.gptj.modeling_gptj import apply_rotary_pos_emb
 from xformers.ops.fmha import AttentionOp
 
 from ._base import *
 from ..nn_modules.fused_modules.linear import FusedGeneralQuantLinear
 from ..nn_modules.fused_modules.attention import FusedAttention
 from ..nn_modules.fused_modules.mlp import FusedMLP
-
-
-def fixed_pos_embedding(x, seq_dim=1, seq_len=None):
-    dtype = x.dtype
-    dim = x.shape[-1]
-    if seq_len is None:
-        seq_len = x.shape[seq_dim]
-    inv_freq = 1.0 / (10000 ** (torch.arange(0, dim, 2) / dim))
-    sinusoid_inp = (
-        torch.einsum("i , j -> i j", torch.arange(seq_len, dtype=torch.float), inv_freq).to(x.device).float()
-    )
-    return torch.sin(sinusoid_inp).to(dtype), torch.cos(sinusoid_inp).to(dtype)
-
-
-def rotate_every_two(x):
-    x1 = x[:, :, :, ::2]
-    x2 = x[:, :, :, 1::2]
-    x = torch.stack((-x2, x1), dim=-1)
-    return x.flatten(-2)  # in einsum notation: rearrange(x, '... d j -> ... (d j)')
-
-
-def duplicate_interleave(m):
-    """
-    A simple version of `torch.repeat_interleave` for duplicating a matrix while interleaving the copy.
-    """
-    dim0 = m.shape[0]
-    m = m.view(-1, 1)  # flatten the matrix
-    m = m.repeat(1, 2)  # repeat all elements into the 2nd dimension
-    m = m.view(dim0, -1)  # reshape into a matrix, interleaving the copy
-    return m
-
-
-def apply_rotary_pos_emb(x, sincos, offset=0):
-    sin, cos = (duplicate_interleave(t)[None, offset : x.shape[1] + offset, None, :] for t in sincos)
-    # einsum notation for lambda t: repeat(t[offset:x.shape[1]+offset,:], "n d -> () n () (d j)", j=2)
-    return (x * cos) + (rotate_every_two(x) * sin)
 
 
 class GPTJFusedAttention(FusedAttention):
@@ -84,23 +49,26 @@ class GPTJFusedAttention(FusedAttention):
         self.embed_positions = embed_positions
         self.rotary_dim = rotary_dim
 
+    def _get_embed_positions(self, position_ids: torch.Tensor):
+        return self.embed_positions.repeat(position_ids.shape[0], 1, 1)
+
     def _apply_rotary(
         self,
         query: torch.Tensor,
         key: torch.Tensor,
-        layer_past: Optional[Tuple[torch.Tensor, torch.Tensor]] = None,
+        position_ids: torch.Tensor,
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         bsz, seq_len = key.shape[:2]
 
-        query = query.view(bsz, seq_len, self.num_query_heads, -1)
-        key = key.view(bsz, seq_len, self.num_key_heads, -1)
+        dtype = query.dtype
+        query = query.view(bsz, seq_len, self.num_query_heads, -1).to(dtype=torch.float)
+        key = key.view(bsz, seq_len, self.num_key_heads, -1).to(dtype=torch.float)
 
-        seq_len = key.shape[1]
-        offset = 0
+        embed_positions = self._get_embed_positions(position_ids)
 
-        if layer_past is not None:
-            offset = layer_past[0].shape[-2]
-            seq_len += offset
+        repeated_position_ids = position_ids.unsqueeze(-1).repeat(1, 1, embed_positions.shape[-1])
+        sincos = torch.gather(embed_positions, 1, repeated_position_ids)
+        sin, cos = torch.split(sincos, sincos.shape[-1] // 2, dim=-1)
 
         if self.rotary_dim is not None:
             k_rot = key[:, :, :, : self.rotary_dim]
@@ -109,18 +77,23 @@ class GPTJFusedAttention(FusedAttention):
             q_rot = query[:, :, :, : self.rotary_dim]
             q_pass = query[:, :, :, self.rotary_dim:]
 
-            sincos = fixed_pos_embedding(k_rot, 1, seq_len=seq_len)
-            k_rot = apply_rotary_pos_emb(k_rot, sincos, offset=offset)
-            q_rot = apply_rotary_pos_emb(q_rot, sincos, offset=offset)
+            k_rot = apply_rotary_pos_emb(k_rot, sin, cos)
+            q_rot = apply_rotary_pos_emb(q_rot, sin, cos)
 
             key = torch.cat([k_rot, k_pass], dim=-1)
             query = torch.cat([q_rot, q_pass], dim=-1)
         else:
-            sincos = fixed_pos_embedding(key, 1, seq_len=seq_len)
-            key = apply_rotary_pos_emb(key, sincos, offset=offset)
-            query = apply_rotary_pos_emb(query, sincos, offset=offset)
+            key = apply_rotary_pos_emb(key, sin, cos)
+            query = apply_rotary_pos_emb(query, sin, cos)
 
-        return query, key
+        return query.view(bsz, seq_len, -1).to(dtype=dtype), key.view(bsz, seq_len, -1).to(dtype=dtype)
+
+    def _build_attn_bias(
+        self,
+        hidden_states: torch.Tensor,
+        attention_mask: Optional[torch.Tensor] = None
+    ) -> Optional[xop.AttentionBias]:
+        return xop.LowerTriangularMask()
 
     def forward(
         self,
@@ -136,9 +109,9 @@ class GPTJFusedAttention(FusedAttention):
         q, k, v = self.qkv_proj(hidden_states).chunk(chunks=3, dim=-1)
 
         if position_ids is not None:
-            q, k = self._apply_rotary(q, k, layer_past)
+            q, k = self._apply_rotary(q, k, position_ids)
 
-        attn_bias = self._build_attn_bias(hidden_states, attention_mask)
+        attn_bias = self._build_attn_bias(hidden_states, attention_mask) if layer_past is None else None
         attn_out, present = self._attn(
             bsz,
             seq_len,
@@ -184,6 +157,7 @@ class GPTJGPTQForCausalLM(BaseGPTQForCausalLM):
 
         for layer in layers:
             old_attn = layer.attn
+            device = old_attn.q_proj.qweight.data.device
             new_qkv_proj = FusedGeneralQuantLinear.fuse(
                 old_attn.q_proj,
                 old_attn.k_proj,
@@ -193,7 +167,7 @@ class GPTJGPTQForCausalLM(BaseGPTQForCausalLM):
             new_attn = GPTJFusedAttention(
                 qkv_proj=new_qkv_proj,
                 out_proj=new_out_proj,
-                embed_positions=old_attn.embed_positions.to(old_attn.q_proj.qweight.data.device),
+                embed_positions=old_attn.embed_positions.to(device),
                 rotary_dim=old_attn.rotary_dim,
                 num_query_heads=num_heads,
                 num_key_heads=num_heads,
