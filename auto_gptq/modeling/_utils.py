@@ -129,11 +129,11 @@ def make_quant_qigen(
                 in_features = tmp.weight.shape[0]
                 out_features = tmp.weight.shape[1]
                 
-            new_layer = QuantLinear(bits=bits, group_size=group_size, N=in_features, M=out_features, 
+            new_layer = QuantLinear(bits=bits, group_size=group_size, infeatures=in_features, outfeatures=out_features, 
+                                    bias = checkpoint[name1 + '.bias'].float() if name1 + '.bias' in checkpoint else None,
                                     qweights=checkpoint[name1 + '.qweight'].contiguous(), 
                                     zeros=checkpoint[name1 + '.qzeros'],
-                                    scales=checkpoint[name1 + '.scales'].float(),
-                                    bias = checkpoint[name1 + '.bias'].float() if name1 + '.bias' in checkpoint else None)
+                                    scales=checkpoint[name1 + '.scales'].float())
             setattr(module, attr, new_layer )
     for name1, child in module.named_children():
         make_quant_qigen(
