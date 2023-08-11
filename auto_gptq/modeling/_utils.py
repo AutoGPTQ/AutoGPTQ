@@ -136,7 +136,7 @@ def make_quant_qigen(
                                     bias = checkpoint[name1 + '.bias'].float() if name1 + '.bias' in checkpoint else None)
             setattr(module, attr, new_layer )
     for name1, child in module.named_children():
-        make_quant_cpu(
+        make_quant_qigen(
             child,
             names,
             bits,
@@ -319,7 +319,7 @@ __all__ = [
     "get_module_by_name_prefix",
     "get_module_by_name_suffix",
     "make_quant",
-    "make_quant_cpu",
+    "make_quant_qigen",
     "pack_model",
     "autogptq_post_init",
     "check_and_get_model_type",
