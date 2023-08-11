@@ -61,6 +61,7 @@ class LlamaGPTQForCausalLM(BaseGPTQForCausalLM):
                 num_key_heads=num_heads,
                 num_value_heads=num_heads,
                 attn_dropout=0.0,
+                resid_dropout=0.0,
                 scale=scale,
                 attention_ops=attn_op,
                 outputs_handler=(lambda x, y, z: (x, z, y)),
