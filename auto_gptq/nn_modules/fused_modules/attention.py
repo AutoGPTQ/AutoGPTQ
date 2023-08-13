@@ -29,7 +29,7 @@ def build_rope_cache(
     base: int = 10000,
     device: torch.device = torch.device("cuda:0"),
     dtype: torch.dtype = torch.float16
-):
+):  # TODO: support multiple scaling strategies
     inv_freq = (1.0 / (base ** (torch.arange(0, rotary_dim, 2, device=device, dtype=dtype) / rotary_dim)))
     t = torch.arange(max_position, device=device, dtype=dtype)
     freqs = torch.einsum("i,j -> ij", t, inv_freq)
@@ -243,6 +243,29 @@ class FusedAttentionWithRoPE(FusedAttention):
     ) -> Optional[xop.AttentionBias]:
         return LowerTriangularMask()
 
+    def _apply_rotary_embedding(
+        self,
+        query: torch.Tensor,
+        key: torch.Tensor,
+        position_ids: Optional[torch.Tensor] = None
+    ):
+        bsz, seq_len, hidden_size = query.shape
+
+        if position_ids is not None:
+            query = query.view(bsz * seq_len, -1)
+            key = key.view(bsz * seq_len, -1)
+            vllm_pos_encoding_ops.rotary_embedding_neox(
+                position_ids.view(-1).to(query.device),
+                query,
+                key,
+                hidden_size // self.num_query_heads,
+                self.cos_sin_cache,
+            )
+            query = query.view(bsz, seq_len, -1)
+            key = key.view(bsz, seq_len, -1)
+
+        return query, key
+
     def forward(
         self,
         hidden_states: torch.Tensor,
@@ -255,17 +278,8 @@ class FusedAttentionWithRoPE(FusedAttention):
         kv_cache = _try_to_get_kv_cache(**kwargs)
 
         q, k, v = self.qkv_proj(hidden_states).chunk(chunks=3, dim=-1)
-        q = q.view(bsz * seq_len, -1)
-        k = k.view(bsz * seq_len, -1)
 
-        if position_ids is not None:
-            vllm_pos_encoding_ops.rotary_embedding_neox(
-                position_ids.view(-1).to(q.device),
-                q,
-                k,
-                q.shape[-1] // self.num_query_heads,
-                self.cos_sin_cache,
-            )
+        q, k = self._apply_rotary_embedding(q, k, position_ids)
 
         attn_bias = self._build_attn_bias(hidden_states, attention_mask) if kv_cache is None else None
         attn_out, present = self._attn(
