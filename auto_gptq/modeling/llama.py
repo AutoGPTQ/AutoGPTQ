@@ -40,6 +40,7 @@ class LlamaGPTQForCausalLM(BaseGPTQForCausalLM):
         rope_cache = build_rope_cache(
             rotary_dim=model_config.hidden_size // num_heads,
             max_position=model_config.max_position_embeddings,
+            base=10000,
             device=model.device,
             dtype=model.dtype
         )
