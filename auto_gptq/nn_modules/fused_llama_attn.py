@@ -79,7 +79,7 @@ class FusedLlamaAttentionForQuantizedModel(FusedBaseAttentionModule):
 
         past_key_value = (key_states, value_states) if use_cache else None
 
-        if compare_pytorch_version("v2.0.0", op="eq"):
+        if compare_pytorch_version("v2.0.0", op="ge"):
             attn_output = F.scaled_dot_product_attention(
                 query_states,
                 key_states,

@@ -28,30 +28,42 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
 
-      - name: Free disk space
-        run: |
-          df -h
-          echo "Removing large packages"
-          sudo apt-get remove -y '^dotnet-.*'
-          sudo apt-get remove -y 'php.*'
-          sudo apt-get remove -y azure-cli google-cloud-sdk google-chrome-stable firefox powershell mono-devel
-          df -h
-          sudo apt-get autoremove -y >/dev/null 2>&1
-          sudo apt-get clean
-          sudo apt-get autoremove -y >/dev/null 2>&1
-          sudo apt-get autoclean -y >/dev/null 2>&1
-          df -h
-          echo "https://github.com/actions/virtual-environments/issues/709"
-          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
-          df -h
-          echo "remove big /usr/local"
-          sudo rm -rf "/usr/local/share/boost"
-          sudo rm -rf /usr/local/lib/android >/dev/null 2>&1
-          df -h
-          sudo rm -rf /usr/share/dotnet/sdk > /dev/null 2>&1
-          sudo rm -rf /usr/share/dotnet/shared > /dev/null 2>&1
-          sudo rm -rf /usr/share/swift > /dev/null 2>&1
-          df -h
+#      - name: Free disk space
+#        run: |
+#          df -h
+#          echo "Removing large packages"
+#          sudo apt-get remove -y '^dotnet-.*'
+#          sudo apt-get remove -y 'php.*'
+#          sudo apt-get remove -y azure-cli google-cloud-sdk google-chrome-stable firefox powershell mono-devel
+#          df -h
+#          sudo apt-get autoremove -y >/dev/null 2>&1
+#          sudo apt-get clean
+#          sudo apt-get autoremove -y >/dev/null 2>&1
+#          sudo apt-get autoclean -y >/dev/null 2>&1
+#          df -h
+#          echo "https://github.com/actions/virtual-environments/issues/709"
+#          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+#          df -h
+#          echo "remove big /usr/local"
+#          sudo rm -rf "/usr/local/share/boost"
+#          sudo rm -rf /usr/local/lib/android >/dev/null 2>&1
+#          df -h
+#          sudo rm -rf /usr/share/dotnet/sdk > /dev/null 2>&1
+#          sudo rm -rf /usr/share/dotnet/shared > /dev/null 2>&1
+#          sudo rm -rf /usr/share/swift > /dev/null 2>&1
+#          df -h
+
+      - name: Setup Miniconda
+        uses: conda-incubator/setup-miniconda@v2.2.0
+        with:
+          activate-environment: "build"
+          python-version: ${{ matrix.python }}
+          mamba-version: "*"
+          use-mamba: false
+          channels: conda-forge,defaults
+          channel-priority: true
+          add-pip-as-python-dependency: true
+          auto-activate-base: false
 
       - name: Set up environment
         run: |
@@ -66,16 +78,19 @@ jobs:
           curl -O https://repo.radeon.com/amdgpu-install/${{ matrix.rocm }}/ubuntu/jammy/$ROCM_DL_FILE
           sudo dpkg -i $ROCM_DL_FILE
           sudo DEBIAN_FRONTEND=noninteractive amdgpu-install --usecase=rocm --no-dkms --no-32 -y
+
       - name: Install dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends rocsparse-dev rocthrust-dev rocblas-dev hipblas-dev hipsparse-dev
 
-          python -m pip install torch --index-url https://download.pytorch.org/whl/rocm${{ matrix.rocm }}
           python -m pip install --upgrade build setuptools wheel ninja
+          python -m pip install torch --index-url https://download.pytorch.org/whl/rocm${{ matrix.rocm }}
+
       - name: Build wheels
         run: |
           ROCM_VERSION=${{ matrix.rocm }} python setup.py sdist bdist_wheel
+
       - uses: actions/upload-artifact@v3
         with:
           name: 'linux-rocm-wheels'
