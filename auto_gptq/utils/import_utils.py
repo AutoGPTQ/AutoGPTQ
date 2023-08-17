@@ -28,8 +28,8 @@ except:
 logger = getLogger(__name__)
 
 
-def dynamically_import_QuantLinear(use_triton: bool, desc_act: bool, group_size: int, bits: int, disable_exllama: bool = False, use_cpu: bool = False):
-    if use_cpu:
+def dynamically_import_QuantLinear(use_triton: bool, desc_act: bool, group_size: int, bits: int, disable_exllama: bool = False, use_qigen: bool = False):
+    if use_qigen:
         from ..nn_modules.qlinear.qlinear_qigen import QuantLinear
     else:
         if use_triton:
