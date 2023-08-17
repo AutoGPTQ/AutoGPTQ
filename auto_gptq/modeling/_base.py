@@ -732,6 +732,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             inject_fused_attention = False
             inject_fused_mlp = False
             use_triton = False
+            disable_exllama = True
             
         if use_triton and not TRITON_AVAILABLE:
             logger.warning("Triton is not installed, reset use_triton to False.")
@@ -914,15 +915,26 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                 checkpoint = safe_load(model_save_name)
             else:
                 checkpoint = torch.load(model_save_name)
-            model.load_state_dict(checkpoint,strict=False)
-            make_quant_qigen(
+            make_quant(
                 model,
                 layers,
                 quantize_config.bits,
                 quantize_config.group_size,
-                checkpoint=checkpoint,
+                use_triton=use_triton,
+                disable_exllama=disable_exllama,
+                use_cuda_fp16=use_cuda_fp16,
+                desc_act=quantize_config.desc_act,
+                trainable=trainable,
+                use_qigen=True
             )
-            
+            preprocess_checkpoint_qigen(
+                model,
+                layers,
+                quantize_config.bits,
+                quantize_config.group_size,
+                checkpoint
+            )
+            model.load_state_dict(checkpoint)
             # == step4: set seqlen == #
         model_config = model.config.to_dict()
         seq_len_keys = ["max_position_embeddings", "seq_length", "n_positions"]
