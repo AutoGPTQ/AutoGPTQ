@@ -153,11 +153,12 @@ def process_zeros_scales(zeros, scales, bits, M):
 class QuantLinear(nn.Module):
     QUANT_TYPE = "qigen"
 
-    def __init__(self, bits, group_size, infeatures, outfeatures, bias=None, qweights=None, zeros=None, scales=None, hint=1, p=8, l1=2**18):
+    def __init__(self, bits, group_size, infeatures, outfeatures, bias=None, trainable=False, hint=1, p=8, l1=2**18):
         super().__init__()
         if bits not in [2, 4]:
             raise NotImplementedError("Only 2,4 bits are supported.")
-        
+        if trainable:
+            raise NotImplementedError("Qigen kernel does not support training.")
         self.bits = bits
         pack = 32 // bits
 
@@ -217,22 +218,15 @@ class QuantLinear(nn.Module):
 
         self.group_size = group_size
 
-        if bias is None:
-            self.bias = torch.zeros(self.outfeatures)
-        else:
-            self.bias = bias.contiguous()
-
-        self.zeros, self.scales = process_zeros_scales(zeros, scales, bits, self.outfeatures)
-
+        self.register_buffer('bias', torch.zeros(self.outfeatures))
+        self.register_buffer('zeros', torch.zeros((math.ceil(infeatures / self.group_size), outfeatures), dtype=torch.float32))
+        self.register_buffer('scales', torch.zeros((math.ceil(infeatures / self.group_size), outfeatures), dtype=torch.float32))
         if bits == 4:
-            self.weight = torch.zeros(int(self.infeatures // packed * self.outfeatures)).int().contiguous()
-            qinfer.pack4(qweights.int().contiguous(),self.weight, self.infeatures // packed, self.outfeatures, self.mb, self.tb, self.cutoff)# * (self.tt//tb))
+            self.register_buffer('qweight', torch.zeros(int(self.infeatures // packed * self.outfeatures)).int().contiguous())
         elif bits == 3:
-            self.weight = torch.zeros(int(self.infeatures // packed * 3 * self.outfeatures)).int().contiguous()
-            qinfer.pack3(qweights.int().contiguous(),self.weight, self.infeatures // packed * 3, self.outfeatures, self.mb // packed * 3, self.tb, self.cutoff)
+            self.register_buffer('qweight', torch.zeros(int(self.infeatures // packed * 3 * self.outfeatures)).int().contiguous())
         elif bits == 2:
-            self.weight = torch.zeros(int(self.infeatures // packed * self.outfeatures)).int().contiguous()
-            qinfer.pack2(qweights.int().contiguous(),self.weight, self.infeatures // packed, self.outfeatures, self.mb, self.tb, self.cutoff)# * (self.tt//tb))
+            self.register_buffer('qweight', torch.zeros(int(self.infeatures // packed * self.outfeatures)).int().contiguous())
                 
     def forward(self, x):
         out_shape = x.shape[:-1] + (self.outfeatures,)
@@ -243,22 +237,22 @@ class QuantLinear(nn.Module):
         sums = compute_reductions(x,gs=self.group_size,cpp=True).contiguous()
         if self.group_size == -1:
             if self.bits == 4:
-                qinfer.forward4(new_x, self.weight, out, self.bias, self.scales, self.zeros, sums, 
+                qinfer.forward4(new_x, self.qweight, out, self.bias, self.scales, self.zeros, sums, 
                                 B, self.infeatures, self.outfeatures, B, self.mb, self.tb, self.tt, self.cutoff)
             elif self.bits == 2:
-                qinfer.forward2(new_x, self.weight, out, self.bias, self.scales, self.zeros, sums, 
+                qinfer.forward2(new_x, self.qweight, out, self.bias, self.scales, self.zeros, sums, 
                                 B, self.infeatures, self.outfeatures, B, self.mb, self.tb, self.tt, self.cutoff)
             elif self.bits == 3:
-                qinfer.forward3(new_x, self.weight, out, self.bias, self.scales, self.zeros, sums, 
+                qinfer.forward3(new_x, self.qweight, out, self.bias, self.scales, self.zeros, sums, 
                                 B, self.infeatures, self.outfeatures, B, self.mb, self.tb, self.tt, self.cutoff)
         else:
             if self.bits == 4:
-                qinfer.forward_gs4(new_x, self.weight, out, self.bias, self.scales, self.zeros, sums, 
+                qinfer.forward_gs4(new_x, self.qweight, out, self.bias, self.scales, self.zeros, sums, 
                                    B, self.infeatures, self.outfeatures, B, self.mb, self.tb, self.tt, self.group_size, self.cutoff)
             elif self.bits == 2:
-                qinfer.forward_gs2(new_x, self.weight, out, self.bias, self.scales, self.zeros, sums, 
+                qinfer.forward_gs2(new_x, self.qweight, out, self.bias, self.scales, self.zeros, sums, 
                                    B, self.infeatures, self.outfeatures, B, self.mb, self.tb, self.tt, self.group_size, self.cutoff)
             elif self.bits == 3:
-                qinfer.forward_gs3(new_x, self.weight, out, self.bias, self.scales, self.zeros, sums,
+                qinfer.forward_gs3(new_x, self.qweight, out, self.bias, self.scales, self.zeros, sums,
                                    B, self.infeatures, self.outfeatures, B, self.mb, self.tb, self.tt, self.group_size, self.cutoff)
         return out.reshape(out_shape)
