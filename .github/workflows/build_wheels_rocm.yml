@@ -24,10 +24,6 @@ jobs:
         with:
           ref: 'main'
 
-      - uses: actions/setup-python@v3
-        with:
-          python-version: ${{ matrix.python }}
-
       - name: Free disk space
         run: |
           df -h
