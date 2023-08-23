@@ -53,11 +53,15 @@ For perplexity comparison, you can turn to [here](https://github.com/qwopqwop200
 ## Installation
 
 ### Quick Installation
-You can install the latest stable release of AutoGPTQ from pip:
+You can install the latest stable release of AutoGPTQ from pip for CUDA 11.7:
 
 ```shell
 pip install auto-gptq
 ```
+
+Other wheels are available:
+* For CUDA 11.8: `pip install auto-gptq --index-url https://huggingface.github.io/autogptq-index/whl/cu118/`
+* For RoCm 5.4.2: `pip install auto-gptq --index-url https://huggingface.github.io/autogptq-index/whl/rocm542/`
 
 Start from v0.2.0, you can download pre-build wheel that satisfied your environment setup from each version's release assets and install it to skip building stage for the fastest installation speed. For example:
 ```shell
