@@ -53,13 +53,9 @@ For perplexity comparison, you can turn to [here](https://github.com/qwopqwop200
 ## Installation
 
 ### Quick Installation
-You can install the latest stable release of AutoGPTQ from pip for CUDA 11.7 compatible with PyTorch 2.0.1:
+You can install the latest stable release of AutoGPTQ from pip with pre-built wheels compatible with PyTorch 2.0.1:
 
-```shell
-pip install auto-gptq
-```
-
-Other wheels are available:
+* For CUDA 11.7: `pip install auto-gptq --index-url https://huggingface.github.io/autogptq-index/whl/cu117/`
 * For CUDA 11.8: `pip install auto-gptq --index-url https://huggingface.github.io/autogptq-index/whl/cu118/`
 * For RoCm 5.4.2: `pip install auto-gptq --index-url https://huggingface.github.io/autogptq-index/whl/rocm542/`
 
