@@ -9,7 +9,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        os: [ubuntu-20.04, windows-latest]
         pyver: ["3.8", "3.9", "3.10", "3.11"]
         cuda: ["11.7", "11.8"]
     defaults:
