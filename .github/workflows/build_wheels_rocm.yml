@@ -49,6 +49,10 @@ jobs:
           sudo rm -rf /usr/share/swift > /dev/null 2>&1
           df -h
 
+      - uses: actions/setup-python@v3
+        with:
+          python-version: ${{ matrix.python }}
+
       - name: Setup Miniconda
         uses: conda-incubator/setup-miniconda@v2.2.0
         with:
@@ -63,6 +67,10 @@ jobs:
 
       - name: Set up environment
         run: |
+          echo "Using python:"
+          python --version
+          which python
+
           if [[ "${{ matrix.rocm }}" == "5.4.2" ]]; then
             export ROCM_DL_FILE=amdgpu-install_5.4.50402-1_all.deb
           elif [[ "${{ matrix.rocm }}" == "5.5" ]]; then
@@ -85,6 +93,10 @@ jobs:
 
       - name: Build wheels
         run: |
+          echo "Using python for build:"
+          python --version
+          which python
+
           ROCM_VERSION=${{ matrix.rocm }} python setup.py sdist bdist_wheel
 
       - uses: actions/upload-artifact@v3
