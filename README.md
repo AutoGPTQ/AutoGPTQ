@@ -53,17 +53,13 @@ For perplexity comparison, you can turn to [here](https://github.com/qwopqwop200
 ## Installation
 
 ### Quick Installation
-You can install the latest stable release of AutoGPTQ from pip:
+You can install the latest stable release of AutoGPTQ from pip with pre-built wheels compatible with PyTorch 2.0.1:
 
-```shell
-pip install auto-gptq
-```
+* For CUDA 11.7: `pip install auto-gptq --index-url https://huggingface.github.io/autogptq-index/whl/cu117/`
+* For CUDA 11.8: `pip install auto-gptq --index-url https://huggingface.github.io/autogptq-index/whl/cu118/`
+* For RoCm 5.4.2: `pip install auto-gptq --index-url https://huggingface.github.io/autogptq-index/whl/rocm542/`
 
-Start from v0.2.0, you can download pre-build wheel that satisfied your environment setup from each version's release assets and install it to skip building stage for the fastest installation speed. For example:
-```shell
-# firstly, cd the directory where the wheel saved, then execute command below
-pip install auto_gptq-0.2.0+cu118-cp310-cp310-linux_x86_64.whl # install v0.2.0 auto_gptq pre-build wheel for linux in an environment whose python=3.10 and cuda=11.8
-```
+**Warning:** These wheels are not expected to work on PyTorch nightly. Please install AutoGPTQ from source when using PyTorch nightly.
 
 #### disable cuda extensions
 By default, cuda extensions will be installed when `torch` and `cuda` is already installed in your machine, if you don't want to use them, using:
