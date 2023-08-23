@@ -75,7 +75,7 @@ jobs:
             export ROCM_DL_FILE=amdgpu-install_5.6.50600-1_all.deb
           fi
 
-          curl -O https://repo.radeon.com/amdgpu-install/${{ matrix.rocm }}/ubuntu/jammy/$ROCM_DL_FILE
+          curl -O https://repo.radeon.com/amdgpu-install/${{ matrix.rocm }}/ubuntu/focal/$ROCM_DL_FILE
           sudo dpkg -i $ROCM_DL_FILE
           sudo DEBIAN_FRONTEND=noninteractive amdgpu-install --usecase=rocm --no-dkms --no-32 -y
 
