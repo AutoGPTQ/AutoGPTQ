@@ -49,6 +49,10 @@ jobs:
           sudo rm -rf /usr/share/swift > /dev/null 2>&1
           df -h
 
+      - uses: actions/setup-python@v3
+        with:
+          python-version: ${{ matrix.python }}
+
       - name: Setup Miniconda
         uses: conda-incubator/setup-miniconda@v2.2.0
         with:
