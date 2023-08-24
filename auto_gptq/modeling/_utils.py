@@ -1,5 +1,5 @@
 from logging import getLogger
-from typing import Union
+from typing import Union, Optional
 
 import accelerate
 import torch
@@ -7,7 +7,7 @@ import torch.nn as nn
 from transformers import AutoConfig
 import transformers
 
-from ._const import SUPPORTED_MODELS, CPU, CUDA_0
+from ._const import SUPPORTED_MODELS, CPU, CUDA_0, EXLLAMA_DEFAULT_MAX_INPUT_LENGTH
 from ..utils.import_utils import dynamically_import_QuantLinear
 
 
@@ -187,7 +187,10 @@ def simple_dispatch_model(model, device_map):
     return model
 
 
-def autogptq_post_init(model, use_act_order: bool):
+def autogptq_post_init(model, use_act_order: bool, max_input_length: Optional[int] = None):
+    """
+    The max_input_length argument is specific to the exllama backend, that requires to initialize a buffer temp_state.
+    """
     device_to_buffers_size = {}
 
     model_uses_exllama = False
@@ -229,9 +232,13 @@ def autogptq_post_init(model, use_act_order: bool):
         device_to_buffers = {}
 
         if use_act_order:
-            # TODO: initialize this properly
-            max_input_len = 2048
+            if max_input_length is None:
+                max_input_len = EXLLAMA_DEFAULT_MAX_INPUT_LENGTH
+            else:
+                max_input_len = max_input_len
         else:
+            if max_input_length is not None:
+                logger.info("Using exllama backend without act-order, the parameter max_input_length was set although not needed, it will be ignored.")
             max_input_len = 1
 
         for device, buffers_size in device_to_buffers_size.items():
@@ -239,7 +246,9 @@ def autogptq_post_init(model, use_act_order: bool):
             # The temp_dq buffer is required to dequantize weights when using cuBLAS, typically for the prefill.
             device_to_buffers[device] = {
                 "temp_state": torch.zeros((max_input_len, buffers_size["max_inner_outer_dim"]), dtype=torch.float16, device=device),
-                "temp_dq": torch.zeros((1, buffers_size["max_dq_buffer_size"]), dtype=torch.float16, device=device)
+                "temp_dq": torch.zeros((1, buffers_size["max_dq_buffer_size"]), dtype=torch.float16, device=device),
+                "max_dq_buffer_size": buffers_size["max_dq_buffer_size"],
+                "max_inner_outer_dim": buffers_size["max_inner_outer_dim"],
             }
         
         # Buffers need to be persistent to avoid any bug.

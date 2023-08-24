@@ -982,5 +982,4 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         except:
             return getattr(self.model, item)
 
-
 __all__ = ["BaseGPTQForCausalLM", "BaseQuantizeConfig"]

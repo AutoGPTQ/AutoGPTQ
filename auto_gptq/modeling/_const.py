@@ -25,4 +25,6 @@ SUPPORTED_MODELS = [
 if compare_transformers_version("v4.28.0", op="ge"):
     SUPPORTED_MODELS.append("llama")
 
-__all__ = ["CPU", "CUDA_0", "SUPPORTED_MODELS"]
+EXLLAMA_DEFAULT_MAX_INPUT_LENGTH = 2048
+
+__all__ = ["CPU", "CUDA_0", "SUPPORTED_MODELS", "EXLLAMA_DEFAULT_MAX_INPUT_LENGTH"]
