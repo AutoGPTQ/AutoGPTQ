@@ -1,4 +1,4 @@
-name: Build AutoGPTQ Wheels with CUDA
+name: Build AutoGPTQ Wheels for PyPI with CUDA
 
 on: workflow_dispatch
 
@@ -11,12 +11,11 @@ jobs:
       matrix:
         os: [ubuntu-20.04, windows-latest]
         pyver: ["3.8", "3.9", "3.10", "3.11"]
-        cuda: ["11.7", "11.8"]
     defaults:
       run:
         shell: pwsh
     env:
-        CUDA_VERSION: ${{ matrix.cuda }}
+        CUDA_VERSION: "11.7"
 
     steps:
       - uses: actions/checkout@v3
@@ -49,12 +48,12 @@ jobs:
           $env:CUDA_HOME = $env:CONDA_PREFIX
           if ($IsLinux) {$env:LD_LIBRARY_PATH = $env:CONDA_PREFIX + '/lib:' + $env:LD_LIBRARY_PATH}
 
-          # TODO: remove this
-          if (!$IsLinux) {$env:INCLUDE_EXLLAMA_KERNELS = 0}
-
           $env:TORCH_CUDA_ARCH_LIST = '6.0 6.1 7.0 7.5 8.0 8.6+PTX'
           if ([decimal]$env:CUDA_VERSION -ge 11.8) { $env:TORCH_CUDA_ARCH_LIST = '6.0 6.1 7.0 7.5 8.0 8.6 8.9 9.0+PTX' }
-          python setup.py sdist bdist_wheel
+
+          echo "CUDA_PATH: $CUDA_PATH"
+          echo "CUDA_VERSION: $CUDA_VERSION"
+          PYPI_RELEASE=1 python setup.py sdist bdist_wheel
 
       - uses: actions/upload-artifact@v3
         if: runner.os == 'Linux'

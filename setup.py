@@ -30,6 +30,7 @@ common_setup_kwargs = {
 }
 
 
+PYPI_RELEASE = os.environ.get('PYPI_RELEASE', None)
 BUILD_CUDA_EXT = int(os.environ.get('BUILD_CUDA_EXT', '1')) == 1
 if BUILD_CUDA_EXT:
     try:
@@ -60,8 +61,10 @@ if BUILD_CUDA_EXT:
                 "is installed without CUDA support."
             )
             sys.exit(-1)
-        common_setup_kwargs['version'] += f"+cu{CUDA_VERSION}"
 
+        # For the PyPI release, the version is simply x.x.x to comply with PEP 440.
+        if not PYPI_RELEASE:
+            common_setup_kwargs['version'] += f"+cu{CUDA_VERSION}"
 
 requirements = [
     "accelerate>=0.19.0",
@@ -110,19 +113,28 @@ if BUILD_CUDA_EXT:
         )
     ]
 
-    if os.environ.get("INCLUDE_EXLLAMA_KERNELS", "1") == "1":  # TODO: improve github action to always compile exllama_kernels
-        extensions.append(
-            cpp_extension.CUDAExtension(
-                "exllama_kernels",
-                [
-                    "autogptq_cuda/exllama/exllama_ext.cpp",
-                    "autogptq_cuda/exllama/cuda_buffers.cu",
-                    "autogptq_cuda/exllama/cuda_func/column_remap.cu",
-                    "autogptq_cuda/exllama/cuda_func/q4_matmul.cu",
-                    "autogptq_cuda/exllama/cuda_func/q4_matrix.cu"
-                ]
-            )
+    if os.name == "nt":
+        # On Windows, fix an error LNK2001: unresolved external symbol cublasHgemm bug in the compilation
+        cuda_path = os.environ.get("CUDA_PATH", None)
+        if cuda_path is None:
+            raise ValueError("The environment variable CUDA_PATH must be set to the path to the CUDA install when installing from source on Windows systems.")
+        extra_link_args = ["-L", f"{cuda_path}/lib/x64/cublas.lib"]
+    else:
+        extra_link_args = []
+
+    extensions.append(
+        cpp_extension.CUDAExtension(
+            "exllama_kernels",
+            [
+                "autogptq_cuda/exllama/exllama_ext.cpp",
+                "autogptq_cuda/exllama/cuda_buffers.cu",
+                "autogptq_cuda/exllama/cuda_func/column_remap.cu",
+                "autogptq_cuda/exllama/cuda_func/q4_matmul.cu",
+                "autogptq_cuda/exllama/cuda_func/q4_matrix.cu"
+            ],
+            extra_link_args=extra_link_args
         )
+    )
 
     additional_setup_kwargs = {
         "ext_modules": extensions,
