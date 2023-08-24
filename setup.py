@@ -5,7 +5,7 @@ from setuptools import setup, find_packages
 
 
 common_setup_kwargs = {
-    "version": "0.4.1",
+    "version": "0.4.2",
     "name": "auto_gptq",
     "author": "PanQiWei",
     "description": "An easy-to-use LLMs quantization package with user-friendly apis, based on GPTQ algorithm.",
