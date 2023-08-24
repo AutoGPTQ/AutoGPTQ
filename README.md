@@ -56,33 +56,15 @@ For perplexity comparison, you can turn to [here](https://github.com/qwopqwop200
 ### Quick Installation
 You can install the latest stable release of AutoGPTQ from pip with pre-built wheels compatible with PyTorch 2.0.1:
 
-* For CUDA 11.7: `pip install auto-gptq --extra-index-url https://huggingface.github.io/autogptq-index/whl/cu117/`
+* For CUDA 11.7: `pip install auto-gptq`
 * For CUDA 11.8: `pip install auto-gptq --extra-index-url https://huggingface.github.io/autogptq-index/whl/cu118/`
 * For RoCm 5.4.2: `pip install auto-gptq --extra-index-url https://huggingface.github.io/autogptq-index/whl/rocm542/`
 
 **Warning:** These wheels are not expected to work on PyTorch nightly. Please install AutoGPTQ from source when using PyTorch nightly.
 
-#### disable cuda extensions
-By default, cuda extensions will be installed when `torch` and `cuda` is already installed in your machine, if you don't want to use them, using:
-```shell
-BUILD_CUDA_EXT=0 pip install auto-gptq
-```
-And to make sure `autogptq_cuda` is not ever in your virtual environment, run:
-```shell
-pip uninstall autogptq_cuda -y
-```
-
-#### to support triton speedup
-To integrate with `triton`, using:
-> warning: currently triton only supports linux; 3-bit quantization is not supported when using triton
-
-```shell
-pip install auto-gptq[triton]
-```
+AutoGPTQ can be installed with the Triton dependency with `pip install auto-gptq[triton]` in order to be able to use the Triton backend (currently only supports linux, no 3-bits quantization).
 
 ### Install from source
-<details>
-<summary>click to see details</summary>
 
 Clone the source code:
 ```shell
@@ -90,21 +72,17 @@ git clone https://github.com/PanQiWei/AutoGPTQ.git && cd AutoGPTQ
 ```
 Then, install from source:
 ```shell
-pip install .
+pip install -v .
 ```
-Like quick installation, you can also set `BUILD_CUDA_EXT=0` to disable pytorch extension building.
-
-Use `.[triton]` if you want to integrate with triton and it's available on your operating system.
+You can set `BUILD_CUDA_EXT=0` to disable pytorch extension building, but this is **strongly discouraged** as AutoGPTQ then falls back on a slow python implementation.
 
 To install from source for AMD GPUs supporting RoCm, please specify the `ROCM_VERSION` environment variable. The compilation can be speeded up by specifying the `PYTORCH_ROCM_ARCH` variable ([reference](https://github.com/pytorch/pytorch/blob/7b73b1e8a73a1777ebe8d2cd4487eb13da55b3ba/setup.py#L132)), for example `gfx90a` for MI200 series devices. Example:
 
 ```
-ROCM_VERSION=5.6 pip install .
+ROCM_VERSION=5.6 pip install -v .
 ```
 
 For RoCm systems, the packages `rocsparse-dev`, `hipsparse-dev`, `rocthrust-dev`, `rocblas-dev` and `hipblas-dev` are required to build.
-
-</details>
 
 ## Quick Tour
 
