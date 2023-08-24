@@ -5,7 +5,7 @@ on: workflow_dispatch
 jobs:
   build_wheels:
     if: ${{ github.repository_owner == 'PanQiWei' }}
-    name: Build wheels for ${{ matrix.os }} and Python ${{ matrix.python }} and CUDA ${{ matrix.cuda }}
+    name: Build wheels for ${{ matrix.os }} and Python ${{ matrix.python }} and CUDA 11.7
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -51,9 +51,15 @@ jobs:
           $env:TORCH_CUDA_ARCH_LIST = '6.0 6.1 7.0 7.5 8.0 8.6+PTX'
           if ([decimal]$env:CUDA_VERSION -ge 11.8) { $env:TORCH_CUDA_ARCH_LIST = '6.0 6.1 7.0 7.5 8.0 8.6 8.9 9.0+PTX' }
 
-          echo "CUDA_PATH: $CUDA_PATH"
-          echo "CUDA_VERSION: $CUDA_VERSION"
-          PYPI_RELEASE=1 python setup.py sdist bdist_wheel
+          $env:PYPI_RELEASE = "1"
+
+          echo "CUDA_PATH:"
+          echo $env:CUDA_PATH
+
+          echo "PYPI_RELEASE:"
+          echo $env:PYPI_RELEASE
+
+          python setup.py sdist bdist_wheel
 
       - uses: actions/upload-artifact@v3
         if: runner.os == 'Linux'
