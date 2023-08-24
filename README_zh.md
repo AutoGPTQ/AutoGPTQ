@@ -19,6 +19,7 @@
 
 ## 新闻或更新
 
+- 2023-08-23 - (新闻) - 🤗 Transformers、optimum 和 peft 完成了对 `auto-gptq` 的集成，现在使用 GPTQ 模型进行推理和训练将变得更容易！阅读 [这篇博客](https://huggingface.co/blog/gptq-integration) 和相关资源以了解更多细节！
 - 2023-08-21 - (新闻) - 通义千问团队发布了基于 `auto-gptq` 的 Qwen-7B 4bit 量化版本模型，并提供了[详尽的测评结果](https://huggingface.co/Qwen/Qwen-7B-Chat-Int4#%E9%87%8F%E5%8C%96-quantization)
 - 2023-08-06 - (更新) - 支持 exllama 的 q4 CUDA 算子使得 int4 量化模型能够获得至少1.3倍的推理速度提升.
 - 2023-08-04 - (更新) - 支持 RoCm 使得 AMD GPU 的用户能够使用 auto-gptq 的 CUDA 拓展.
@@ -53,15 +54,14 @@
 ## 安装
 
 ### 快速安装
-你可以通过 pip 来安装 AutoGPTQ 当前最新的稳定版本：
-```shell
-pip install auto-gptq
-```
-从 0.2.0 版本开始，你可以从每次版本发布的资产文件列表中下载预构建好的符合你系统配置情况的轮子文件，并通过安装这些轮子文件来跳过漫长的构建过程以达到最快的安装速度。如下是一个例子：
-```shell
-# 首先，进入轮子文件存放的目录，然后执行下面的命令
-pip install auto_gptq-0.2.0+cu118-cp310-cp310-linux_x86_64.whl # 在 linux 操作系统的一个 python=3.10 且 cuda=11.8 的环境下安装 0.2.0 版本的 auto_gptq
-```
+你可以通过 pip 来安装与 PyTorch 2.0.1 相兼容的最新稳定版本的 AutoGPTQ 的预构建轮子文件：
+
+* 对于 CUDA 11.7： `pip install auto-gptq --extra-index-url https://huggingface.github.io/autogptq-index/whl/cu117/`
+* 对于 CUDA 11.8： `pip install auto-gptq --extra-index-url https://huggingface.github.io/autogptq-index/whl/cu118/`
+* 对于 RoCm 5.4.2： `pip install auto-gptq --extra-index-url https://huggingface.github.io/autogptq-index/whl/rocm542/`
+
+**警告：** 预构建的轮子文件不一定在 PyTorch 的 nightly 版本上有效。如果要使用 PyTorch 的 nightly 版本，请从源码安装 AutoGPTQ。
+
 #### 取消 cuda 拓展的安装
 默认情况下，在 `torch` 和 `cuda` 已经于你的机器上被安装时，cuda 拓展将被自动安装，如果你不想要这些拓展的话，采用以下安装命令：
 ```shell
