@@ -240,7 +240,7 @@ void q4_matmul_recons_cuda
     const half* x_mapped = x;
     if (w->cuda_x_map)
     {
-        TORCH_CHECK(buffers->temp_state_size >= x_height * dim, "temp_state buffer is too small");
+        TORCH_CHECK(buffers->temp_state_size >= x_height * dim, "The temp_state buffer is too small in the exllama backend. Please call the exllama_set_max_input_length function to increase the buffer size. Example:\nfrom auto_gptq import exllama_set_max_input_length\nmodel = exllama_set_max_input_length(model, 4096)");
         column_remap_cuda(x, buffers->temp_state, x_height, dim, w->cuda_x_map);
         x_mapped = buffers->temp_state;
     }

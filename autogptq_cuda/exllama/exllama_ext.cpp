@@ -251,4 +251,5 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m)
     m.def("cleanup", &cleanup, "cleanup");
     m.def("make_q4", &make_q4, "make_q4");
     m.def("q4_matmul", &q4_matmul, "q4_matmul");
+    m.def("cleanup_buffers_cuda", &cleanup_buffers_cuda, "cleanup_buffers_cuda");
 }
