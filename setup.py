@@ -17,7 +17,7 @@ common_setup_kwargs = {
     "classifiers": [
         "Environment :: GPU :: NVIDIA CUDA :: 11.7",
         "Environment :: GPU :: NVIDIA CUDA :: 11.8",
-        "Environment :: GPU :: NVIDIA CUDA :: 12.0",
+        "Environment :: GPU :: NVIDIA CUDA :: 12",
         "License :: OSI Approved :: MIT License",
         "Natural Language :: Chinese (Simplified)",
         "Natural Language :: English",
