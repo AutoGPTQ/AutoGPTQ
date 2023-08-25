@@ -87,30 +87,29 @@ def load_data(data_path, tokenizer, n_samples, max_new_tokens):
         outputs = examples["output"]
 
         prompts = []
-        texts = []
+        outs = []
         input_ids = []
         attention_mask = []
         for istr, inp, opt in zip(instructions, inputs, outputs):
             if inp:
                 prompt = f"Instruction:\n{istr}\nInput:\n{inp}\nOutput:\n"
-                text = prompt + opt
             else:
                 prompt = f"Instruction:\n{istr}\nOutput:\n"
-                text = prompt + opt
             if len(tokenizer(prompt)["input_ids"]) >= tokenizer.model_max_length - max_new_tokens:
                 continue
 
-            tokenized_data = tokenizer(text)
+            tokenized_data = tokenizer(prompt)
 
             input_ids.append(tokenized_data["input_ids"][: tokenizer.model_max_length])
             attention_mask.append(tokenized_data["attention_mask"][: tokenizer.model_max_length])
             prompts.append(prompt)
-            texts.append(text)
+            outs.append(opt)
 
         return {
             "input_ids": input_ids,
             "attention_mask": attention_mask,
-            "prompt": prompts
+            "prompt": prompts,
+            "output": outs
         }
 
     dataset = Dataset.from_generator(dummy_gen)
@@ -236,9 +235,9 @@ def main():
     parser.add_argument("--use_triton", action="store_true")
     parser.add_argument("--use_safetensors", action="store_true")
     parser.add_argument("--use_fast_tokenizer", action="store_true")
+    parser.add_argument("--inject_fused_attention", action="store_true")
+    parser.add_argument("--inject_fused_mlp", action="store_true")
     parser.add_argument("--disable_exllama", action="store_true")
-    parser.add_argument("--no_inject_fused_attention", action="store_true")
-    parser.add_argument("--no_inject_fused_mlp", action="store_true")
     parser.add_argument("--num_samples", type=int, default=10)
     parser.add_argument("--per_gpu_max_memory", type=int, default=None)
     parser.add_argument("--cpu_max_memory", type=int, default=None)
@@ -277,8 +276,8 @@ def main():
         use_triton=args.use_triton,
         use_safetensors=args.use_safetensors,
         use_fast_tokenizer=args.use_fast_tokenizer,
-        inject_fused_attention=not args.no_inject_fused_attention,
-        inject_fused_mlp=not args.no_inject_fused_mlp,
+        inject_fused_attention=args.inject_fused_attention,
+        inject_fused_mlp=args.inject_fused_mlp,
         disable_exllama=args.disable_exllama
     )
     end = time.time()
@@ -289,7 +288,7 @@ def main():
 
     if args.use_triton:
         logger.info("warmup triton, this may take a while.")
-        model.warmup_triton()
+        model.warmup_triton(model)
 
     logger.info("loading data")
     examples = load_data(

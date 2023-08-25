@@ -354,7 +354,7 @@ def get_gptq_peft_model(
     train_mode: bool = False
 ):
     if train_mode and not model.trainable:
-        model.enable_trainable_mode()
+        raise TypeError("model is not trainable, please load model with 'trainable=True'")
     if train_mode and not peft_config:
         raise ValueError("peft_config not specified when in train mode.")
     if not train_mode and not model_id:

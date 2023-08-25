@@ -1,6 +1,8 @@
 from inspect import signature
 from typing import Dict, Optional, Union
 
+from xformers.ops.fmha import AttentionOp
+
 from ._base import BaseQuantizeConfig, BaseGPTQForCausalLM
 from ._utils import check_and_get_model_type
 from .bloom import BloomGPTQForCausalLM
@@ -81,6 +83,7 @@ class AutoGPTQForCausalLM:
         trust_remote_code: bool = False,
         warmup_triton: bool = False,
         trainable: bool = False,
+        attn_op: Optional[AttentionOp] = None,
         disable_exllama: bool = False,
         **kwargs
     ) -> BaseGPTQForCausalLM:
@@ -121,6 +124,7 @@ class AutoGPTQForCausalLM:
             trust_remote_code=trust_remote_code,
             warmup_triton=warmup_triton,
             trainable=trainable,
+            attn_op=attn_op,
             disable_exllama=disable_exllama,
             **keywords
         )

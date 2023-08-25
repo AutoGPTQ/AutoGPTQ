@@ -37,12 +37,18 @@ if __name__ == "__main__":
     parser.add_argument("--use_safetensors", action="store_true", help="Whether to use safetensors model file")
     parser.add_argument("--use_fast_tokenizer", action="store_true", help="Wheter to use fast tokenizer")
     parser.add_argument("--trust_remote_code", action="store_true", help="Whether to use remote code")
+    parser.add_argument("--inject_fused_attention", action="store_true", help="Whether to inject fused attention")
+    parser.add_argument("--inject_fused_mlp", action="store_true", help="Whether to inject fused mlp")
     parser.add_argument("--disable_exllama", action="store_true", help="Whether to use disable exllama kernel")
     args = parser.parse_args()
 
     os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
-    tokenizer = AutoTokenizer.from_pretrained(args.model_name, use_fast=args.use_fast_tokenizer)
+    tokenizer = AutoTokenizer.from_pretrained(
+        args.model_name,
+        use_fast=args.use_fast_tokenizer,
+        trust_remote_code=args.trust_remote_code
+    )
     if not tokenizer.pad_token_id:
         tokenizer.pad_token_id = tokenizer.eos_token_id
 
@@ -68,8 +74,8 @@ if __name__ == "__main__":
             model_basename=args.model_basename,
             use_safetensors=args.use_safetensors,
             trust_remote_code=args.trust_remote_code,
-            inject_fused_mlp=False,
-            inject_fused_attention=False,
+            inject_fused_mlp=args.inject_fused_mlp,
+            inject_fused_attention=args.inject_fused_attention,
             disable_exllama=args.disable_exllama
         )
     else:

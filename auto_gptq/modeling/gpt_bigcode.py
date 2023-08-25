@@ -1,4 +1,4 @@
-from auto_gptq.modeling import BaseGPTQForCausalLM
+from ._base import BaseGPTQForCausalLM
 
 
 class GPTBigCodeGPTQForCausalLM(BaseGPTQForCausalLM):
@@ -13,5 +13,6 @@ class GPTBigCodeGPTQForCausalLM(BaseGPTQForCausalLM):
         ["mlp.c_fc"],
         ["mlp.c_proj"]
     ]
+
 
 __all__ = ["GPTBigCodeGPTQForCausalLM"]
