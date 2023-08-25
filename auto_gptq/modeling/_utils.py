@@ -6,10 +6,10 @@ import torch
 import torch.nn as nn
 from transformers import AutoConfig
 import transformers
+import cQIGen as qinfer
 
 from ._const import SUPPORTED_MODELS, CPU, CUDA_0, EXLLAMA_DEFAULT_MAX_INPUT_LENGTH
 from ..utils.import_utils import dynamically_import_QuantLinear
-
 
 logger = getLogger(__name__)
 
@@ -58,11 +58,12 @@ def make_quant(
     name='',
     use_triton: bool = False,
     disable_exllama: bool = False,
+    use_qigen: bool = False,
     use_cuda_fp16: bool = True,
     desc_act: bool = False,
     trainable: bool = False
-):
-    QuantLinear = dynamically_import_QuantLinear(use_triton=use_triton, desc_act=desc_act, group_size=group_size, bits=bits, disable_exllama=disable_exllama)
+):  
+    QuantLinear = dynamically_import_QuantLinear(use_triton=use_triton, desc_act=desc_act, group_size=group_size, bits=bits, disable_exllama=disable_exllama, use_qigen=use_qigen)
 
     if isinstance(module, QuantLinear):
         return
@@ -81,7 +82,7 @@ def make_quant(
             elif isinstance(tmp,transformers.pytorch_utils.Conv1D):            
                 in_features = tmp.weight.shape[0]
                 out_features = tmp.weight.shape[1]
-            if (not(desc_act) or group_size == -1) and not use_triton:
+            if (not(desc_act) or group_size == -1) and not use_triton and not use_qigen:
                 new_layer = QuantLinear(
                     bits, group_size, in_features, out_features, True, use_cuda_fp16=use_cuda_fp16, trainable=trainable
                 )
@@ -101,8 +102,73 @@ def make_quant(
             desc_act=desc_act,
             trainable=trainable,
             disable_exllama=disable_exllama,
+            use_qigen=use_qigen
         )
 
+def process_zeros_scales(zeros, scales, bits, out_features):
+    if zeros.dtype != torch.float32:
+        new_zeros = torch.zeros_like(scales).float().contiguous()
+        if bits == 4:
+            qinfer.unpack_zeros4(zeros, new_zeros, new_zeros.shape[0], new_zeros.shape[1])
+        elif bits == 2:
+            qinfer.unpack_zeros2(zeros, new_zeros, new_zeros.shape[0], new_zeros.shape[1])
+        elif bits == 3:
+            logger.info("Unpacking zeros for 3 bits")
+        new_scales = scales.contiguous()
+    else:
+        if scales.shape[1] != out_features:
+            new_scales = scales.transpose(0,1).contiguous()
+        else:
+            new_scales = scales.contiguous()
+        if zeros.shape[1] != out_features:
+            new_zeros = zeros.transpose(0,1).contiguous()
+        else:
+            new_zeros = zeros.contiguous()
+
+    return new_zeros, new_scales
+
+def preprocess_checkpoint_qigen(
+    module,
+    names,
+    bits,
+    group_size,
+    checkpoint,
+    name='',
+):
+    QuantLinear = dynamically_import_QuantLinear(use_triton=False, desc_act=False, group_size=group_size, bits=bits, disable_exllama=False, use_qigen=True)
+    if isinstance(module, QuantLinear):
+        in_features = module.infeatures
+        out_features = module.outfeatures
+
+        checkpoint[name + '.zeros'],checkpoint[name + '.scales'] = process_zeros_scales(checkpoint[name + '.qzeros'],checkpoint[name + '.scales'].float(), bits, out_features)
+        del checkpoint[name + '.qzeros']
+        del checkpoint[name + '.g_idx']
+        if name + '.bias' in checkpoint:
+            checkpoint[name + '.bias'] = checkpoint[name + '.bias'].float()
+        else:
+            checkpoint[name + '.bias'] = torch.zeros(out_features)
+        checkpoint_qweight = checkpoint[name + '.qweight'].int().contiguous()
+        if bits == 4:
+            qweight = torch.zeros(int(in_features // 8 * out_features)).int().contiguous()
+            qinfer.pack4(checkpoint_qweight, qweight, in_features // 8, out_features, module.mb, module.tb, module.cutoff)# * (module.tt//tb))
+        elif bits == 3:
+            qweight = torch.zeros(int(in_features // 32 * 3 * out_features)).int().contiguous()
+            qinfer.pack3(checkpoint_qweight, qweight, in_features // 32 * 3, out_features, module.mb // 32 * 3, module.tb, module.cutoff)
+        elif bits == 2:
+            qweight = torch.zeros(int(in_features // 16 * out_features)).int().contiguous()
+            qinfer.pack2(checkpoint_qweight, qweight, in_features // 16, out_features, module.mb, module.tb, module.cutoff)# * (module.tt//tb))
+        checkpoint[name + '.qweight'] = qweight
+        return
+
+    for name1, child in module.named_children():
+        preprocess_checkpoint_qigen(
+            child,
+            names,
+            bits,
+            group_size,
+            checkpoint,
+            name + '.' + name1 if name != '' else name1,
+        )
 
 def pack_model(
     model,
@@ -287,6 +353,7 @@ __all__ = [
     "get_module_by_name_prefix",
     "get_module_by_name_suffix",
     "make_quant",
+    "preprocess_checkpoint_qigen",
     "pack_model",
     "autogptq_post_init",
     "check_and_get_model_type",
