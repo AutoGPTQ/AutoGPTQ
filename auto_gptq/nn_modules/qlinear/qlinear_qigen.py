@@ -4,7 +4,6 @@ from torch import nn
 from tqdm import tqdm
 import gc
 
-import cQIGen as qinfer
 import math
 import numpy as np
 from gekko import GEKKO
@@ -12,6 +11,11 @@ from logging import getLogger
 
 logger = getLogger(__name__)
 
+try:
+    import cQIGen as qinfer
+except ImportError:
+    logger.error('cQIGen not installed.')
+    raise
 
 def mem_model(N, M, T, mu, tu, bits, l1, p, gs):
     m = GEKKO() # create GEKKO model

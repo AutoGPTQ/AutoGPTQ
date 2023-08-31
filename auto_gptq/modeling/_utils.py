@@ -6,7 +6,6 @@ import torch
 import torch.nn as nn
 from transformers import AutoConfig
 import transformers
-import cQIGen as qinfer
 
 from ._const import SUPPORTED_MODELS, CPU, CUDA_0, EXLLAMA_DEFAULT_MAX_INPUT_LENGTH
 from ..utils.import_utils import dynamically_import_QuantLinear
@@ -105,28 +104,6 @@ def make_quant(
             use_qigen=use_qigen
         )
 
-def process_zeros_scales(zeros, scales, bits, out_features):
-    if zeros.dtype != torch.float32:
-        new_zeros = torch.zeros_like(scales).float().contiguous()
-        if bits == 4:
-            qinfer.unpack_zeros4(zeros, new_zeros, new_zeros.shape[0], new_zeros.shape[1])
-        elif bits == 2:
-            qinfer.unpack_zeros2(zeros, new_zeros, new_zeros.shape[0], new_zeros.shape[1])
-        elif bits == 3:
-            logger.info("Unpacking zeros for 3 bits")
-        new_scales = scales.contiguous()
-    else:
-        if scales.shape[1] != out_features:
-            new_scales = scales.transpose(0,1).contiguous()
-        else:
-            new_scales = scales.contiguous()
-        if zeros.shape[1] != out_features:
-            new_zeros = zeros.transpose(0,1).contiguous()
-        else:
-            new_zeros = zeros.contiguous()
-
-    return new_zeros, new_scales
-
 def preprocess_checkpoint_qigen(
     module,
     names,
@@ -135,12 +112,40 @@ def preprocess_checkpoint_qigen(
     checkpoint,
     name='',
 ):
+    try:
+        import cQIGen as qinfer
+    except ImportError:
+        logger.error('cQIGen not installed.')
+        raise
+
     QuantLinear = dynamically_import_QuantLinear(use_triton=False, desc_act=False, group_size=group_size, bits=bits, disable_exllama=False, use_qigen=True)
     if isinstance(module, QuantLinear):
         in_features = module.infeatures
         out_features = module.outfeatures
+        
+        zeros = checkpoint[name + '.qzeros']
+        scales = checkpoint[name + '.scales'].float()
+        
+        if zeros.dtype != torch.float32:
+            new_zeros = torch.zeros_like(scales).float().contiguous()
+            if bits == 4:
+                qinfer.unpack_zeros4(zeros, new_zeros, new_zeros.shape[0], new_zeros.shape[1])
+            elif bits == 2:
+                qinfer.unpack_zeros2(zeros, new_zeros, new_zeros.shape[0], new_zeros.shape[1])
+            elif bits == 3:
+                logger.info("Unpacking zeros for 3 bits")
+            new_scales = scales.contiguous()
+        else:
+            if scales.shape[1] != out_features:
+                new_scales = scales.transpose(0,1).contiguous()
+            else:
+                new_scales = scales.contiguous()
+            if zeros.shape[1] != out_features:
+                new_zeros = zeros.transpose(0,1).contiguous()
+            else:
+                new_zeros = zeros.contiguous()
 
-        checkpoint[name + '.zeros'],checkpoint[name + '.scales'] = process_zeros_scales(checkpoint[name + '.qzeros'],checkpoint[name + '.scales'].float(), bits, out_features)
+        checkpoint[name + '.zeros'],checkpoint[name + '.scales'] = new_zeros, new_scales
         del checkpoint[name + '.qzeros']
         del checkpoint[name + '.g_idx']
         if name + '.bias' in checkpoint:
