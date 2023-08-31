@@ -26,7 +26,7 @@ from ..nn_modules._fused_base import FusedBaseAttentionModule, FusedBaseMLPModul
 from ..quantization import GPTQ
 from ..utils.data_utils import collate_data
 from ..utils.import_utils import (
-    dynamically_import_QuantLinear, TRITON_AVAILABLE, AUTOGPTQ_CUDA_AVAILABLE, EXLLAMA_KERNELS_AVAILABLE
+    dynamically_import_QuantLinear, TRITON_AVAILABLE, AUTOGPTQ_CUDA_AVAILABLE, EXLLAMA_KERNELS_AVAILABLE, QIGEN_AVAILABLE
 )
 
 logger = getLogger(__name__)
@@ -727,13 +727,9 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             "_raise_exceptions_for_missing_entries": False,
             "_commit_hash": commit_hash,
         }
-        if use_qigen:
-            logger.warning("QIgen is active. Ignores all settings related to cuda.")
-            inject_fused_attention = False
-            inject_fused_mlp = False
-            use_triton = False
-            disable_exllama = True
-            
+        if use_qigen and not QIGEN_AVAILABLE:
+            logger.warning("Qigen is not installed, reset use_qigen to False.")
+            use_qigen = False    
         if use_triton and not TRITON_AVAILABLE:
             logger.warning("Triton is not installed, reset use_triton to False.")
             use_triton = False
@@ -754,7 +750,14 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                 "2. You are using pytorch without CUDA support.\n"
                 "3. CUDA and nvcc are not installed in your device."
             )
-
+            
+        if use_qigen and QIGEN_AVAILABLE:
+            logger.warning("QIgen is active. Ignores all settings related to cuda.")
+            inject_fused_attention = False
+            inject_fused_mlp = False
+            use_triton = False
+            disable_exllama = True
+            
         # == step1: prepare configs and file names == #
         config = AutoConfig.from_pretrained(model_name_or_path, trust_remote_code=trust_remote_code, **cached_file_kwargs)
 

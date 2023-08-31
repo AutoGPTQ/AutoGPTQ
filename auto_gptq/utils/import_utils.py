@@ -25,6 +25,13 @@ try:
 except:
     EXLLAMA_KERNELS_AVAILABLE = False
 
+try:
+    import cQIGen as qinfer
+
+    QIGEN_AVAILABLE = True
+except:
+    QIGEN_AVAILABLE = False
+
 logger = getLogger(__name__)
 
 
