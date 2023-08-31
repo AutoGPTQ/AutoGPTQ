@@ -4,6 +4,7 @@ from pathlib import Path
 from setuptools import setup, Extension, find_packages
 import subprocess
 import math
+import platform
 
 os.environ["CC"] = "g++"
 os.environ["CXX"] = "g++"
@@ -94,10 +95,11 @@ include_dirs = ["autogptq_cuda"]
 additional_setup_kwargs = dict()
 if BUILD_CUDA_EXT:
     from torch.utils import cpp_extension
-
-    p = int(subprocess.run("cat /proc/cpuinfo | grep cores | head -1", shell=True, check=True, text=True, stdout=subprocess.PIPE).stdout.split(" ")[2])
-
-    subprocess.call(["python", "./autogptq_extension/qigen/generate.py", "--module", "--search", "--p", str(p)])
+    
+    if platform != 'Windows':
+        p = int(subprocess.run("cat /proc/cpuinfo | grep cores | head -1", shell=True, check=True, text=True, stdout=subprocess.PIPE).stdout.split(" ")[2])
+        subprocess.call(["python", "./autogptq_extension/qigen/generate.py", "--module", "--search", "--p", str(p)])
+        
     if not ROCM_VERSION:
         from distutils.sysconfig import get_python_lib
         conda_cuda_include_dir = os.path.join(get_python_lib(), "nvidia/cuda_runtime/include")
@@ -120,16 +122,20 @@ if BUILD_CUDA_EXT:
                 "autogptq_extension/cuda_256/autogptq_cuda_256.cpp",
                 "autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu"
             ]
-        ),
-        cpp_extension.CppExtension(
-            "cQIGen",
-            [
-                'autogptq_extension/qigen/backend.cpp'
-            ],
-            extra_compile_args = ["-O3", "-mavx", "-mavx2", "-mfma", "-march=native", "-ffast-math", "-ftree-vectorize", "-faligned-new", "-std=c++17", "-fopenmp", "-fno-signaling-nans", "-fno-trapping-math"]
         )
     ]
-
+    
+    if platform != 'Windows':
+        extensions.append(
+            cpp_extension.CppExtension(
+                "cQIGen",
+                [
+                    'autogptq_extension/qigen/backend.cpp'
+                ],
+                extra_compile_args = ["-O3", "-mavx", "-mavx2", "-mfma", "-march=native", "-ffast-math", "-ftree-vectorize", "-faligned-new", "-std=c++17", "-fopenmp", "-fno-signaling-nans", "-fno-trapping-math"]
+            )
+        )
+        
     if os.name == "nt":
         # On Windows, fix an error LNK2001: unresolved external symbol cublasHgemm bug in the compilation
         cuda_path = os.environ.get("CUDA_PATH", None)
