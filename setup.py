@@ -95,8 +95,8 @@ include_dirs = ["autogptq_cuda"]
 additional_setup_kwargs = dict()
 if BUILD_CUDA_EXT:
     from torch.utils import cpp_extension
-    
-    if platform != 'Windows':
+       
+    if platform.system() != 'Windows':
         p = int(subprocess.run("cat /proc/cpuinfo | grep cores | head -1", shell=True, check=True, text=True, stdout=subprocess.PIPE).stdout.split(" ")[2])
         subprocess.call(["python", "./autogptq_extension/qigen/generate.py", "--module", "--search", "--p", str(p)])
         
@@ -125,7 +125,7 @@ if BUILD_CUDA_EXT:
         )
     ]
     
-    if platform != 'Windows':
+    if platform.system() != 'Windows':
         extensions.append(
             cpp_extension.CppExtension(
                 "cQIGen",
