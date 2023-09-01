@@ -306,7 +306,7 @@ def autogptq_post_init(model, use_act_order: bool, max_input_length: Optional[in
             if max_input_length is None:
                 max_input_len = EXLLAMA_DEFAULT_MAX_INPUT_LENGTH
             else:
-                max_input_len = max_input_len
+                max_input_len = max_input_length
         else:
             if max_input_length is not None:
                 logger.info("Using exllama backend without act-order, the parameter max_input_length was set although not needed, it will be ignored.")
