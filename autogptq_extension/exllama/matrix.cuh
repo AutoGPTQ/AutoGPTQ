@@ -94,7 +94,7 @@ __device__ __forceinline__ half2 dot_product_8
     const int v_row,                    // divisible by 8
     const int v_column,
     const half2 v_scale_2,
-    const uint32_t v_zero,              // + 1 (!!)
+    const uint32_t v_zero,
     const int count
 )
 {
@@ -145,7 +145,7 @@ __device__ __forceinline__ half dot_product_8_h
     const int v_row,                    // divisible by 8
     const int v_column,
     const half v_scale,
-    const uint32_t v_zero,              // + 1 (!!)
+    const uint32_t v_zero,
     const int count
 )
 {
@@ -192,7 +192,7 @@ __device__ __forceinline__ half2 dot_product_8_x_map
     const int v_row,                    // divisible by 8
     const int v_column,
     const half2 v_scale_2,
-    const uint32_t v_zero,              // + 1 (!!)
+    const uint32_t v_zero,
     const int count,
     const uint32_t* x_map
 )
@@ -254,7 +254,7 @@ __device__ __forceinline__ half dot_product_8_x_map_h
     const int v_row,                    // divisible by 8
     const int v_column,
     const half v_scale,
-    const uint32_t v_zero,              // + 1 (!!)
+    const uint32_t v_zero,
     const int count,
     const uint32_t* x_map
 )

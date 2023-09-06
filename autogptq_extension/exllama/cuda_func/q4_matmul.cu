@@ -87,7 +87,7 @@ __global__ void q4_matmul_kernel
             if constexpr (use_half2)
             {
                 half2 w_scale = w_scales_.item_half2half2(group, w_column);
-                uint32_t w_zero = w_zeros_.item(group, w_column) + 1;
+                uint32_t w_zero = w_zeros_.item(group, w_column);
 
                 if constexpr (use_x_map) acc = dot_product_8_x_map(acc, x_, x_row, k, w_, k, w_column, w_scale, w_zero, groupsize / 8, x_map);
                 else                     acc = dot_product_8      (acc, x_, x_row, k, w_, k, w_column, w_scale, w_zero, groupsize / 8);
@@ -95,7 +95,7 @@ __global__ void q4_matmul_kernel
             else
             {
                 half w_scale = w_scales_.item(group, w_column);
-                uint32_t w_zero = w_zeros_.item(group, w_column) + 1;
+                uint32_t w_zero = w_zeros_.item(group, w_column);
 
                 if constexpr (use_x_map) acc_h = dot_product_8_x_map_h(acc_h, x_, x_row, k, w_, k, w_column, w_scale, w_zero, groupsize / 8, x_map);
                 else                     acc_h = dot_product_8_h      (acc_h, x_, x_row, k, w_, k, w_column, w_scale, w_zero, groupsize / 8);
@@ -112,7 +112,7 @@ __global__ void q4_matmul_kernel
             {
                 int group = k / groupsize;
                 half2 w_scale = w_scales_.item_half2half2(group, w_column);
-                uint32_t w_zero = w_zeros_.item(group, w_column) + 1;
+                uint32_t w_zero = w_zeros_.item(group, w_column);
 
                 if constexpr (use_x_map) acc = dot_product_8_x_map(acc, x_, x_row, k, w_, k, w_column, w_scale, w_zero, 1, x_map);
                 else                     acc = dot_product_8      (acc, x_, x_row, k, w_, k, w_column, w_scale, w_zero, 1);
@@ -121,7 +121,7 @@ __global__ void q4_matmul_kernel
             {
                 int group = k / groupsize;
                 half w_scale = w_scales_.item(group, w_column);
-                uint32_t w_zero = w_zeros_.item(group, w_column) + 1;
+                uint32_t w_zero = w_zeros_.item(group, w_column);
 
                 if constexpr (use_x_map) acc_h = dot_product_8_x_map_h(acc_h, x_, x_row, k, w_, k, w_column, w_scale, w_zero, 1, x_map);
                 else                     acc_h = dot_product_8_h      (acc_h, x_, x_row, k, w_, k, w_column, w_scale, w_zero, 1);
