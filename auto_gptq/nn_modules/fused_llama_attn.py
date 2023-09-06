@@ -7,6 +7,8 @@ from transformers.models.llama.modeling_llama import LlamaAttention, apply_rotar
 from ._fused_base import FusedBaseAttentionModule
 from ..utils.import_utils import compare_pytorch_version, dynamically_import_QuantLinear
 
+from logging import getLogger
+logger = getLogger(__name__)
 
 class FusedLlamaAttentionForQuantizedModel(FusedBaseAttentionModule):
     """Multi-headed attention from 'Attention Is All You Need' paper"""
@@ -142,7 +144,13 @@ class FusedLlamaAttentionForQuantizedModel(FusedBaseAttentionModule):
         Replace all LlamaAttention modules with QuantLlamaAttention modules, fusing the q, k, v projections.
         """
         QuantLinear = dynamically_import_QuantLinear(use_triton=use_triton, desc_act=desc_act, group_size=group_size, bits=bits, disable_exllama=disable_exllama)
-
+        if QuantLinear.QUANT_TYPE == "exllama" and desc_act:
+            # TODO: support it. The issue lies maybe in the line:
+            # int groups = qzeros.size(0);
+            # in exllama_ext.cpp
+            logger.warning(f"Exllama kernel does not support query/key/value fusion with act-order. Because of this, Fused attention is automatically disabled.")
+            return False
+            
         for name, m in model.named_modules():
             if not isinstance(m, LlamaAttention):
                 continue
@@ -156,13 +164,7 @@ class FusedLlamaAttentionForQuantizedModel(FusedBaseAttentionModule):
             scales = torch.cat([q_proj.scales, k_proj.scales, v_proj.scales], dim=1)
 
             if QuantLinear.QUANT_TYPE == "exllama":
-                if desc_act:
-                    # TODO: support it. The issue lies maybe in the line:
-                    # int groups = qzeros.size(0);
-                    # in exllama_ext.cpp
-                    raise ValueError("Exllama kernel does not support query/key/value fusion with act-order. Please either use inject_fused_attention=False or disable_exllama=True.")
-                else:
-                    g_idx = None
+                g_idx = None
             else:
                 g_idx = torch.cat([q_proj.g_idx, k_proj.g_idx, v_proj.g_idx], dim=0)
             
@@ -197,6 +199,7 @@ class FusedLlamaAttentionForQuantizedModel(FusedBaseAttentionModule):
                 child_name = name
 
             setattr(parent, child_name, attn)
+        return True
 
 
 __all__ = ["FusedLlamaAttentionForQuantizedModel"]
