@@ -39,7 +39,7 @@ class BaseQuantizeConfig(PushToHubMixin):
     damp_percent: float = field(default=0.01)
     desc_act: bool = field(default=True)
     static_groups: bool = field(default=False)
-    sym: bool = field(default=True)
+    sym: bool = field(default=False)
     true_sequential: bool = field(default=True)
     model_name_or_path: Optional[str] = field(default=None)
     model_file_base_name: Optional[str] = field(default=None)
