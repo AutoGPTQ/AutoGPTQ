@@ -15,8 +15,6 @@
     </p>
 </h4>
 
-*<center>📣 好久不见！👋 七月和八月将会迎来架构升级，性能优化和新特性，敬请关注！🥂</center>*
-
 ## 新闻或更新
 
 - 2023-08-23 - (新闻) - 🤗 Transformers、optimum 和 peft 完成了对 `auto-gptq` 的集成，现在使用 GPTQ 模型进行推理和训练将变得更容易！阅读 [这篇博客](https://huggingface.co/blog/gptq-integration) 和相关资源以了解更多细节！
