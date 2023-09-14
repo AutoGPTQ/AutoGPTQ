@@ -29,6 +29,7 @@ GPTQ_CAUSAL_LM_MODEL_MAP = {
     "codegen": CodeGenGPTQForCausalLM,
     "RefinedWebModel": RWGPTQForCausalLM,
     "RefinedWeb": RWGPTQForCausalLM,
+    "falcon": RWGPTQForCausalLM,
     "baichuan": BaiChuanGPTQForCausalLM,
     "internlm": InternLMGPTQForCausalLM,
     "qwen": QwenGPTQForCausalLM,

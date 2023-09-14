@@ -24,6 +24,8 @@ SUPPORTED_MODELS = [
 ]
 if compare_transformers_version("v4.28.0", op="ge"):
     SUPPORTED_MODELS.append("llama")
+if compare_transformers_version("v4.33.0", op="ge"):
+    SUPPORTED_MODELS.append("falcon")
 
 EXLLAMA_DEFAULT_MAX_INPUT_LENGTH = 2048
 
