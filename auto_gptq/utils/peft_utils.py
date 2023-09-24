@@ -402,7 +402,7 @@ def get_gptq_peft_model(
     with hijack_peft_mappings():
         try:
             if train_mode:
-                peft_model = get_peft_model(model.model, peft_config)
+                peft_model = get_peft_model(model.model, peft_config, adapter_name=adapter_name)
             else:
                 peft_model = PeftModel.from_pretrained(model.model, model_id, adapter_name)
         except:
