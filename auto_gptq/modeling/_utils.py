@@ -56,13 +56,14 @@ def make_quant(
     group_size,
     name='',
     use_triton: bool = False,
-    disable_exllama: bool = False,
+    disable_exllama: bool = True,
+    disable_exllamav2: bool = False, 
     use_qigen: bool = False,
     use_cuda_fp16: bool = True,
     desc_act: bool = False,
     trainable: bool = False
 ):  
-    QuantLinear = dynamically_import_QuantLinear(use_triton=use_triton, desc_act=desc_act, group_size=group_size, bits=bits, disable_exllama=disable_exllama, use_qigen=use_qigen)
+    QuantLinear = dynamically_import_QuantLinear(use_triton=use_triton, desc_act=desc_act, group_size=group_size, bits=bits, disable_exllama=disable_exllama, disable_exllamav2=disable_exllamav2, use_qigen=use_qigen)
 
     if isinstance(module, QuantLinear):
         return
@@ -101,6 +102,7 @@ def make_quant(
             desc_act=desc_act,
             trainable=trainable,
             disable_exllama=disable_exllama,
+            disable_exllamav2=disable_exllamav2,
             use_qigen=use_qigen
         )
 
@@ -339,8 +341,32 @@ def autogptq_post_init(model, use_act_order: bool, max_input_length: Optional[in
             if hasattr(submodule, "QUANT_TYPE") and submodule.QUANT_TYPE == "exllama":
                 submodule.post_init()
 
-        torch.cuda.empty_cache()
+    ## exllamav2
+    fixed_bytes = {}
+    model_uses_exllamav2 = False
     
+    for _, submodule in model.named_modules():
+        if hasattr(submodule, "QUANT_TYPE") and submodule.QUANT_TYPE == "exllamav2":
+            model_uses_exllamav2 = True
+            device = submodule.qweight.device
+            scratch_fixed = submodule.scratch_space_fixed()
+            fixed_bytes[device] = max(scratch_fixed, fixed_bytes.get(device,0))
+
+    if model_uses_exllamav2:
+        from ..nn_modules.qlinear.qlinear_exllamav2 import ExLlamaV2DeviceTensors
+        device_tensors = {} 
+        for device, scratch_bytes in fixed_bytes.items():
+            device_tensors[device] = ExLlamaV2DeviceTensors(device.index, scratch_bytes)
+        
+        # have persistent buffers, otherwise we will get OOM
+        model.device_tensors = device_tensors
+
+        for _, submodule in model.named_modules():
+            if hasattr(submodule, "QUANT_TYPE") and submodule.QUANT_TYPE == "exllamav2":
+                device = submodule.qweight.device
+                submodule.post_init(temp_dq = model.device_tensors[device])
+    torch.cuda.empty_cache()
+
     return model
 
 

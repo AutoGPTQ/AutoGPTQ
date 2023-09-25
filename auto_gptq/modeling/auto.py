@@ -82,7 +82,8 @@ class AutoGPTQForCausalLM:
         trust_remote_code: bool = False,
         warmup_triton: bool = False,
         trainable: bool = False,
-        disable_exllama: bool = False,
+        disable_exllama: bool = True,
+        disable_exllamav2: bool = False,
         **kwargs
     ) -> BaseGPTQForCausalLM:
         model_type = check_and_get_model_type(model_name_or_path, trust_remote_code)
@@ -123,6 +124,7 @@ class AutoGPTQForCausalLM:
             warmup_triton=warmup_triton,
             trainable=trainable,
             disable_exllama=disable_exllama,
+            disable_exllamav2=disable_exllamav2,
             **keywords
         )
 
