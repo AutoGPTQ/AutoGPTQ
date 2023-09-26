@@ -137,14 +137,16 @@ class FusedLlamaAttentionForQuantizedModel(FusedBaseAttentionModule):
         desc_act=False,
         trainable=False,
         bits: int = 4,
-        disable_exllama=False,
+        disable_exllama=True,
+        disable_exllamav2=False,
         **kwargs
     ):
         """
         Replace all LlamaAttention modules with QuantLlamaAttention modules, fusing the q, k, v projections.
         """
-        QuantLinear = dynamically_import_QuantLinear(use_triton=use_triton, desc_act=desc_act, group_size=group_size, bits=bits, disable_exllama=disable_exllama)
-        if QuantLinear.QUANT_TYPE == "exllama" and desc_act:
+
+        QuantLinear = dynamically_import_QuantLinear(use_triton=use_triton, desc_act=desc_act, group_size=group_size, bits=bits, disable_exllama=disable_exllama, disable_exllamav2=disable_exllamav2)
+        if QuantLinear.QUANT_TYPE in ["exllama", "exllamav2"] and desc_act:
             # TODO: support it. The issue lies maybe in the line:
             # int groups = qzeros.size(0);
             # in exllama_ext.cpp

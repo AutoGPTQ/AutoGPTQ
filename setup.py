@@ -158,6 +158,17 @@ if BUILD_CUDA_EXT:
             extra_link_args=extra_link_args
         )
     )
+    extensions.append(
+        cpp_extension.CUDAExtension(
+            "exllamav2_kernels",
+            [
+                "autogptq_extension/exllamav2/ext.cpp",
+                "autogptq_extension/exllamav2/cuda/q_matrix.cu",
+                "autogptq_extension/exllamav2/cuda/q_gemm.cu",
+            ],
+            extra_link_args=extra_link_args
+        )
+    )
 
     additional_setup_kwargs = {
         "ext_modules": extensions,

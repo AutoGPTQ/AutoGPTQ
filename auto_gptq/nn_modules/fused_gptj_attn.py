@@ -237,16 +237,18 @@ class FusedGPTJAttentionForQuantizedModel(FusedBaseAttentionModule):
         desc_act=False,
         trainable=False,
         bits: int = 4,
-        disable_exllama=False,
+        disable_exllama=True,
+        disable_exllamav2=False,
         **kwargs
     ):
         config = model.config
-        QuantLinear = dynamically_import_QuantLinear(use_triton=use_triton, desc_act=desc_act, group_size=group_size, bits=bits, disable_exllama=disable_exllama)
-        if QuantLinear.QUANT_TYPE == "exllama" and desc_act:
+        
+        QuantLinear = dynamically_import_QuantLinear(use_triton=use_triton, desc_act=desc_act, group_size=group_size, bits=bits, disable_exllama=disable_exllama, disable_exllamav2=disable_exllamav2)
+        if QuantLinear.QUANT_TYPE in ["exllama", "exllamav2"] and desc_act:
             # See fused_llama_attn.py comment
             logger.warning(f"Exllama kernel does not support query/key/value fusion with act-order. Because of this, Fused attention is automatically disabled.")
             return False
-            
+        
         for name, m in model.named_modules():
             if not isinstance(m, GPTJAttention):
                 continue
