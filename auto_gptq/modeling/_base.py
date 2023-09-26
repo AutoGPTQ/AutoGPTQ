@@ -91,9 +91,17 @@ class BaseQuantizeConfig(PushToHubMixin):
                 _commit_hash=commit_hash,
             )
         
+        field_names = [field.name for field in fields(cls)]
         with open(resolved_config_file, "r", encoding="utf-8") as f:
-            return cls(**json.load(f))
-                
+            args_from_json = json.load(f)
+            filtered_args = {}
+            for key, val in args_from_json.items():
+                if key in field_names:
+                    filtered_args[key] = val
+                else:
+                    logger.warning(f"ignoring unknown parameter in {quantize_config_filename}: {key}.")
+            return cls(**filtered_args)
+
     def to_dict(self):
         return {
             "bits": self.bits,
