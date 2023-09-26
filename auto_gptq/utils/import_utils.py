@@ -24,7 +24,14 @@ try:
     EXLLAMA_KERNELS_AVAILABLE = True
 except:
     EXLLAMA_KERNELS_AVAILABLE = False
+    
+try:
+    import exllamav2_kernels
 
+    EXLLAMAV2_KERNELS_AVAILABLE = True
+except:
+    EXLLAMAV2_KERNELS_AVAILABLE = False
+    
 try:
     import cQIGen as qinfer
 
@@ -35,7 +42,7 @@ except:
 logger = getLogger(__name__)
 
 
-def dynamically_import_QuantLinear(use_triton: bool, desc_act: bool, group_size: int, bits: int, disable_exllama: bool = False, use_qigen: bool = False):
+def dynamically_import_QuantLinear(use_triton: bool, desc_act: bool, group_size: int, bits: int, disable_exllama: bool = True, disable_exllamav2:bool = False, use_qigen: bool = False):
     if use_qigen:
         from ..nn_modules.qlinear.qlinear_qigen import QuantLinear
     else:
@@ -45,7 +52,9 @@ def dynamically_import_QuantLinear(use_triton: bool, desc_act: bool, group_size:
 
             from ..nn_modules.qlinear.qlinear_triton import QuantLinear
         else:
-            if bits == 4 and not disable_exllama and EXLLAMA_KERNELS_AVAILABLE:
+            if bits == 4 and not disable_exllamav2 and EXLLAMAV2_KERNELS_AVAILABLE:
+                from ..nn_modules.qlinear.qlinear_exllamav2 import QuantLinear
+            elif bits == 4 and not disable_exllama and EXLLAMA_KERNELS_AVAILABLE:
                 from ..nn_modules.qlinear.qlinear_exllama import QuantLinear
             elif not desc_act or group_size == -1:
                 from ..nn_modules.qlinear.qlinear_cuda_old import QuantLinear
