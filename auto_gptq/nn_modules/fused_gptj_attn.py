@@ -8,6 +8,8 @@ from transformers.models.gptj.modeling_gptj import GPTJAttention
 from ._fused_base import FusedBaseAttentionModule
 from ..utils.import_utils import compare_pytorch_version, dynamically_import_QuantLinear
 
+from logging import getLogger
+logger = getLogger(__name__)
 
 def fixed_pos_embedding(x, seq_dim=1, seq_len=None):
     dim = x.shape[-1]
@@ -240,8 +242,13 @@ class FusedGPTJAttentionForQuantizedModel(FusedBaseAttentionModule):
         **kwargs
     ):
         config = model.config
+        
         QuantLinear = dynamically_import_QuantLinear(use_triton=use_triton, desc_act=desc_act, group_size=group_size, bits=bits, disable_exllama=disable_exllama, disable_exllamav2=disable_exllamav2)
-
+        if QuantLinear.QUANT_TYPE in ["exllama", "exllamav2"] and desc_act:
+            # See fused_llama_attn.py comment
+            logger.warning(f"Exllama kernel does not support query/key/value fusion with act-order. Because of this, Fused attention is automatically disabled.")
+            return False
+        
         for name, m in model.named_modules():
             if not isinstance(m, GPTJAttention):
                 continue
@@ -257,11 +264,7 @@ class FusedGPTJAttentionForQuantizedModel(FusedBaseAttentionModule):
             scales = torch.cat([q_proj.scales, k_proj.scales, v_proj.scales], dim=1)
 
             if QuantLinear.QUANT_TYPE == "exllama":
-                if desc_act:
-                    # See fused_llama_attn.py comment
-                    raise ValueError("Exllama kernel does not support query/key/value fusion with act-order. Please either use inject_fused_attention=False or disable_exllama=True.")
-                else:
-                    g_idx = None
+                g_idx = None
             else:
                 g_idx = torch.cat([q_proj.g_idx, k_proj.g_idx, v_proj.g_idx], dim=0)
 
@@ -298,6 +301,6 @@ class FusedGPTJAttentionForQuantizedModel(FusedBaseAttentionModule):
 
             setattr(parent, child_name, attn)
             del m
-
+        return True
 
 __all__ = ["FusedGPTJAttentionForQuantizedModel"]
