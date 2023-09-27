@@ -1162,7 +1162,7 @@ def unpack_zeros(bits):
     res += f"void unpack_zeros{bits}_cpu(const int* zv, float* ov, int n, int m)"
     packed = 32//bits
     mask = (2**bits)-1
-    res += "{\n"
+    res += "{\nconst __m256i ones = _mm256_set1_epi32(1);\n"
     res += f"const __m256i mask = _mm256_set1_epi32({mask});\n"
     if bits == 4:
         res += "const __m256i shift = _mm256_set_epi32(28,24,20,16,12,8,4,0);\n"
@@ -1179,14 +1179,15 @@ def unpack_zeros(bits):
         res += "__m256i z = _mm256_set1_epi32(zv[i*m/8 + j/8]);\n"
         res += "__m256i z0 = _mm256_srlv_epi32(z, shift);\n"
         res += "__m256i z1 = _mm256_and_si256(z0, mask);\n"
-        res += "__m256 z2 = _mm256_cvtepi32_ps(z1);\n"
-        res += "_mm256_storeu_ps(&ov[i*m +j], z2);\n"
+        res += "__m256i z2 = _mm256_add_epi32(z1, ones);\n"
+        res += "__m256 z3 = _mm256_cvtepi32_ps(z2);\n"
+        res += "_mm256_storeu_ps(&ov[i*m +j], z3);\n"
     elif bits == 2:
         res += f"for (int j = 0; j < m; j+={packed})"
         res += "{\n"
         res += f"for (int k = 0; k < {packed}; k++)"
         res += "{\n"
-        res += f"ov[i*m + j+k] = ((zv[j/{packed}] >> ({bits}*k)) & {mask});\n"
+        res += f"ov[i*m + j+k] = (((zv[j/{packed}] >> ({bits}*k)) & {mask})+1);\n"
         res += "}\n"
         # res += "for(int j = 0; j < m; j+=16){\n"
         # res += "__m256i z = _mm256_set1_epi32(zv[i*m/16 + j/16]);\n"
