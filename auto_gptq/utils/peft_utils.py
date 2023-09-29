@@ -14,6 +14,12 @@ from peft.mapping import PEFT_TYPE_TO_CONFIG_MAPPING
 from peft.utils.other import _get_submodules
 
 from ..modeling._base import BaseGPTQForCausalLM
+from ..nn_modules.qlinear import GeneralQuantLinear
+from ..nn_modules.qlinear.qlinear_cuda import QuantLinear as QuantLinearCuda
+from ..nn_modules.qlinear.qlinear_cuda_old import QuantLinear as QuantLinearCudaOld
+from ..nn_modules.qlinear.qlinear_exllama import QuantLinear as QuantLinearExllama
+from ..nn_modules.qlinear.qlinear_qigen import QuantLinear as QuantLinearQigen
+from ..nn_modules.qlinear.qlinear_triton import QuantLinear as QuantLinearTriton
 
 
 class GPTQLoraConfig(LoraConfig):
@@ -34,14 +40,21 @@ class GPTQLoraLinear(torch.nn.Linear, LoraLayer):
     ):
         init_lora_weights = kwargs.pop("init_lora_weights", True)
 
-        torch.nn.Linear.__init__(self, linear_module.in_features, linear_module.out_features)
-        LoraLayer.__init__(self, linear_module.in_features, linear_module.out_features)
+        in_features = getattr(linear_module, "in_features",
+                              getattr(linear_module, "infeatures"))
+        out_features = getattr(linear_module, "out_features",
+                               getattr(linear_module, "outfeatures"))
+        torch.nn.Linear.__init__(self, in_features, out_features)
+        LoraLayer.__init__(self, in_features, out_features)
 
         self.linear_module = linear_module
 
-        self.weight.requires_grad = False
-        self.weight = self.linear_module.weight
-        self.bias = self.linear_module.bias
+        delattr(self, "weight")
+        if hasattr(self.linear_module, "weight"):
+            self.weight = self.linear_module.weight
+        if hasattr(self.linear_module, "qweight"):
+            self.weight = self.linear_module.qweight
+        delattr(self, "bias")
         self.fan_in_fan_out = fan_in_fan_out
         if fan_in_fan_out:
             self.weight.data = self.weight.data.T
@@ -163,7 +176,40 @@ class GPTQLoraModel(LoraModel):
         # dispatch to correct device
         for name, module in new_module.named_modules():
             if "lora_" in name:
-                module.to(old_module.weight.device)
+                device = (
+                    list(old_module.parameters()) + \
+                    list(old_module.buffers())
+                )[0].device
+                module.to(device)
+
+    @staticmethod
+    def _create_new_module(lora_config: GPTQLoraConfig, adapter_name: str, target: torch.nn.Linear,
+                           **kwargs):
+        gptq_quantlinears = {
+            GeneralQuantLinear, QuantLinearCuda,
+            QuantLinearCudaOld, QuantLinearExllama,
+            QuantLinearQigen, QuantLinearTriton
+        }
+        is_gptq_layer = any([
+            isinstance(target, cls)
+            for cls in gptq_quantlinears
+        ])
+        if is_gptq_layer:
+            return GPTQLoraLinear(
+                adapter_name,
+                target,
+                r=lora_config.r,
+                lora_alpha=lora_config.lora_alpha,
+                lora_dropout=lora_config.lora_dropout,
+                fan_in_fan_out=lora_config.fan_in_fan_out,
+            )
+        else:
+            return LoraModel._create_new_module(
+                lora_config,
+                adapter_name,
+                target,
+                **kwargs
+            )
 
     def merge_adapter(self):
         raise NotImplementedError("gptq model not support merge ada lora adapter")
@@ -406,6 +452,7 @@ def get_gptq_peft_model(
             else:
                 peft_model = PeftModel.from_pretrained(model.model, model_id, adapter_name)
         except:
+            raise
             raise NotImplementedError(
                 f"{model.__class__.__name__} not support {peft_config.peft_type.value} peft type yet."
             )
