@@ -16,6 +16,7 @@ from .gpt_bigcode import GPTBigCodeGPTQForCausalLM
 from .baichuan import BaiChuanGPTQForCausalLM
 from .internlm import InternLMGPTQForCausalLM
 from .qwen import QwenGPTQForCausalLM
+from .mistral import MistralGPTQForCausalLM
 
 GPTQ_CAUSAL_LM_MODEL_MAP = {
     "bloom": BloomGPTQForCausalLM,
@@ -33,6 +34,7 @@ GPTQ_CAUSAL_LM_MODEL_MAP = {
     "baichuan": BaiChuanGPTQForCausalLM,
     "internlm": InternLMGPTQForCausalLM,
     "qwen": QwenGPTQForCausalLM,
+    "mistral": MistralGPTQForCausalLM,
 }
 
 
