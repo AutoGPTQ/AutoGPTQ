@@ -21,6 +21,8 @@ except ImportError:
 
 
 class QuantLinear(nn.Module, TritonModuleMixin):
+    QUANT_TYPE = "triton"
+
     def __init__(
         self,
         bits,
@@ -63,6 +65,9 @@ class QuantLinear(nn.Module, TritonModuleMixin):
             self.bias = None
 
         self.trainable = trainable
+
+    def post_init(self):
+        pass
 
     def pack(self, linear, scales, zeros, g_idx=None):
         W = linear.weight.data.clone()

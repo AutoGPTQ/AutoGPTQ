@@ -15,15 +15,21 @@
     </p>
 </h4>
 
-*<center>📣 好久不见！👋 七月和八月将会迎来架构升级，性能优化和新特性，敬请关注！🥂</center>*
+## 通向 v1.0.0 之路
+
+嗨，社区的伙伴们，好久不见！很抱歉这段时间由于个人原因，我没能以较高的频率来更新这个项目。过去几周对我的职业生涯规划而言意义重大。在不久前，我正式告别了毕业后便加入两年之久的创业团队，非常感谢团队的领导和同事们给予我的信任与指导，让我能够在两年时间里飞速地成长；同时也十分感激团队允许我自 AutoGPTQ 项目创立以来一直无偿使用内部的 A100 GPU 服务器集群以完成各项实验与性能测评。（当然今后是无法继续使用了，因此**若有新的硬件赞助我将感激不尽**！）过去的两年里，我在这个团队中担任算法工程师的角色，负责基于大语言模型的对话系统架构设计与开发，我们曾成功推出一款名为 gemsouls 的产品，但不幸的是它已经停止运营。而现在，这个团队即将推出一款名为 [modelize](https://www.beta.modelize.ai/) 的新产品，**这是一个大模型原生的 AI 智能体平台，用户可以使用多个 AI 智能体搭建一个高度自动化的团队，让它们在工作流中相互合作，高效完成复杂的项目。**
+
+话归正题，我非常兴奋地看到，在过去几个月的时间里，针对大语言模型推理性能优化的研究取得了巨大的进展，如今我们不仅能够在高端显卡上完成大语言模型的推理，甚至在 CPU 和边缘设备上都可以轻松运行大语言模型。一系列的技术进步，让我同样迫不及待地在开源社区上做出更多的贡献，因此，首先，我将用约四周的时间将 AutoGPTQ 迭代至 v1.0.0 正式版本，在此期间，也会有 2~3 个小版本发布以让用户能够及时体验性能优化和新特性。在我的愿景里，**到 v1.0.0 版本正式发布时，AutoGPTQ 将能够作为一个灵活可拓展的、支持所有 GPTQ-like 方法的量化后端，自动地完成各种基于 Pytorch 编写的大语言模型的量化工作**。我在[这里](https://github.com/PanQiWei/AutoGPTQ/issues/348)详细介绍了开发计划，欢迎移步至此进行讨论并给出你们的建议！
 
 ## 新闻或更新
 
+- 2023-08-23 - (新闻) - 🤗 Transformers、optimum 和 peft 完成了对 `auto-gptq` 的集成，现在使用 GPTQ 模型进行推理和训练将变得更容易！阅读 [这篇博客](https://huggingface.co/blog/gptq-integration) 和相关资源以了解更多细节！
+- 2023-08-21 - (新闻) - 通义千问团队发布了基于 `auto-gptq` 的 Qwen-7B 4bit 量化版本模型，并提供了[详尽的测评结果](https://huggingface.co/Qwen/Qwen-7B-Chat-Int4#%E9%87%8F%E5%8C%96-quantization)
+- 2023-08-06 - (更新) - 支持 exllama 的 q4 CUDA 算子使得 int4 量化模型能够获得至少1.3倍的推理速度提升.
+- 2023-08-04 - (更新) - 支持 RoCm 使得 AMD GPU 的用户能够使用 auto-gptq 的 CUDA 拓展.
 - 2023-07-26 - (更新) - 一个优雅的 [PPL 测评脚本](examples/benchmark/perplexity.py)以获得可以与诸如 `llama.cpp` 等代码库进行公平比较的结果。
 - 2023-06-05 - (更新) - 集成 🤗 peft 来使用 gptq 量化过的模型训练适应层，支持 LoRA，AdaLoRA，AdaptionPrompt 等。
 - 2023-05-30 - (更新) - 支持从 🤗 Hub 下载量化好的模型或上次量化好的模型到 🤗 Hub。
-- 2023-05-27 - (更新) - 支持以下模型的量化和推理： `gpt_bigcode`， `codegen` 以及 `RefineWeb/RefineWebModel`（falcon）。
-- 2023-05-04 - (更新) - 支持在 `not desc_act or group_size == -1` 的情况下使用更快的 cuda 算子。
 
 *获取更多的历史信息，请转至[这里](docs/NEWS_OR_UPDATE.md)*
 
@@ -52,15 +58,14 @@
 ## 安装
 
 ### 快速安装
-你可以通过 pip 来安装 AutoGPTQ 当前最新的稳定版本：
-```shell
-pip install auto-gptq
-```
-从 0.2.0 版本开始，你可以从每次版本发布的资产文件列表中下载预构建好的符合你系统配置情况的轮子文件，并通过安装这些轮子文件来跳过漫长的构建过程以达到最快的安装速度。如下是一个例子：
-```shell
-# 首先，进入轮子文件存放的目录，然后执行下面的命令
-pip install auto_gptq-0.2.0+cu118-cp310-cp310-linux_x86_64.whl # 在 linux 操作系统的一个 python=3.10 且 cuda=11.8 的环境下安装 0.2.0 版本的 auto_gptq
-```
+你可以通过 pip 来安装与 PyTorch 2.0.1 相兼容的最新稳定版本的 AutoGPTQ 的预构建轮子文件：
+
+* 对于 CUDA 11.7： `pip install auto-gptq --extra-index-url https://huggingface.github.io/autogptq-index/whl/cu117/`
+* 对于 CUDA 11.8： `pip install auto-gptq --extra-index-url https://huggingface.github.io/autogptq-index/whl/cu118/`
+* 对于 RoCm 5.4.2： `pip install auto-gptq --extra-index-url https://huggingface.github.io/autogptq-index/whl/rocm542/`
+
+**警告：** 预构建的轮子文件不一定在 PyTorch 的 nightly 版本上有效。如果要使用 PyTorch 的 nightly 版本，请从源码安装 AutoGPTQ。
+
 #### 取消 cuda 拓展的安装
 默认情况下，在 `torch` 和 `cuda` 已经于你的机器上被安装时，cuda 拓展将被自动安装，如果你不想要这些拓展的话，采用以下安装命令：
 ```shell
@@ -94,6 +99,14 @@ pip install .
 正如在快速安装一节，你可以使用 `BUILD_CUDA_EXT=0` 来取消构建 cuda 拓展。
 
 如果你想要使用 triton 加速且其能够被你的操作系统所支持，请使用 `.[triton]`。
+
+对应 AMD GPUs，为了从源码安装以支持 RoCm，请设置 `ROCM_VERSION` 环境变量。同时通过设置 `PYTORCH_ROCM_ARCH` ([reference](https://github.com/pytorch/pytorch/blob/7b73b1e8a73a1777ebe8d2cd4487eb13da55b3ba/setup.py#L132)) 可提升编译速度，例如：对于 MI200 系列设备，该变量可设为 `gfx90a`。例子：
+
+```
+ROCM_VERSION=5.6 pip install .
+```
+
+对于 RoCm 系统，在从源码安装时额外需要提前安装以下包：`rocsparse-dev`, `hipsparse-dev`, `rocthrust-dev`, `rocblas-dev` and `hipblas-dev`。
 
 </details>
 

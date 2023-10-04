@@ -20,9 +20,14 @@ SUPPORTED_MODELS = [
     "RefinedWeb",
     "baichuan",
     "internlm",
+    "qwen",
     "mpt",
 ]
 if compare_transformers_version("v4.28.0", op="ge"):
     SUPPORTED_MODELS.append("llama")
+if compare_transformers_version("v4.33.0", op="ge"):
+    SUPPORTED_MODELS.append("falcon")
 
-__all__ = ["CPU", "CUDA_0", "SUPPORTED_MODELS"]
+EXLLAMA_DEFAULT_MAX_INPUT_LENGTH = 2048
+
+__all__ = ["CPU", "CUDA_0", "SUPPORTED_MODELS", "EXLLAMA_DEFAULT_MAX_INPUT_LENGTH"]

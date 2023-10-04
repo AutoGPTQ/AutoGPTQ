@@ -15,6 +15,7 @@ from .rw import RWGPTQForCausalLM
 from .gpt_bigcode import GPTBigCodeGPTQForCausalLM
 from .baichuan import BaiChuanGPTQForCausalLM
 from .internlm import InternLMGPTQForCausalLM
+from .qwen import QwenGPTQForCausalLM
 from .mpt import MPTGPTQForCausalLM
 
 
@@ -30,8 +31,10 @@ GPTQ_CAUSAL_LM_MODEL_MAP = {
     "codegen": CodeGenGPTQForCausalLM,
     "RefinedWebModel": RWGPTQForCausalLM,
     "RefinedWeb": RWGPTQForCausalLM,
+    "falcon": RWGPTQForCausalLM,
     "baichuan": BaiChuanGPTQForCausalLM,
     "internlm": InternLMGPTQForCausalLM,
+    "qwen": QwenGPTQForCausalLM,
     "mpt": MPTGPTQForCausalLM,
 }
 
@@ -82,6 +85,8 @@ class AutoGPTQForCausalLM:
         trust_remote_code: bool = False,
         warmup_triton: bool = False,
         trainable: bool = False,
+        disable_exllama: bool = True,
+        disable_exllamav2: bool = False,
         **kwargs
     ) -> BaseGPTQForCausalLM:
         model_type = check_and_get_model_type(model_name_or_path, trust_remote_code)
@@ -121,6 +126,8 @@ class AutoGPTQForCausalLM:
             trust_remote_code=trust_remote_code,
             warmup_triton=warmup_triton,
             trainable=trainable,
+            disable_exllama=disable_exllama,
+            disable_exllamav2=disable_exllamav2,
             **keywords
         )
 

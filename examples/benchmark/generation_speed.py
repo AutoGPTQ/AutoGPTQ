@@ -146,7 +146,8 @@ def load_model_tokenizer(
     use_safetensors: bool = False,
     use_fast_tokenizer: bool = False,
     inject_fused_attention: bool = True,
-    inject_fused_mlp: bool = True
+    inject_fused_mlp: bool = True,
+    disable_exllama: bool = False
 ):
     tokenizer = AutoTokenizer.from_pretrained(
         pretrained_model_name_or_path=tokenizer_name_or_path or model_name_or_path,
@@ -176,7 +177,8 @@ def load_model_tokenizer(
             model_basename=model_basename,
             use_safetensors=use_safetensors,
             trust_remote_code=trust_remote_code,
-            warmup_triton=False
+            warmup_triton=False,
+            disable_exllama=disable_exllama
         )
 
     return model, tokenizer
@@ -234,6 +236,7 @@ def main():
     parser.add_argument("--use_triton", action="store_true")
     parser.add_argument("--use_safetensors", action="store_true")
     parser.add_argument("--use_fast_tokenizer", action="store_true")
+    parser.add_argument("--disable_exllama", action="store_true")
     parser.add_argument("--no_inject_fused_attention", action="store_true")
     parser.add_argument("--no_inject_fused_mlp", action="store_true")
     parser.add_argument("--num_samples", type=int, default=10)
@@ -275,7 +278,8 @@ def main():
         use_safetensors=args.use_safetensors,
         use_fast_tokenizer=args.use_fast_tokenizer,
         inject_fused_attention=not args.no_inject_fused_attention,
-        inject_fused_mlp=not args.no_inject_fused_mlp
+        inject_fused_mlp=not args.no_inject_fused_mlp,
+        disable_exllama=args.disable_exllama
     )
     end = time.time()
     logger.info(f"model and tokenizer loading time: {end - start:.4f}s")
