@@ -219,7 +219,7 @@ class QuantLinear(nn.Module):
                     torch.unsqueeze(self.qzeros, 2).expand(-1, -1, 32 // self.bits),
                     self.wf.unsqueeze(0)
                 ).to(torch.int16 if self.bits == 8 else torch.int8)
-                torch.bitwise_and(zeros, (2 ** self.bits) - 1, out=zeros)
+                zeros = torch.bitwise_and(zeros, (2 ** self.bits) - 1)
 
                 zeros = zeros + 1
                 zeros = zeros.reshape(self.scales.shape)
@@ -228,7 +228,7 @@ class QuantLinear(nn.Module):
                     torch.unsqueeze(self.qweight, 1).expand(-1, 32 // self.bits, -1),
                     self.wf.unsqueeze(-1)
                 ).to(torch.int16 if self.bits == 8 else torch.int8)
-                torch.bitwise_and(weight, (2 ** self.bits) - 1, out=weight)
+                weight = torch.bitwise_and(weight, (2 ** self.bits) - 1)
             elif self.bits == 3:
                 zeros = self.qzeros.reshape(
                     self.qzeros.shape[0], self.qzeros.shape[1] // 3, 3, 1
@@ -267,10 +267,10 @@ class QuantLinear(nn.Module):
                     g_idx_i = self.g_idx[i*num_dim:(i+1)*num_dim]
                     weights.append(scale_i[g_idx_i.long()] * (weight_i - zeros_i[g_idx_i.long()]))
                 weights = torch.cat(weights,dim=1)
-            out = torch.matmul(x.half(), weights)
+            out = torch.matmul(x.to(weights.dtype), weights)
         out = out.half().reshape(out_shape)
         out = out + self.bias if self.bias is not None else out
-        return out
+        return out.to(x.dtype)
 
 
 __all__ = ["QuantLinear"]
