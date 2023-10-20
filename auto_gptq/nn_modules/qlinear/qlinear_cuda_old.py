@@ -229,7 +229,7 @@ class QuantLinear(nn.Module):
                 
             if self.bits in [2,4,8]:
                zeros = torch.bitwise_right_shift(torch.unsqueeze(self.qzeros, 2).expand(-1, -1, 32 // self.bits), self.wf.unsqueeze(0)).to(torch.int16 if self.bits == 8 else torch.int8)
-               torch.bitwise_and(zeros, (2 ** self.bits) - 1, out=zeros)
+               zeros = torch.bitwise_and(zeros, (2 ** self.bits) - 1)
                    
                zeros = zeros + 1
                zeros = zeros.reshape(-1, 1, zeros.shape[1] * zeros.shape[2])
@@ -238,7 +238,7 @@ class QuantLinear(nn.Module):
                scales = scales.reshape(-1, 1, scales.shape[-1])
                 
                weight = torch.bitwise_right_shift(torch.unsqueeze(self.qweight, 1).expand(-1, 32 // self.bits, -1), self.wf.unsqueeze(-1)).to(torch.int16 if self.bits == 8 else torch.int8)
-               torch.bitwise_and(weight,(2 ** self.bits) - 1, out=weight)
+               weight = torch.bitwise_and(weight,(2 ** self.bits) - 1)
                weight = weight.reshape(-1, self.group_size, weight.shape[2])
             elif self.bits == 3:
                zeros = self.qzeros.reshape(self.qzeros.shape[0], self.qzeros.shape[1]//3, 3, 1).expand(-1, -1, -1, 12)
@@ -266,10 +266,10 @@ class QuantLinear(nn.Module):
             weight = (scales * (weight - zeros))
             weight = weight.reshape(weight.shape[0] * weight.shape[1], weight.shape[2])
 
-            out = torch.matmul(x.half(), weight)
+            out = torch.matmul(x.to(weight.dtype), weight)
         out = out.half().reshape(out_shape)
         out = out + self.bias if self.bias is not None else out
-        return out
+        return out.to(x.dtype)
 
 
 __all__ = ["QuantLinear"]
