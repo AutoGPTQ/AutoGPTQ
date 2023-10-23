@@ -266,7 +266,12 @@ class QuantLinear(nn.Module):
             weight = (scales * (weight - zeros))
             weight = weight.reshape(weight.shape[0] * weight.shape[1], weight.shape[2])
 
-            out = torch.matmul(x.to(weight.dtype), weight)
+            # Temporarly upcast in fp32 to support CPU inference
+            if weight.dtype == torch.float16 and weight.device.type == "cpu":
+                out = torch.matmul(x.float(), weight.float())
+            else:
+                out = torch.matmul(x.to(weight.dtype), weight)
+                
         out = out.half().reshape(out_shape)
         out = out + self.bias if self.bias is not None else out
         return out.to(x.dtype)
