@@ -267,7 +267,12 @@ class QuantLinear(nn.Module):
                     g_idx_i = self.g_idx[i*num_dim:(i+1)*num_dim]
                     weights.append(scale_i[g_idx_i.long()] * (weight_i - zeros_i[g_idx_i.long()]))
                 weights = torch.cat(weights,dim=1)
-            out = torch.matmul(x.to(weights.dtype), weights)
+
+            # To support CPU inference
+            if weight.dtype == torch.float16 and weight.device.type == "cpu":
+                out = torch.matmul(x.float(), weight.float())
+            else:
+                out = torch.matmul(x.to(weight.dtype), weight)
         out = out.half().reshape(out_shape)
         out = out + self.bias if self.bias is not None else out
         return out.to(x.dtype)
