@@ -81,13 +81,25 @@ pip install -v .
 ```
 You can set `BUILD_CUDA_EXT=0` to disable pytorch extension building, but this is **strongly discouraged** as AutoGPTQ then falls back on a slow python implementation.
 
-To install from source for AMD GPUs supporting RoCm, please specify the `ROCM_VERSION` environment variable. The compilation can be speeded up by specifying the `PYTORCH_ROCM_ARCH` variable ([reference](https://github.com/pytorch/pytorch/blob/7b73b1e8a73a1777ebe8d2cd4487eb13da55b3ba/setup.py#L132)), for example `gfx90a` for MI200 series devices. Example:
+#### On RoCm systems
+
+To install from source for AMD GPUs supporting RoCm, please specify the `ROCM_VERSION` environment variable. Example:
 
 ```
 ROCM_VERSION=5.6 pip install -v .
 ```
 
+The compilation can be speeded up by specifying the `PYTORCH_ROCM_ARCH` variable ([reference](https://github.com/pytorch/pytorch/blob/7b73b1e8a73a1777ebe8d2cd4487eb13da55b3ba/setup.py#L132)) in order to build for a single target device, for example `gfx90a` for MI200 series devices.
+
 For RoCm systems, the packages `rocsparse-dev`, `hipsparse-dev`, `rocthrust-dev`, `rocblas-dev` and `hipblas-dev` are required to build.
+
+The following combinations are tested:
+
+| RoCm version | PyTorch version |
+|--------------|-----------------|
+| 5.4.2        | 2.0.1           |
+| 5.6          | 2.1.0           |
+| 5.7          | nightly         |
 
 ## Quick Tour
 
