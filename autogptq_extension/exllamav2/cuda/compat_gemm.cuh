@@ -2,6 +2,11 @@
 #define _compat_gemm_cuh
 
 #if defined(USE_ROCM)
+
+// For some reason this include is not present anywhere in exllama_v2 codebase, but it is required
+// for symbols as hipblasHalf.
+#include <hipblas/hipblas.h>
+
 __host__ __forceinline__ hipblasStatus_t __compat_hipblasHgemm(hipblasHandle_t    handle,
                                                                hipblasOperation_t transA,
                                                                hipblasOperation_t transB,
