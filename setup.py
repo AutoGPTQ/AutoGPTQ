@@ -97,9 +97,13 @@ if BUILD_CUDA_EXT:
     from torch.utils import cpp_extension
        
     if platform.system() != 'Windows':
+        print("Generating qigen kernels...")
         p = int(subprocess.run("cat /proc/cpuinfo | grep cores | head -1", shell=True, check=True, text=True, stdout=subprocess.PIPE).stdout.split(" ")[2])
-        subprocess.call(["python", "./autogptq_extension/qigen/generate.py", "--module", "--search", "--p", str(p)])
-        
+        try:
+            subprocess.check_output(["python", "./autogptq_extension/qigen/generate.py", "--module", "--search", "--p", str(p)])
+        except subprocess.CalledProcessError as e:
+            raise Exception(f"Generating QiGen kernels failed with the error shown above.")
+
     if not ROCM_VERSION:
         from distutils.sysconfig import get_python_lib
         conda_cuda_include_dir = os.path.join(get_python_lib(), "nvidia/cuda_runtime/include")

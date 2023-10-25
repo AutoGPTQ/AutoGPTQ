@@ -793,12 +793,12 @@ def gen_and_compile(n, m, t, nb, mb, tb, nu, mu, tu, p, unroll, bits=4, gs=-1, m
 # g++ mmm_test.cpp -O3 -ftree-vectorize -mfma -mavx -mavx2 -fno-signaling-nans -fno-trapping-math -fopenmp -o mmm_test
     start = time.time()
     if not module:
-        subprocess.call(["g++", "-O3", "-o", "./autogptq_extension/qigen/mmm_test", "./autogptq_extension/qigen/mmm_test.cpp", "-mavx", "-mfma", "-mavx2", "-ftree-vectorize", "-fno-signaling-nans", "-fno-trapping-math", "-march=native", "-fopenmp"])
-        subprocess.call(["./autogptq_extension/qigen/mmm_test", f"{n}", f"{m}", f"{t}", f"{bits}", f"{gs}"])
+        subprocess.check_output(["g++", "-O3", "-o", "./autogptq_extension/qigen/mmm_test", "./autogptq_extension/qigen/mmm_test.cpp", "-mavx", "-mfma", "-mavx2", "-ftree-vectorize", "-fno-signaling-nans", "-fno-trapping-math", "-march=native", "-fopenmp"])
+        subprocess.check_output(["./autogptq_extension/qigen/mmm_test", f"{n}", f"{m}", f"{t}", f"{bits}", f"{gs}"])
     else:
-        subprocess.call(["g++", "-O3", "-o", "./autogptq_extension/qigen/mmm", "./autogptq_extension/qigen/mmm.cpp", "-mavx", "-mfma", "-mavx2", "-ftree-vectorize", "-fno-signaling-nans", "-fno-trapping-math", "-march=native", "-fopenmp"])
-        subprocess.call(["./autogptq_extension/qigen/mmm", f"{n}", f"{m}", f"{t}", f"{bits}", f"{gs}"])
-        # subprocess.call(["./autogptq_extension/qigen/mmm", f"{n}", f"{m}", f"{t}", f"{bits}", f"{gs}", ">>", "./autogptq_extension/qigen/tmp.csv"])
+        subprocess.check_output(["g++", "-O3", "-o", "./autogptq_extension/qigen/mmm", "./autogptq_extension/qigen/mmm.cpp", "-mavx", "-mfma", "-mavx2", "-ftree-vectorize", "-fno-signaling-nans", "-fno-trapping-math", "-march=native", "-fopenmp"])
+        subprocess.check_output(["./autogptq_extension/qigen/mmm", f"{n}", f"{m}", f"{t}", f"{bits}", f"{gs}"])
+
     end = time.time() - start
     return end
 
@@ -1396,8 +1396,7 @@ def gen_module_search(r, p, bits_list=[2,3,4]):
     #print measurements to a tmp file and read back best micro parameters
     code = ""
 
-    subprocess.call(["rm", "./autogptq_extension/qigen/tmp.csv"])
-    subprocess.call(["touch", "./autogptq_extension/qigen/tmp.csv"])
+    # Opening in 'w' mode overwrites tmp.csv.
     with open("./autogptq_extension/qigen/tmp.csv", "w") as f:
         f.write("bits,nu,mu,tu,unroll,p,gs,time\n") 
 
@@ -1451,8 +1450,6 @@ def gen_module_search(r, p, bits_list=[2,3,4]):
         f.write(unquantize_sim(p))
         f.write(code)
         f.write(template.module(bits_list))
-
-    # subprocess.call(["rm", "./autogptq_extension/qigen/tmp.csv"])
 
 
 if __name__ == "__main__":
