@@ -139,6 +139,9 @@ QMatrix::QMatrix
     shuffle_kernel<<<gridDim, blockDim>>>(cuda_q_weight, height, width, rows_8, rows_6, rows_5, rows_4, rows_3, rows_2);
 }
 
+QMatrix::~QMatrix()
+{
+}
 
 // Reconstruct b[k,n] (GPTQ)
 
