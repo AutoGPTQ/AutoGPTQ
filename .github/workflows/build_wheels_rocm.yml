@@ -10,7 +10,7 @@ jobs:
       matrix:
         os: [ubuntu-20.04]
         python: ["3.8", "3.9", "3.10", "3.11"]
-        rocm: ["5.4.2"]  # , "5.5", "5.6"]
+        rocm: ["5.6"]  # we build only for rocm5.6 to match PyTorch 2.1.0
 
     name: Build wheels for ${{ matrix.os }} and Python ${{ matrix.python }} and RoCm ${{ matrix.rocm }}
     runs-on: ${{ matrix.os }}
@@ -71,10 +71,13 @@ jobs:
 
           if [[ "${{ matrix.rocm }}" == "5.4.2" ]]; then
             export ROCM_DL_FILE=amdgpu-install_5.4.50402-1_all.deb
-          elif [[ "${{ matrix.rocm }}" == "5.5" ]]; then
-            export ROCM_DL_FILE=amdgpu-install_5.5.50500-1_all.deb
+          elif [[ "${{ matrix.rocm }}" == "5.6" ]]; then
+            export ROCM_DL_FILE=amdgpu-install_5.6.50601-1_all.deb
+          elif [[ "${{ matrix.rocm }}" == "5.7" ]]; then
+            export ROCM_DL_FILE=amdgpu-install_5.7.50701-1_all.deb
           else
-            export ROCM_DL_FILE=amdgpu-install_5.6.50600-1_all.deb
+            echo Unknown rocm version
+            exit 1
           fi
 
           curl -O https://repo.radeon.com/amdgpu-install/${{ matrix.rocm }}/ubuntu/focal/$ROCM_DL_FILE
@@ -86,7 +89,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends rocsparse-dev rocthrust-dev rocblas-dev hipblas-dev hipsparse-dev
 
-          python -m pip install --upgrade build setuptools wheel ninja
+          python -m pip install --upgrade build setuptools wheel ninja numpy gekko pandas
           python -m pip install torch --index-url https://download.pytorch.org/whl/rocm${{ matrix.rocm }}
 
       - name: Build wheels

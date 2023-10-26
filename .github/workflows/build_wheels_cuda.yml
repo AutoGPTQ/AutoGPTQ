@@ -11,7 +11,7 @@ jobs:
       matrix:
         os: [ubuntu-20.04, windows-latest]
         pyver: ["3.8", "3.9", "3.10", "3.11"]
-        cuda: ["11.7", "11.8"]
+        cuda: ["11.8"]  # wheel for 12.1 are built in build_wheels_pypi.yml
     defaults:
       run:
         shell: pwsh
@@ -41,7 +41,7 @@ jobs:
         run: |
           conda install cuda-toolkit -c "nvidia/label/cuda-${env:CUDA_VERSION}.0"
           conda install pytorch "pytorch-cuda=${env:CUDA_VERSION}" -c pytorch -c nvidia
-          python -m pip install --upgrade build setuptools wheel ninja
+          python -m pip install --upgrade build setuptools wheel ninja numpy gekko pandas
 
       - name: Build Wheel
         run: |
