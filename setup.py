@@ -87,7 +87,7 @@ requirements = [
 
 extras_require = {
     "triton": ["triton==2.0.0"],
-    "test": ["parameterized"]
+    "test": ["pytest", "parameterized"]
 }
 
 include_dirs = ["autogptq_cuda"]

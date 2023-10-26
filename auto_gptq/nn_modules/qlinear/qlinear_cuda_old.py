@@ -194,6 +194,7 @@ class QuantLinear(nn.Module):
         self.qzeros = torch.from_numpy(qzeros)
 
     def forward(self, x):
+        x_dtype = x.dtype
         out_shape = x.shape[:-1] + (self.outfeatures,)
         x = x.reshape(-1, x.shape[-1])
         if self.autogptq_cuda_available is True and (
@@ -269,7 +270,7 @@ class QuantLinear(nn.Module):
             out = torch.matmul(x.to(weight.dtype), weight)
         out = out.half().reshape(out_shape)
         out = out + self.bias if self.bias is not None else out
-        return out.to(x.dtype)
+        return out.to(x_dtype)
 
 
 __all__ = ["QuantLinear"]

@@ -74,6 +74,9 @@ AutoGPTQ can be installed with the Triton dependency with `pip install auto-gptq
 Clone the source code:
 ```shell
 git clone https://github.com/PanQiWei/AutoGPTQ.git && cd AutoGPTQ
+
+A few packages are required in order to build from source: `pip install numpy gekko pandas`.
+
 ```
 Then, install from source:
 ```shell
