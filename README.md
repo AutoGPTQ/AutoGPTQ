@@ -102,7 +102,7 @@ The following combinations are tested:
 |--------------|-----------------|
 | 5.4.2        | 2.0.1           |
 | 5.6          | 2.1.0           |
-| 5.7          | nightly         |
+| 5.7          | nightly (2.2.0.dev2023)         |
 
 ## Quick Tour
 
