@@ -81,7 +81,7 @@ requirements = [
     "torch>=1.13.0",
     "safetensors",
     "transformers>=4.31.0",
-    "peft",
+    "peft>=0.5.0",
     "tqdm",
 ]
 

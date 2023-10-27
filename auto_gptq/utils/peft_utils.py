@@ -3,7 +3,7 @@ import re
 from contextlib import contextmanager
 from dataclasses import asdict
 from enum import Enum
-from typing import List, Optional
+from typing import List, Optional, Union, Tuple
 
 import torch
 from peft import get_peft_model, PeftConfig, PeftModel, PeftType
@@ -14,18 +14,40 @@ from peft.mapping import PEFT_TYPE_TO_CONFIG_MAPPING
 from peft.utils.other import _get_submodules
 
 from ..modeling._base import BaseGPTQForCausalLM
+from ..nn_modules.qlinear import GeneralQuantLinear
+from ..nn_modules.qlinear.qlinear_cuda import QuantLinear as QuantLinearCuda
+from ..nn_modules.qlinear.qlinear_cuda_old import QuantLinear as QuantLinearCudaOld
+from ..nn_modules.qlinear.qlinear_exllama import QuantLinear as QuantLinearExllama
+from ..nn_modules.qlinear.qlinear_qigen import QuantLinear as QuantLinearQigen
+from ..nn_modules.qlinear.qlinear_triton import QuantLinear as QuantLinearTriton
 
+LinearLayer = Union[torch.nn.Linear, GeneralQuantLinear, QuantLinearCuda,
+                    QuantLinearCudaOld, QuantLinearExllama, QuantLinearQigen,
+                    QuantLinearTriton]
 
 class GPTQLoraConfig(LoraConfig):
     injected_fused_attention: bool = False
     injected_fused_mlp: bool = False
 
 
+def _get_linear_feature_count(linear_layer: LinearLayer) -> Tuple[int, int]:
+    in_features = getattr(linear_layer, "in_features",
+                          getattr(linear_layer, "infeatures"))
+    out_features = getattr(linear_layer, "out_features",
+                           getattr(linear_layer, "outfeatures"))
+    return in_features, out_features
+
+
+def _get_weight(linear_layer: LinearLayer) -> torch.Tensor:
+    return getattr(linear_layer, "weight",
+                   getattr(linear_layer, "qweight"))
+
+
 class GPTQLoraLinear(torch.nn.Linear, LoraLayer):
     def __init__(
         self,
         adapter_name: str,
-        linear_module: torch.nn.Linear,
+        linear_module: LinearLayer,
         r: int = 0,
         lora_alpha: int = 1,
         lora_dropout: float = 0.0,
@@ -34,17 +56,20 @@ class GPTQLoraLinear(torch.nn.Linear, LoraLayer):
     ):
         init_lora_weights = kwargs.pop("init_lora_weights", True)
 
-        torch.nn.Linear.__init__(self, linear_module.in_features, linear_module.out_features)
-        LoraLayer.__init__(self, linear_module.in_features, linear_module.out_features)
+        in_features, out_features = _get_linear_feature_count(linear_module)
+        torch.nn.Linear.__init__(self, in_features, out_features)
+        LoraLayer.__init__(self, in_features, out_features)
 
         self.linear_module = linear_module
 
-        self.weight.requires_grad = False
-        self.weight = self.linear_module.weight
-        self.bias = self.linear_module.bias
+        delattr(self, "weight")
+        self.weight = _get_weight(linear_module)
+        delattr(self, "bias")
+
         self.fan_in_fan_out = fan_in_fan_out
         if fan_in_fan_out:
-            self.weight.data = self.weight.data.T
+            assert hasattr(linear_module, "weight")
+            linear_module.weight.data = linear_module.weight.data.T
 
         self.update_layer(adapter_name, r, lora_alpha, lora_dropout, init_lora_weights)
         self.active_adapter = adapter_name
@@ -88,66 +113,6 @@ class GPTQLoraLinear(torch.nn.Linear, LoraLayer):
 
 
 class GPTQLoraModel(LoraModel):
-    def _find_and_replace(self, adapter_name):
-        lora_config = self.peft_config[adapter_name]
-        is_target_modules_in_base_model = False
-        kwargs = {
-            "r": lora_config.r,
-            "lora_alpha": lora_config.lora_alpha,
-            "lora_dropout": lora_config.lora_dropout,
-            "fan_in_fan_out": lora_config.fan_in_fan_out,
-            "init_lora_weights": lora_config.init_lora_weights,
-        }
-        key_list = [key for key, _ in self.model.named_modules()]
-        for key in key_list:
-            if isinstance(lora_config.target_modules, str):
-                target_module_found = re.fullmatch(lora_config.target_modules, key)
-            else:
-                target_module_found = any(key.endswith(target_key) for target_key in lora_config.target_modules)
-            if target_module_found:
-                if not is_target_modules_in_base_model:
-                    is_target_modules_in_base_model = True
-                parent, target, target_name = _get_submodules(self.model, key)
-                bias = False
-                if hasattr(target, "bias"):
-                    bias = target.bias is not None
-
-                if isinstance(target, LoraLayer):
-                    target.update_layer(
-                        adapter_name,
-                        lora_config.r,
-                        lora_config.lora_alpha,
-                        lora_config.lora_dropout,
-                        lora_config.init_lora_weights,
-                    )
-                else:
-                    if isinstance(target, torch.nn.Embedding):
-                        embedding_kwargs = kwargs.copy()
-                        embedding_kwargs.pop("fan_in_fan_out", None)
-                        in_features, out_features = target.num_embeddings, target.embedding_dim
-                        new_module = Embedding(adapter_name, in_features, out_features, **embedding_kwargs)
-                    else:
-                        if isinstance(target, torch.nn.Linear):
-                            if kwargs["fan_in_fan_out"]:
-                                warnings.warn(
-                                    "fan_in_fan_out is set to True but the target module is `torch.nn.Linear`. "
-                                    "Setting fan_in_fan_out to False."
-                                )
-                                kwargs["fan_in_fan_out"] = lora_config.fan_in_fan_out = False
-                        else:
-                            raise ValueError(
-                                f"Target module {target} is not supported. "
-                                f"Currently, only `torch.nn.Linear` and its subclasses are supported."
-                            )
-                        new_module = GPTQLoraLinear(adapter_name, target, **kwargs)
-
-                    self._replace_module(parent, target_name, new_module, target)
-        if not is_target_modules_in_base_model:
-            raise ValueError(
-                f"Target modules {lora_config.target_modules} not found in the base model. "
-                f"Please check the target modules and try again."
-            )
-
     def _replace_module(self, parent_module, child_name, new_module, old_module):
         setattr(parent_module, child_name, new_module)
         if not isinstance(new_module, GPTQLoraLinear):
@@ -163,7 +128,40 @@ class GPTQLoraModel(LoraModel):
         # dispatch to correct device
         for name, module in new_module.named_modules():
             if "lora_" in name:
-                module.to(old_module.weight.device)
+                device = (
+                    list(old_module.parameters()) + \
+                    list(old_module.buffers())
+                )[0].device
+                module.to(device)
+
+    @staticmethod
+    def _create_new_module(lora_config: GPTQLoraConfig, adapter_name: str, target: torch.nn.Linear,
+                           **kwargs):
+        gptq_quantlinears = {
+            GeneralQuantLinear, QuantLinearCuda,
+            QuantLinearCudaOld, QuantLinearExllama,
+            QuantLinearQigen, QuantLinearTriton
+        }
+        is_gptq_layer = any([
+            isinstance(target, cls)
+            for cls in gptq_quantlinears
+        ])
+        if is_gptq_layer:
+            return GPTQLoraLinear(
+                adapter_name,
+                target,
+                r=lora_config.r,
+                lora_alpha=lora_config.lora_alpha,
+                lora_dropout=lora_config.lora_dropout,
+                fan_in_fan_out=lora_config.fan_in_fan_out,
+            )
+        else:
+            return LoraModel._create_new_module(
+                lora_config,
+                adapter_name,
+                target,
+                **kwargs
+            )
 
     def merge_adapter(self):
         raise NotImplementedError("gptq model not support merge ada lora adapter")
@@ -184,7 +182,7 @@ class GPTQSVDLinear(torch.nn.Linear, AdaLoraLayer):
     def __init__(
         self,
         adapter_name: str,
-        linear_module: torch.nn.Linear,
+        linear_module: LinearLayer,
         r: int = 0,
         lora_alpha: int = 1,
         lora_dropout: float = 0.0,
@@ -193,17 +191,19 @@ class GPTQSVDLinear(torch.nn.Linear, AdaLoraLayer):
     ):
         init_lora_weights = kwargs.pop("init_lora_weights", True)
 
-        torch.nn.Linear.__init__(self, linear_module.in_features, linear_module.out_features)
-        AdaLoraLayer.__init__(self, linear_module.in_features, linear_module.out_features)
+        in_features, out_features = _get_linear_feature_count(linear_module)
+        torch.nn.Linear.__init__(self, in_features, out_features)
+        AdaLoraLayer.__init__(self, in_features, out_features)
 
         self.linear_module = linear_module
 
-        self.weight.requires_grad = False
-        self.weight = self.linear_module.weight
-        self.bias = self.linear_module.bias
+        delattr(self, "weight")
+        self.weight = _get_weight(linear_module)
+        delattr(self, "bias")
         self.fan_in_fan_out = fan_in_fan_out
         if fan_in_fan_out:
-            self.weight.data = self.weight.data.T
+            assert hasattr(linear_module, "weight")
+            linear_module.weight.data = linear_module.weight.data.T
 
         self.update_layer(adapter_name, r, lora_alpha, lora_dropout, init_lora_weights)
         self.active_adapter = adapter_name
@@ -236,68 +236,60 @@ class GPTQSVDLinear(torch.nn.Linear, AdaLoraLayer):
             result = self.linear_module(x)
         return result
 
+    def reset_lora_parameters(self, adapter_name):
+        if adapter_name in self.lora_A.keys():
+            # Peft standard values seems too high
+            # Still not ideal, just not causing NaNs with fp16 anymore
+            torch.nn.init.normal_(self.lora_E[adapter_name], mean=0.0, std=0.005)
+            torch.clamp_(self.lora_E[adapter_name].data, -0.1, 0.1)
+            torch.nn.init.normal_(self.lora_A[adapter_name], mean=0.0, std=0.005)
+            torch.clamp_(self.lora_A[adapter_name].data, -0.1, 0.1)
+            torch.nn.init.normal_(self.lora_B[adapter_name], mean=0.0, std=0.005)
+            torch.clamp_(self.lora_B[adapter_name].data, -0.1, 0.1)
+
 
 class GPTQAdaLoraModel(AdaLoraModel):
-    def _find_and_replace(self, adapter_name):
-        lora_config = self.peft_config[adapter_name]
-        is_target_modules_in_base_model = False
-        kwargs = {
-            "r": lora_config.init_r,
-            "lora_alpha": lora_config.lora_alpha,
-            "lora_dropout": lora_config.lora_dropout,
-            "fan_in_fan_out": lora_config.fan_in_fan_out,
-            "init_lora_weights": lora_config.init_lora_weights,
-        }
-        key_list = [key for key, _ in self.model.named_modules()]
-        for key in key_list:
-            if isinstance(lora_config.target_modules, str):
-                target_module_found = re.fullmatch(lora_config.target_modules, key)
-            else:
-                target_module_found = any(key.endswith(target_key) for target_key in lora_config.target_modules)
-            if target_module_found:
-                if not is_target_modules_in_base_model:
-                    is_target_modules_in_base_model = True
-                parent, target, target_name = _get_submodules(self.model, key)
-                bias = target.bias is not None
-                if isinstance(target, LoraLayer):
-                    target.update_layer(
-                        adapter_name,
-                        lora_config.init_r,
-                        lora_config.lora_alpha,
-                        lora_config.lora_dropout,
-                        lora_config.init_lora_weights,
-                    )
-                else:
-                    if isinstance(target, torch.nn.Linear):
-                        in_features, out_features = target.in_features, target.out_features
-                        if kwargs["fan_in_fan_out"]:
-                            warnings.warn(
-                                "fan_in_fan_out is set to True but the target module is `torch.nn.Linear`. "
-                                "Setting fan_in_fan_out to False."
-                            )
-                            kwargs["fan_in_fan_out"] = lora_config.fan_in_fan_out = False
-                    else:
-                        raise ValueError(
-                            f"Target module {target} is not supported. "
-                            f"Currently, only `torch.nn.Linear` and its subclasses are supported."
-                        )
-                    new_module = GPTQSVDLinear(adapter_name, target, **kwargs)
-
-                    self._replace_module(parent, target_name, new_module, target)
-        if not is_target_modules_in_base_model:
-            raise ValueError(
-                f"Target modules {lora_config.target_modules} not found in the base model. "
-                f"Please check the target modules and try again."
-            )
-
     def _replace_module(self, parent_module, child_name, new_module, old_module):
         setattr(parent_module, child_name, new_module)
 
         # dispatch to correct device
         for name, module in new_module.named_modules():
             if "lora_" in name:
-                module.to(old_module.weight.device)
-
+                device = (
+                    list(old_module.parameters()) + \
+                    list(old_module.buffers())
+                )[0].device
+                module.to(device)
+    
+    @staticmethod
+    def _create_new_module(lora_config: GPTQLoraConfig, adapter_name: str, target: torch.nn.Linear,
+                           **kwargs):
+        gptq_quantlinears = {
+            GeneralQuantLinear, QuantLinearCuda,
+            QuantLinearCudaOld, QuantLinearExllama,
+            QuantLinearQigen, QuantLinearTriton
+        }
+        is_gptq_layer = any([
+            isinstance(target, cls)
+            for cls in gptq_quantlinears
+        ])
+        if is_gptq_layer:
+            return GPTQSVDLinear(
+                adapter_name,
+                target,
+                r=lora_config.r,
+                lora_alpha=lora_config.lora_alpha,
+                lora_dropout=lora_config.lora_dropout,
+                fan_in_fan_out=lora_config.fan_in_fan_out,
+            )
+        else:
+            return LoraModel._create_new_module(
+                lora_config,
+                adapter_name,
+                target,
+                **kwargs
+            )
+    
     def merge_adapter(self):
         raise NotImplementedError("gptq model not support merge ada lora adapter")
 
@@ -406,6 +398,7 @@ def get_gptq_peft_model(
             else:
                 peft_model = PeftModel.from_pretrained(model.model, model_id, adapter_name)
         except:
+            raise
             raise NotImplementedError(
                 f"{model.__class__.__name__} not support {peft_config.peft_type.value} peft type yet."
             )
