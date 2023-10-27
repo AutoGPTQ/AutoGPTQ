@@ -78,7 +78,7 @@ class AutoGPTQForCausalLM:
         use_cuda_fp16: bool = True,
         quantize_config: Optional[BaseQuantizeConfig] = None,
         model_basename: Optional[str] = None,
-        use_safetensors: bool = False,
+        use_safetensors: bool = True,
         trust_remote_code: bool = False,
         warmup_triton: bool = False,
         trainable: bool = False,

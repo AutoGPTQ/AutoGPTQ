@@ -527,7 +527,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                 repo_type="model",
             )
 
-    def save_quantized(self, save_dir: str, use_safetensors: bool = False, safetensors_metadata: Optional[Dict[str, str]] = None):
+    def save_quantized(self, save_dir: str, use_safetensors: bool = True, safetensors_metadata: Optional[Dict[str, str]] = None):
         """save quantized model and configs to local disk"""
         os.makedirs(save_dir, exist_ok=True)
 
@@ -586,7 +586,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         self.quantize_config.model_name_or_path = save_dir
         self.quantize_config.model_file_base_name = model_base_name
 
-    def save_pretrained(self, save_dir: str, use_safetensors: bool = False, safetensors_metadata: Optional[Dict[str, str]] = None, **kwargs):
+    def save_pretrained(self, save_dir: str, use_safetensors: bool = True, safetensors_metadata: Optional[Dict[str, str]] = None, **kwargs):
         """alias of save_quantized"""
         logger.warning("you are using save_pretrained, which will re-direct to save_quantized.")
         self.save_quantized(save_dir, use_safetensors, safetensors_metadata)
@@ -704,7 +704,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         use_cuda_fp16: bool = True,
         quantize_config: Optional[BaseQuantizeConfig] = None,
         model_basename: Optional[str] = None,
-        use_safetensors: bool = False,
+        use_safetensors: bool = True,
         trust_remote_code: bool = False,
         warmup_triton: bool = False,
         trainable: bool = False,
@@ -783,7 +783,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                 "You have activated both exllama and exllamav2 kernel. Setting disable_exllama to True and keeping disable_exllamav2 to False"
             )
             disable_exllama = True
-            
+                    
         # == step1: prepare configs and file names == #
         config = AutoConfig.from_pretrained(model_name_or_path, trust_remote_code=trust_remote_code, **cached_file_kwargs)
 
@@ -795,13 +795,14 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         
         if model_basename is None:
             if quantize_config.model_file_base_name:
-                model_basename = quantize_config.model_file_base_name
+                possible_model_basenames = [quantize_config.model_file_base_name]
             else:
-                model_basename = f"gptq_model-{quantize_config.bits}bit-{quantize_config.group_size}g"
+                possible_model_basenames = [f"gptq_model-{quantize_config.bits}bit-{quantize_config.group_size}g", "model"]
+        else:
+            possible_model_basenames = [model_basename]
         
         quantize_config.model_name_or_path = model_name_or_path
-        quantize_config.model_file_base_name = model_basename
-
+        
         extensions = []
         if use_safetensors:
             extensions.append(".safetensors")
@@ -812,25 +813,35 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         is_local = isdir(model_name_or_path)
 
         resolved_archive_file = None
+        true_model_basename = None
+        searched_files = []
         if is_local:
-            model_save_name = join(model_name_or_path, model_basename)
             for ext in extensions:
-                if isfile(model_save_name + ext):
-                    resolved_archive_file = model_save_name + ext
-                    break
+                for possible_model_basename in possible_model_basenames:
+                    model_save_name = join(model_name_or_path, possible_model_basename)
+                    searched_files.append(possible_model_basename + ext)
+                    if isfile(model_save_name + ext):
+                        resolved_archive_file = model_save_name + ext
+                        true_model_basename = possible_model_basename
+                        break
         else:  # remote
             for ext in extensions:
-                resolved_archive_file = cached_file(model_name_or_path, model_basename + ext, **cached_file_kwargs)
-                if resolved_archive_file is not None:
-                    break
+                for possible_model_basename in possible_model_basenames:
+                    resolved_archive_file = cached_file(model_name_or_path, possible_model_basename + ext, **cached_file_kwargs)
+                    searched_files.append(possible_model_basename + ext)
+                    if resolved_archive_file is not None:
+                        true_model_basename = possible_model_basename
+                        break
         
-        if resolved_archive_file is None: # Could not find a model file to use
-            raise FileNotFoundError(f"Could not find model in {model_name_or_path}")
+        quantize_config.model_file_base_name = true_model_basename
+        
+        if resolved_archive_file is None:
+            raise FileNotFoundError(f"Could not find a model in {model_name_or_path} with a name in {', '.join(searched_files)}. Please specify the argument model_basename to use a custom file name.")
                 
         model_save_name = resolved_archive_file
 
         if (not disable_exllama or not disable_exllamav2) and trainable:
-            logger.warning("QuantLinear with exllama backend not support trainable mode yet, Switch to the pytorch backend.")
+            logger.warning("QuantLinear with the exllama backend not does support the trainable mode yet, switching to cuda/cuda_old/triton backend.")
             disable_exllama = True
             disable_exllamav2 = True
             

@@ -143,7 +143,7 @@ def load_model_tokenizer(
     quantize_config: Optional[str] = None,
     trust_remote_code: bool = False,
     use_triton: bool = False,
-    use_safetensors: bool = False,
+    use_safetensors: bool = True,
     use_fast_tokenizer: bool = False,
     inject_fused_attention: bool = True,
     inject_fused_mlp: bool = True,
