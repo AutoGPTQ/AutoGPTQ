@@ -14,6 +14,10 @@
 #include "cuda_func/q4_matmul.cuh"
 #include "cuda_func/column_remap.cuh"
 
+#include <typeinfo>
+#include <limits>
+#include <algorithm>
+
 // Check CUDA return code. We don't want to include Torch headers in the .cu files because parsing them adds almost a
 // minute to the compile time on a 12900K. Also passing exceptions back to Python is super tricky, so in place of
 // exceptions, CUDA functions return with a cudaError_t which we can parse and dump to the console.
@@ -112,12 +116,13 @@ void prepare_buffers
     int device_index = device.index();
     TORCH_CHECK_DEVICE_INDEX(device_index);
     const at::cuda::OptionalCUDAGuard device_guard(device);
+    const long max_int = std::numeric_limits<int>::max();  // temp_state.numel() is long
 
     prepare_buffers_cuda
     (
         device_index,
         // buffer size used for sanity checks
-        temp_state.numel(),
+        std::clamp(temp_state.numel(), (long)0, max_int),
         (half*) temp_state.data_ptr(),
         (half*) temp_dq.data_ptr()
     );
