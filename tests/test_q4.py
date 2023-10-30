@@ -338,7 +338,7 @@ class TestsQ4CUDA(unittest.TestCase):
         n = 256
         device = "cuda"
 
-        linear_class = dynamically_import_QuantLinear(use_triton=False, desc_act=False, group_size=group_size, bits=4, disable_exllamav2=True)
+        linear_class = dynamically_import_QuantLinear(use_triton=False, desc_act=False, group_size=group_size, bits=4, disable_exllama=True, disable_exllamav2=True)
 
         linear = linear_class(
             bits=4,
