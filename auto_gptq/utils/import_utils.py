@@ -2,6 +2,8 @@ from packaging.version import parse as parse_version
 from logging import getLogger
 import torch
 
+from typing import Optional
+
 try:
     import triton
 
@@ -42,7 +44,7 @@ except:
 logger = getLogger(__name__)
 
 
-def dynamically_import_QuantLinear(use_triton: bool, desc_act: bool, group_size: int, bits: int, disable_exllama: bool = True, disable_exllamav2:bool = False, use_qigen: bool = False):
+def dynamically_import_QuantLinear(use_triton: bool, desc_act: bool, group_size: int, bits: int, disable_exllama: Optional[bool] = None, disable_exllamav2:bool = False, use_qigen: bool = False):
     if use_qigen:
         from ..nn_modules.qlinear.qlinear_qigen import QuantLinear
     else:
@@ -52,6 +54,13 @@ def dynamically_import_QuantLinear(use_triton: bool, desc_act: bool, group_size:
 
             from ..nn_modules.qlinear.qlinear_triton import QuantLinear
         else:
+            # If disable_exllamav2 is True, we want to fall back on the exllama kernel and not the cuda/cuda_old ones.
+            if disable_exllama is None:
+                if disable_exllamav2:
+                    disable_exllama = False
+                else:
+                    disable_exllama = True
+            
             if bits == 4 and not disable_exllamav2 and EXLLAMAV2_KERNELS_AVAILABLE:
                 from ..nn_modules.qlinear.qlinear_exllamav2 import QuantLinear
             elif bits == 4 and not disable_exllama and EXLLAMA_KERNELS_AVAILABLE:
