@@ -56,13 +56,20 @@ def make_quant(
     group_size,
     name='',
     use_triton: bool = False,
-    disable_exllama: bool = True,
+    disable_exllama: Optional[bool] = None,
     disable_exllamav2: bool = False, 
     use_qigen: bool = False,
     use_cuda_fp16: bool = True,
     desc_act: bool = False,
     trainable: bool = False
-):  
+):
+    # If disable_exllamav2 is True, we want to fall back on the exllama kernel and not the cuda/cuda_old ones.
+    if disable_exllama is None:
+        if disable_exllamav2:
+            disable_exllama = False
+        else:
+            disable_exllama = True
+
     QuantLinear = dynamically_import_QuantLinear(use_triton=use_triton, desc_act=desc_act, group_size=group_size, bits=bits, disable_exllama=disable_exllama, disable_exllamav2=disable_exllamav2, use_qigen=use_qigen)
 
     if isinstance(module, QuantLinear):
