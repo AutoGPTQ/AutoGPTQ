@@ -91,10 +91,10 @@ def make_quant(
                 out_features = tmp.weight.shape[1]
             if (not(desc_act) or group_size == -1) and not use_triton and not use_qigen:
                 new_layer = QuantLinear(
-                    bits, group_size, in_features, out_features, True, use_cuda_fp16=use_cuda_fp16, trainable=trainable
+                    bits, group_size, in_features, out_features, True, use_cuda_fp16=use_cuda_fp16, trainable=trainable, weight_dtype=tmp.weight.dtype
                 )
             else:
-                new_layer = QuantLinear(bits, group_size, in_features, out_features, True, trainable=trainable)
+                new_layer = QuantLinear(bits, group_size, in_features, out_features, True, trainable=trainable, weight_dtype=tmp.weight.dtype)
             new_layer.device = ori_layer_device
             setattr(module, attr, new_layer.to(ori_layer_device))
     for name1, child in module.named_children():
