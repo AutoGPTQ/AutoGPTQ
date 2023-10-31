@@ -1,6 +1,8 @@
 import gc
 import torch
 
+from ..nn_modules.qlinear.qlinear_exllama import QuantLinear as ExllamaQuantLinear
+
 def exllama_set_max_input_length(model, max_input_length: int):
     """
     This method does not necessarily require `model` to inherit from BaseGPTQForCausalLM.
@@ -15,6 +17,14 @@ def exllama_set_max_input_length(model, max_input_length: int):
     if not model.quantize_config.desc_act:
         raise ValueError("The method exllama_set_max_input_length should be called only when using the exllama backend **with act-order**.")
     
+    uses_exllama = False
+    for name, submodule in model.named_modules():
+        if isinstance(submodule, ExllamaQuantLinear):
+            uses_exllama = True
+    
+    if not uses_exllama:
+        raise ValueError(f"The function exllama_set_max_input_length was called, but the model (instance of {model.__class__.__name__}) does not use the exllama backend for GPTQ. It is likely that an other implementation is used (exllamav2, cuda, cuda-old, triton) and that the call to exllama_set_max_input_length is unnecessary.")
+
     device_to_buffers_size = {}
     for device, buffers in model.device_to_buffers.items():
         device_to_buffers_size[device] = {"max_dq_buffer_size": buffers["max_dq_buffer_size"], "max_inner_outer_dim": buffers["max_inner_outer_dim"]}

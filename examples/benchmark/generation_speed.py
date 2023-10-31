@@ -264,6 +264,9 @@ def main():
     if args.quantize_config_save_dir:
         quantize_config = BaseQuantizeConfig.from_pretrained(args.quantize_config_save_dir)
 
+    if args.use_safetensors:
+        logger.warning("The command --use_safetensors is deprecated and will be removed in the next release. It is now by default activated.")
+
     logger.info("loading model and tokenizer")
     start = time.time()
     model, tokenizer = load_model_tokenizer(
@@ -275,7 +278,7 @@ def main():
         quantize_config=quantize_config,
         trust_remote_code=args.trust_remote_code,
         use_triton=args.use_triton,
-        use_safetensors=args.use_safetensors,
+        use_safetensors=True,
         use_fast_tokenizer=args.use_fast_tokenizer,
         inject_fused_attention=not args.no_inject_fused_attention,
         inject_fused_mlp=not args.no_inject_fused_mlp,
