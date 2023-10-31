@@ -57,6 +57,9 @@ if __name__ == "__main__":
     if not max_memory:
         max_memory = None
 
+    if args.use_safetensors:
+        print("The argument --use_safetensors is deprecrated and will be removed in the next release. It is now the default behavior.")
+
     if args.is_quantized:
         from auto_gptq import AutoGPTQForCausalLM
 
@@ -66,7 +69,7 @@ if __name__ == "__main__":
             device_map="auto",
             max_memory=max_memory,
             model_basename=args.model_basename,
-            use_safetensors=args.use_safetensors,
+            use_safetensors=True,
             trust_remote_code=args.trust_remote_code,
             inject_fused_mlp=False,
             inject_fused_attention=False,
