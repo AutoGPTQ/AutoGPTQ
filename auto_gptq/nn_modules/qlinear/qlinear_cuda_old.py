@@ -30,7 +30,8 @@ class QuantLinear(nn.Module):
         bias,
         use_cuda_fp16=True,
         kernel_switch_threshold=128,
-        trainable=False
+        trainable=False,
+        weight_dtype=torch.float16,
     ):
         super().__init__()
         global _autogptq_cuda_available
@@ -54,7 +55,7 @@ class QuantLinear(nn.Module):
         )
         self.register_buffer(
             'scales',
-            torch.zeros((math.ceil(infeatures / self.group_size), outfeatures), dtype=torch.float16)
+            torch.zeros((math.ceil(infeatures / self.group_size), outfeatures), dtype=weight_dtype)
         )
         self.register_buffer(
             'g_idx',
@@ -62,7 +63,7 @@ class QuantLinear(nn.Module):
         )
 
         if bias:
-            self.register_buffer('bias', torch.zeros((outfeatures), dtype=torch.float16))
+            self.register_buffer('bias', torch.zeros((outfeatures), dtype=weight_dtype))
         else:
             self.bias = None
         self.half_indim = self.infeatures // 2
@@ -105,9 +106,9 @@ class QuantLinear(nn.Module):
         scales = scales.t().contiguous()
         zeros = zeros.t().contiguous()
         scale_zeros = zeros * scales
-        self.scales = scales.clone().half()
+        self.scales = scales.clone().to(dtype=linear.weight.dtype)
         if linear.bias is not None:
-            self.bias = linear.bias.clone().half()
+            self.bias = linear.bias.clone().to(dtype=linear.weight.dtype)
 
         intweight = []
         for idx in range(self.infeatures):
@@ -267,10 +268,10 @@ class QuantLinear(nn.Module):
             weight = (scales * (weight - zeros))
             weight = weight.reshape(weight.shape[0] * weight.shape[1], weight.shape[2])
 
-            out = torch.matmul(x.to(weight.dtype), weight)
-        out = out.half().reshape(out_shape)
+            out = torch.matmul(x, weight)
+        out = out.to(dtype=weight.dtype).reshape(out_shape)
         out = out + self.bias if self.bias is not None else out
-        return out.to(x_dtype)
+        return out
 
 
 __all__ = ["QuantLinear"]

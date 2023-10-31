@@ -30,7 +30,8 @@ class QuantLinear(nn.Module):
         outfeatures,
         bias,
         kernel_switch_threshold=128,
-        trainable=False
+        trainable=False,
+        weight_dtype=torch.float16,
     ):
         super().__init__()
         global _autogptq_cuda_available
@@ -55,14 +56,14 @@ class QuantLinear(nn.Module):
         )
         self.register_buffer(
             'scales',
-            torch.zeros((math.ceil(infeatures / self.group_size), outfeatures), dtype=torch.float16)
+            torch.zeros((math.ceil(infeatures / self.group_size), outfeatures), dtype=weight_dtype)
         )
         self.register_buffer(
             'g_idx',
             torch.tensor([i // self.group_size for i in range(infeatures)], dtype=torch.int32)
         )
         if bias:
-            self.register_buffer('bias', torch.zeros((outfeatures), dtype=torch.float16))
+            self.register_buffer('bias', torch.zeros((outfeatures), dtype=weight_dtype))
         else:
             self.bias = None
 
@@ -105,9 +106,9 @@ class QuantLinear(nn.Module):
         scales = scales.t().contiguous()
         zeros = zeros.t().contiguous()
         scale_zeros = zeros * scales
-        self.scales = scales.clone().half()
+        self.scales = scales.clone().to(dtype=linear.weight.dtype)
         if linear.bias is not None:
-            self.bias = linear.bias.clone().half()
+            self.bias = linear.bias.clone().to(dtype=linear.weight.dtype)
 
         intweight = []
         for idx in range(self.infeatures):
@@ -267,10 +268,10 @@ class QuantLinear(nn.Module):
                     g_idx_i = self.g_idx[i*num_dim:(i+1)*num_dim]
                     weights.append(scale_i[g_idx_i.long()] * (weight_i - zeros_i[g_idx_i.long()]))
                 weights = torch.cat(weights,dim=1)
-            out = torch.matmul(x.to(weights.dtype), weights)
-        out = out.half().reshape(out_shape)
+            out = torch.matmul(x, weights)
+        out = out.to(dtype=weights.dtype).reshape(out_shape)
         out = out + self.bias if self.bias is not None else out
-        return out.to(x.dtype)
+        return out
 
 
 __all__ = ["QuantLinear"]
