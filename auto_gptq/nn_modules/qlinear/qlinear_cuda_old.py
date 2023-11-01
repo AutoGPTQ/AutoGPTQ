@@ -198,6 +198,7 @@ class QuantLinear(nn.Module):
         x_dtype = x.dtype
         out_shape = x.shape[:-1] + (self.outfeatures,)
         x = x.reshape(-1, x.shape[-1])
+        weight = None
         if self.autogptq_cuda_available is True and (
             self.kernel_switch_threshold is False or x.shape[0] < self.kernel_switch_threshold
         ):
@@ -269,7 +270,11 @@ class QuantLinear(nn.Module):
             weight = weight.reshape(weight.shape[0] * weight.shape[1], weight.shape[2])
 
             out = torch.matmul(x, weight)
-        out = out.to(dtype=weight.dtype).reshape(out_shape)
+        if weight is not None:
+            out = out.to(dtype=weight.dtype)
+        else: 
+            out = out.half()
+        out = out.reshape(out_shape)
         out = out + self.bias if self.bias is not None else out
         return out
 
