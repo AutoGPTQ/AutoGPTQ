@@ -271,9 +271,10 @@ class QuantLinear(nn.Module):
                 weights = torch.cat(weights,dim=1)
             out = torch.matmul(x, weights)
         if weight is not None:
-            out = out.to(dtype=weights.dtype).reshape(out_shape)
+            out = out.to(dtype=weights.dtype)
         else:
             out = out.half()
+        out= out.reshape(out_shape)
         out = out + self.bias if self.bias is not None else out
         return out
 
