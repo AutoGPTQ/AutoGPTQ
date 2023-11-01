@@ -197,6 +197,7 @@ class QuantLinear(nn.Module):
     def forward(self, x: torch.Tensor):
         out_shape = x.shape[:-1] + (self.outfeatures,)
         x = x.reshape(-1, x.shape[-1])
+        weight = None
         if self.autogptq_cuda_available and (
             self.kernel_switch_threshold == 0 or x.shape[0] < self.kernel_switch_threshold
         ):
@@ -269,7 +270,10 @@ class QuantLinear(nn.Module):
                     weights.append(scale_i[g_idx_i.long()] * (weight_i - zeros_i[g_idx_i.long()]))
                 weights = torch.cat(weights,dim=1)
             out = torch.matmul(x, weights)
-        out = out.to(dtype=weights.dtype).reshape(out_shape)
+        if weight is not None:
+            out = out.to(dtype=weights.dtype).reshape(out_shape)
+        else:
+            out = out.half()
         out = out + self.bias if self.bias is not None else out
         return out
 
