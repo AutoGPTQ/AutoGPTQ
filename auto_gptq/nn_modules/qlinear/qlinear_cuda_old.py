@@ -268,8 +268,8 @@ class QuantLinear(nn.Module):
             weight = (scales * (weight - zeros))
             weight = weight.reshape(weight.shape[0] * weight.shape[1], weight.shape[2])
 
-            out = torch.matmul(x, weight)
-        out = out.to(dtype=weight.dtype).reshape(out_shape)
+            out = torch.matmul(x, weight).to(dtype=weight.dtype)
+        out = out.reshape(out_shape)
         out = out + self.bias if self.bias is not None else out
         return out
 
