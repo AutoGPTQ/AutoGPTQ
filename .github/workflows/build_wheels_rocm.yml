@@ -93,10 +93,13 @@ jobs:
 
           if [[ "${{ matrix.rocm }}" == "5.7.1" ]]; then
             echo "Using PyTorch nightly"
-            python -m pip install --pre torch --index-url https://download.pytorch.org/whl/nightly/rocm${{ matrix.rocm }}
-          else
+            python -m pip install --pre torch --index-url https://download.pytorch.org/whl/nightly/rocm5.7
+          elif [[ "${{ matrix.rocm }}" == "5.6.1" ]]; then
             echo "Using PyTorch stable"
-            python -m pip install torch --index-url https://download.pytorch.org/whl/rocm${{ matrix.rocm }}
+            python -m pip install torch --index-url https://download.pytorch.org/whl/rocm5.6
+          else
+            echo Unknown rocm version for python install
+            exit 1
           fi
 
       - name: Build wheels
