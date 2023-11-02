@@ -179,6 +179,8 @@ class FusedLlamaAttentionForQuantizedModel(FusedBaseAttentionModule):
             qlinear_kwargs = {"trainable": trainable}
             if (not desc_act or group_size == -1) and not use_triton:
                 qlinear_kwargs["use_cuda_fp16"] = use_cuda_fp16
+            qlinear_kwargs["weight_dtype"] = q_proj.scales.dtype
+
             qkv_layer = QuantLinear(*qlinear_args, **qlinear_kwargs)
             qkv_layer.qweight = qweights
             qkv_layer.qzeros = qzeros

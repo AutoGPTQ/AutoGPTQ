@@ -6,7 +6,7 @@ from dataclasses import dataclass, field, fields
 from logging import getLogger
 from os.path import join, isfile, isdir
 from typing import Dict, List, Optional, Union
-
+from packaging import version
 import accelerate
 import torch
 import torch.nn as nn
@@ -25,6 +25,7 @@ from ..nn_modules.qlinear import GeneralQuantLinear
 from ..nn_modules._fused_base import FusedBaseAttentionModule, FusedBaseMLPModule
 from ..quantization import GPTQ
 from ..utils.data_utils import collate_data
+from ..utils.patch_utils import set_module_tensor_to_device_patched
 from ..utils.import_utils import (
     dynamically_import_QuantLinear, TRITON_AVAILABLE, AUTOGPTQ_CUDA_AVAILABLE, EXLLAMA_KERNELS_AVAILABLE, QIGEN_AVAILABLE, EXLLAMAV2_KERNELS_AVAILABLE
 )
@@ -437,7 +438,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         if not self.hf_device_map:
             return self.model.device
         else:
-            device = [d for d in self.hf_device_map.values() if d not in {'cpu', 'disk'}][0]
+            device = [d for d in self.hf_device_map.values() if d not in {'disk'}][0]
             return torch.device(device)
 
     def to(self, device: Union[str, torch.device]):
@@ -864,7 +865,11 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                 torch_dtype = torch.float16
             else:
                 torch_dtype = torch.float32
-            
+        
+        if torch_dtype != torch.float16:
+            logger.warning("Overriding use_cuda_fp16 to False since torch_dtype is not torch.float16.")
+            use_cuda_fp16 = False
+        
         if not use_qigen:
             torch.nn.init.kaiming_uniform_ = skip
             torch.nn.init.uniform_ = skip
@@ -936,13 +941,23 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             if low_cpu_mem_usage:
                 make_sure_no_tensor_in_meta_device(model, use_triton, quantize_config.desc_act, quantize_config.group_size, bits=quantize_config.bits)
 
+            # Patch until 0.25.0 is released and includes this fix: https://github.com/huggingface/accelerate/pull/2116
+            if version.parse(accelerate.__version__) < version.parse("0.24.99") or accelerate.__version__ == "0.25.0.dev0":
+                original_set_module_tensor_to_device = accelerate.utils.modeling.set_module_tensor_to_device
+                accelerate.utils.modeling.set_module_tensor_to_device = set_module_tensor_to_device_patched
+
             accelerate.utils.modeling.load_checkpoint_in_model(
                 model,
+                dtype=torch_dtype,  # This is very hacky but works due to https://github.com/huggingface/accelerate/blob/bd72a5f1a80d5146554458823f8aeda0a9db5297/src/accelerate/utils/modeling.py#L292
                 checkpoint=model_save_name,
                 device_map=device_map,
                 offload_state_dict=True,
                 offload_buffers=True
             )
+
+            if version.parse(accelerate.__version__) < version.parse("0.24.99") or accelerate.__version__ == "0.25.0.dev0":
+                accelerate.utils.modeling.set_module_tensor_to_device = original_set_module_tensor_to_device
+
             model = simple_dispatch_model(model, device_map)
         else:
             if quantize_config.desc_act:

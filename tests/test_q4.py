@@ -197,7 +197,7 @@ class TestsQ4Exllama(unittest.TestCase):
         revision = "actorder"
         model_basename = "vicuna-13B-1.1-GPTQ-4bit-128g.latest"
 
-        model_q = AutoGPTQForCausalLM.from_quantized(model_id, revision=revision, device="cuda:0", use_triton=False, use_safetensors=True, inject_fused_attention=False, inject_fused_mlp=True, model_basename=model_basename, disable_exllama=False, disable_exllamav2=True)
+        model_q = AutoGPTQForCausalLM.from_quantized(model_id, revision=revision, device="cuda:0", use_triton=False, inject_fused_attention=False, inject_fused_mlp=True, model_basename=model_basename, disable_exllama=False, disable_exllamav2=True)
         tokenizer = AutoTokenizer.from_pretrained(model_id)
 
         inp = tokenizer(prompt, return_tensors="pt").to(device)
@@ -226,8 +226,7 @@ class TestsQ4Exllama(unittest.TestCase):
         reference_output = "<s> I am in Paris and I am going to the Louvre Museum. What time does it open and what is the best way to get there?\nThe Louvre Museum in Paris is open from 9:00 AM to 6:00 PM every day except for Tuesdays. The best way to get"
 
         model_id = "TheBloke/WizardLM-7B-uncensored-GPTQ"
-        model_basename = "model"
-        model_q = AutoGPTQForCausalLM.from_quantized(model_id, device="cuda:0", use_triton=False, use_safetensors=True, inject_fused_attention=True, inject_fused_mlp=True, model_basename=model_basename, disable_exllama=False, disable_exllamav2=True)
+        model_q = AutoGPTQForCausalLM.from_quantized(model_id, device="cuda:0", use_triton=False, inject_fused_attention=True, inject_fused_mlp=True, disable_exllama=False, disable_exllamav2=True)
         tokenizer = AutoTokenizer.from_pretrained(model_id)
 
         inp = tokenizer(prompt, return_tensors="pt").to(device)
@@ -249,7 +248,7 @@ class TestsQ4Exllama(unittest.TestCase):
         revision = "actorder"
         model_basename = "vicuna-13B-1.1-GPTQ-4bit-128g.latest"
 
-        model_q = AutoGPTQForCausalLM.from_quantized(model_id, revision=revision, device="cuda:0", use_triton=False, use_safetensors=True, inject_fused_attention=False, inject_fused_mlp=True, model_basename=model_basename, disable_exllama=False, disable_exllamav2=True)
+        model_q = AutoGPTQForCausalLM.from_quantized(model_id, revision=revision, device="cuda:0", use_triton=False, inject_fused_attention=False, inject_fused_mlp=True, model_basename=model_basename, disable_exllama=False, disable_exllamav2=True)
         tokenizer = AutoTokenizer.from_pretrained(model_id)
 
         inp = tokenizer(prompt, return_tensors="pt").to(device)
@@ -266,7 +265,6 @@ class TestsQ4Exllama(unittest.TestCase):
 
 
 class TestsQ4CUDA(unittest.TestCase):
-
     REFERENCE_OLD_HALF = torch.Tensor([1.5332, 2.1250, 1.7910, 1.8008, 1.9688, 1.3262, 1.7627, 1.8164, 1.9307,
             1.8574, 1.5449, 1.5293, 1.6074, 1.5566, 1.8545, 1.6582, 1.8838, 2.0215,
             1.8525, 1.2920, 1.9561, 2.2617, 1.7891, 2.2656, 1.6543, 2.0566, 1.4756,
@@ -340,12 +338,14 @@ class TestsQ4CUDA(unittest.TestCase):
 
         linear_class = dynamically_import_QuantLinear(use_triton=False, desc_act=False, group_size=group_size, bits=4, disable_exllama=True, disable_exllamav2=True)
 
+        weight_dtype = torch.float16 if use_half2 else torch.float32
         linear = linear_class(
             bits=4,
             group_size=group_size,
             infeatures=k,
             outfeatures=n,
             bias=False,
+            weight_dtype=weight_dtype
         )
 
         torch.manual_seed(42)
@@ -355,7 +355,8 @@ class TestsQ4CUDA(unittest.TestCase):
         linear.use_cuda_fp16 = use_half2
         self.assertTrue(linear.autogptq_cuda_available)
 
-        inp = torch.rand(1, m, k, dtype=torch.float16).to(device)
+        # We cast twice just for the seed.
+        inp = torch.rand(1, m, k, dtype=torch.float16).to(device).to(weight_dtype)
 
         linear = linear.eval()
         linear = linear.to(device)
@@ -364,12 +365,82 @@ class TestsQ4CUDA(unittest.TestCase):
             res = linear(inp)[0][0]
 
         if use_half2:
-            reference = self.REFERENCE_OLD_HALF.to(device)
+            reference = self.REFERENCE_OLD_HALF.to(device).to(weight_dtype)
         else:
-            reference = self.REFERENCE_OLD_NO_HALF.to(device)
+            reference = self.REFERENCE_OLD_NO_HALF.to(device).to(weight_dtype)
 
-        self.assertTrue(torch.allclose(res, reference), get_diff(res, reference))
+        self.assertTrue(torch.allclose(res, reference, rtol=1e-3), get_diff(res, reference))
+    
+    @parameterized.expand([
+        # (torch.float32, "cpu"),
+        (torch.float32, "cuda:0"),
+        (torch.float16, "cuda:0"),
+    ])
+    def test_generation_with_act_order(self, torch_dtype, device):
+        prompt = "I am in Paris and"
 
+        # Reference generated with the cuda-old kernel
+        if device == "cpu":
+            # CPU implementation is extremely slow.
+            new_tokens = 2
+            reference_output = "<s> I am in Paris and it is"
+        else:
+            reference_output = "<s> I am in Paris and it is a beautiful day. I am sitting in a café, drinking coffee and writing this book. I am surrounded by the sights and sounds of the city, and I am filled with a sense of contentment and gratitude.\n\nI am grateful for the opportunity to live and"
+            new_tokens = 60
+
+        model_id = "TheBloke/vicuna-13B-1.1-GPTQ-4bit-128g"
+        revision = "actorder"
+        model_basename = "vicuna-13B-1.1-GPTQ-4bit-128g.latest"
+
+        model_q = AutoGPTQForCausalLM.from_quantized(model_id, revision=revision, device=device, use_triton=False, inject_fused_attention=False, inject_fused_mlp=True, model_basename=model_basename, disable_exllama=True, disable_exllamav2=True, torch_dtype=torch_dtype)
+
+        tokenizer = AutoTokenizer.from_pretrained(model_id)
+
+        inp = tokenizer(prompt, return_tensors="pt").to(device)
+
+        # This one uses Autocast.
+        res = model_q.generate(**inp, num_beams=1, min_new_tokens=new_tokens, max_new_tokens=new_tokens)
+        predicted_text = tokenizer.decode(res[0])
+        self.assertEqual(predicted_text, reference_output)
+
+        # This one does not.
+        res = model_q.model.generate(**inp, num_beams=1, min_new_tokens=new_tokens, max_new_tokens=new_tokens)
+        predicted_text = tokenizer.decode(res[0])
+        self.assertEqual(predicted_text, reference_output)
+
+    @parameterized.expand([
+        # (torch.float32, "cpu"),
+        (torch.float32, "cuda:0"),
+        (torch.float16, "cuda:0"),
+    ])
+    def test_generation_no_act_order(self, torch_dtype, device):
+        prompt = "I am in Paris and"
+
+        # Reference generated with the cuda-old kernel
+        if device == "cpu":
+            # CPU implementation is extremely slow.
+            new_tokens = 3
+            reference_output = "<s> I am in Paris and I am going"
+        else:
+            reference_output = "<s> I am in Paris and I am going to the Louvre Museum. What time does it open and what is the best way to get there?\nThe Louvre Museum in Paris is open from 9:00 AM to 6:00 PM every day except for Tuesdays. The best way to get"
+            new_tokens = 60
+
+        model_id = "TheBloke/WizardLM-7B-uncensored-GPTQ"
+        
+        model_q = AutoGPTQForCausalLM.from_quantized(model_id, device=device, use_triton=False, disable_exllama=True, disable_exllamav2=True, torch_dtype=torch_dtype)
+        tokenizer = AutoTokenizer.from_pretrained(model_id)
+
+        inp = tokenizer(prompt, return_tensors="pt").to(device)
+        
+        # This one uses Autocast.
+        res = model_q.generate(**inp, num_beams=1, min_new_tokens=new_tokens, max_new_tokens=new_tokens)
+        predicted_text = tokenizer.decode(res[0])
+        self.assertEqual(predicted_text, reference_output)
+
+        # This one does not.
+        res = model_q.model.generate(**inp, num_beams=1, min_new_tokens=new_tokens, max_new_tokens=new_tokens)
+        predicted_text = tokenizer.decode(res[0])
+        self.assertEqual(predicted_text, reference_output)
 
 class TestsQ4ExllamaV2(unittest.TestCase):
 
@@ -538,18 +609,16 @@ class TestsQ4ExllamaV2(unittest.TestCase):
         reference_output = "<s> I am in Paris and I am going to the Louvre Museum. What time does it open and what is the best way to get there?\nThe Louvre Museum in Paris is open from 9:00 AM to 6:00 PM every day except for Tuesdays. The best way to get"
         
         model_id = "TheBloke/WizardLM-7B-uncensored-GPTQ"
-        model_basename = "model"
         
-        model_q = AutoGPTQForCausalLM.from_quantized(model_id, device="cuda:0", use_triton=False, use_safetensors=True, model_basename=model_basename)
+        model_q = AutoGPTQForCausalLM.from_quantized(model_id, device="cuda:0", use_triton=False)
         tokenizer = AutoTokenizer.from_pretrained(model_id)
 
         inp = tokenizer(prompt, return_tensors="pt").to(device)
 
-        res = model_q.generate(**inp, num_beams=1, min_new_tokens=60, max_new_tokens=60)
+        res = model_q.generate(**inp, num_beams=1, do_sample=False, min_new_tokens=60, max_new_tokens=60)
 
         predicted_text = tokenizer.decode(res[0])
         
-
         self.assertEqual(predicted_text, reference_output)
         
     def test_generation_with_act_order(self):
@@ -563,7 +632,7 @@ class TestsQ4ExllamaV2(unittest.TestCase):
         revision = "actorder"
         model_basename = "vicuna-13B-1.1-GPTQ-4bit-128g.latest"
 
-        model_q = AutoGPTQForCausalLM.from_quantized(model_id, revision=revision, device="cuda:0", use_triton=False, use_safetensors=True, inject_fused_attention=False, inject_fused_mlp=True, model_basename=model_basename)
+        model_q = AutoGPTQForCausalLM.from_quantized(model_id, revision=revision, device="cuda:0", use_triton=False, inject_fused_attention=False, inject_fused_mlp=True, model_basename=model_basename)
         tokenizer = AutoTokenizer.from_pretrained(model_id)
 
         inp = tokenizer(prompt, return_tensors="pt").to(device)
@@ -583,7 +652,7 @@ class TestsQ4ExllamaV2(unittest.TestCase):
         revision = "actorder"
         model_basename = "vicuna-13B-1.1-GPTQ-4bit-128g.latest"
 
-        model_q = AutoGPTQForCausalLM.from_quantized(model_id, revision=revision, device="cuda:0", use_triton=False, use_safetensors=True, inject_fused_attention=True, inject_fused_mlp=True, model_basename=model_basename)
+        model_q = AutoGPTQForCausalLM.from_quantized(model_id, revision=revision, device="cuda:0", use_triton=False, inject_fused_attention=True, inject_fused_mlp=True, model_basename=model_basename)
         
         tokenizer = AutoTokenizer.from_pretrained(model_id)
 
