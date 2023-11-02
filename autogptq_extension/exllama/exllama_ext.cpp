@@ -116,7 +116,7 @@ void prepare_buffers
     int device_index = device.index();
     TORCH_CHECK_DEVICE_INDEX(device_index);
     const at::cuda::OptionalCUDAGuard device_guard(device);
-    const long max_int = std::numeric_limits<int>::max();  // temp_state.numel() is long
+    const long max_int = std::numeric_limits<int>::max();
 
     prepare_buffers_cuda
     (
