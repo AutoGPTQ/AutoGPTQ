@@ -122,7 +122,7 @@ void prepare_buffers
     (
         device_index,
         // buffer size used for sanity checks
-        std::clamp(temp_state.numel(), (long)0, max_int),
+        std::clamp((long)temp_state.numel(), (long)0, max_int),
         (half*) temp_state.data_ptr(),
         (half*) temp_dq.data_ptr()
     );
