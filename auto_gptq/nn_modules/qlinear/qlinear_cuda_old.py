@@ -198,7 +198,7 @@ class QuantLinear(nn.Module):
         x_dtype = x.dtype
         out_shape = x.shape[:-1] + (self.outfeatures,)
         x = x.reshape(-1, x.shape[-1])
-        if self.autogptq_cuda_available is True and (
+        if x.device.type == "cuda" and self.autogptq_cuda_available is True and (
             self.kernel_switch_threshold is False or x.shape[0] < self.kernel_switch_threshold
         ):
             out = torch.zeros(x.shape[0], out_shape[-1], dtype=torch.float, device=x.device)
@@ -267,9 +267,9 @@ class QuantLinear(nn.Module):
                weight = weight.reshape(-1, self.group_size, weight.shape[2])
             else:
                raise NotImplementedError("Only 2,3,4,8 bits are supported.")
+            
             weight = (scales * (weight - zeros))
             weight = weight.reshape(weight.shape[0] * weight.shape[1], weight.shape[2])
-
             out = torch.matmul(x, weight)
         out = out.to(dtype=x_dtype).reshape(out_shape)  # A cast is needed here as for some reason the vecquant2matmul_faster_old still allocate a float32 output.
         out = out + self.bias if self.bias is not None else out
