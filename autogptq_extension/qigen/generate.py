@@ -94,7 +94,7 @@ def mem_model(N, M, T, mu, tu, bits, l1, p, gs, verbose=False):
 
 
 def macros():
-    return "#include<omp.h>\n#include<immintrin.h>\n#include<fstream>\n\n#define mymin(a,b) ((a)<(b)?(a):(b))\n#define mymax(a,b) ((a)>(b)?(a):(b))\n"
+    return "#include<omp.h>\n#include<cstdint>\n#include<immintrin.h>\n#include<fstream>\n\n#define mymin(a,b) ((a)<(b)?(a):(b))\n#define mymax(a,b) ((a)>(b)?(a):(b))\n"
 
 def print_parameters(bits, n, m, t, nb, mb, tb, mu, nu, tu, unroll, p, gs=-1):
     res = ""
