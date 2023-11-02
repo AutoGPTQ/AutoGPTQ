@@ -62,13 +62,12 @@ For perplexity comparison, you can turn to [here](https://github.com/qwopqwop200
 ## Installation
 
 ### Quick Installation
-You can install the latest stable release of AutoGPTQ from pip with pre-built wheels compatible with PyTorch 2.0.1:
+You can install the latest stable release of AutoGPTQ from pip with pre-built wheels compatible with PyTorch 2.1 and PyTorch nightly:
 
-* For CUDA 11.7: `pip install auto-gptq`
+* For CUDA 12.1: `pip install auto-gptq`
 * For CUDA 11.8: `pip install auto-gptq --extra-index-url https://huggingface.github.io/autogptq-index/whl/cu118/`
-* For RoCm 5.4.2: `pip install auto-gptq --extra-index-url https://huggingface.github.io/autogptq-index/whl/rocm542/`
-
-**Warning:** These wheels are not expected to work on PyTorch nightly. Please install AutoGPTQ from source when using PyTorch nightly.
+* For RoCm 5.6.1: `pip install auto-gptq --extra-index-url https://huggingface.github.io/autogptq-index/whl/rocm561/`
+* For RoCm 5.7.1: `pip install auto-gptq --extra-index-url https://huggingface.github.io/autogptq-index/whl/rocm571/`
 
 AutoGPTQ can be installed with the Triton dependency with `pip install auto-gptq[triton]` in order to be able to use the Triton backend (currently only supports linux, no 3-bits quantization).
 
@@ -92,7 +91,7 @@ You can set `BUILD_CUDA_EXT=0` to disable pytorch extension building, but this i
 To install from source for AMD GPUs supporting RoCm, please specify the `ROCM_VERSION` environment variable. Example:
 
 ```
-ROCM_VERSION=5.6 pip install -v .
+ROCM_VERSION=5.6 pip install -v -e .
 ```
 
 The compilation can be speeded up by specifying the `PYTORCH_ROCM_ARCH` variable ([reference](https://github.com/pytorch/pytorch/blob/7b73b1e8a73a1777ebe8d2cd4487eb13da55b3ba/setup.py#L132)) in order to build for a single target device, for example `gfx90a` for MI200 series devices.
