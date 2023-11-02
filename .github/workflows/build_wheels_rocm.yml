@@ -91,7 +91,7 @@ jobs:
 
           python -m pip install --upgrade build setuptools wheel ninja numpy gekko pandas
 
-          if [[ "${{ matrix.rocm }}" == "5.7" ]]; then
+          if [[ "${{ matrix.rocm }}" == "5.7.1" ]]; then
             echo "Using PyTorch nightly"
             python -m pip install --pre torch --index-url https://download.pytorch.org/whl/nightly/rocm${{ matrix.rocm }}
           else
