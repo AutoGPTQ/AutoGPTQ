@@ -372,7 +372,7 @@ class TestsQ4CUDA(unittest.TestCase):
         self.assertTrue(torch.allclose(res, reference, rtol=1e-3), get_diff(res, reference))
     
     @parameterized.expand([
-        # (torch.float32, "cpu"),
+        (torch.float32, "cpu"),
         (torch.float32, "cuda:0"),
         (torch.float16, "cuda:0"),
     ])
@@ -409,7 +409,7 @@ class TestsQ4CUDA(unittest.TestCase):
         self.assertEqual(predicted_text, reference_output)
 
     @parameterized.expand([
-        # (torch.float32, "cpu"),
+        (torch.float32, "cpu"),
         (torch.float32, "cuda:0"),
         (torch.float16, "cuda:0"),
     ])
