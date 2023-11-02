@@ -10,7 +10,7 @@ jobs:
       matrix:
         os: [ubuntu-20.04]
         python: ["3.8", "3.9", "3.10", "3.11"]
-        rocm: ["5.6", "5.7"]  # we build only for rocm5.6 & 5.7 to match PyTorch 2.1.0 and PyTorch 2.2 nightly
+        rocm: ["5.6.1", "5.7.1"]  # we build only for rocm5.6 & 5.7 to match PyTorch 2.1.0 and PyTorch 2.2 nightly
 
     name: Build wheels for ${{ matrix.os }} and Python ${{ matrix.python }} and RoCm ${{ matrix.rocm }}
     runs-on: ${{ matrix.os }}
@@ -71,9 +71,9 @@ jobs:
 
           if [[ "${{ matrix.rocm }}" == "5.4.2" ]]; then
             export ROCM_DL_FILE=amdgpu-install_5.4.50402-1_all.deb
-          elif [[ "${{ matrix.rocm }}" == "5.6" ]]; then
+          elif [[ "${{ matrix.rocm }}" == "5.6.1" ]]; then
             export ROCM_DL_FILE=amdgpu-install_5.6.50601-1_all.deb
-          elif [[ "${{ matrix.rocm }}" == "5.7" ]]; then
+          elif [[ "${{ matrix.rocm }}" == "5.7.1" ]]; then
             export ROCM_DL_FILE=amdgpu-install_5.7.50701-1_all.deb
           else
             echo Unknown rocm version
