@@ -864,7 +864,11 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                 torch_dtype = torch.float16
             else:
                 torch_dtype = torch.float32
-            
+        
+        if torch_dtype != torch.float16:
+            logger.warning("Overriding use_cuda_fp16 to False since torch_dtype is not torch.float16.")
+            use_cuda_fp16 = False
+        
         if not use_qigen:
             torch.nn.init.kaiming_uniform_ = skip
             torch.nn.init.uniform_ = skip

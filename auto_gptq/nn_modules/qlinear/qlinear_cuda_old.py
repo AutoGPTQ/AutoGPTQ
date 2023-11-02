@@ -203,7 +203,9 @@ class QuantLinear(nn.Module):
         ):
             out = torch.zeros(x.shape[0], out_shape[-1], dtype=torch.float, device=x.device)
             if self.use_cuda_fp16:
-                x = x.half()
+                if x_dtype != torch.float16:
+                    raise ValueError("The cuda-old kernel with use_cuda_fp16=True requires a float16 input activation. Make sure you loaded your model with torch_dtype=torch.float16, or please pass use_cuda_fp16=False.")
+                
                 if self.bits == 2:
                     self.autogptq_cuda.vecquant2matmul_faster_old(x, self.qweight, out, self.scales.float(), self.qzeros, self.group_size, self.half_indim)
                 elif self.bits == 3:
@@ -214,7 +216,7 @@ class QuantLinear(nn.Module):
                 else:
                     raise NotImplementedError("Only 2,3,4 bits are supported.")
             else:
-                x = x.float()
+                x = x.to(torch.float32)  # This is required for autocast compatibility.
                 if self.bits == 2:
                     self.autogptq_cuda.vecquant2matmul_old(x, self.qweight, out, self.scales.float(), self.qzeros, self.group_size)
                 elif self.bits == 3:
@@ -269,7 +271,7 @@ class QuantLinear(nn.Module):
             weight = weight.reshape(weight.shape[0] * weight.shape[1], weight.shape[2])
 
             out = torch.matmul(x, weight)
-        out = out.to(dtype=weight.dtype).reshape(out_shape)
+        out = out.to(dtype=x_dtype).reshape(out_shape)  # A cast is needed here as for some reason the vecquant2matmul_faster_old still allocate a float32 output.
         out = out + self.bias if self.bias is not None else out
         return out
 
