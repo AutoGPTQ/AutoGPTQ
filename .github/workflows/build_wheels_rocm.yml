@@ -28,7 +28,7 @@ jobs:
           echo "Removing large packages"
           sudo apt-get remove -y '^dotnet-.*'
           sudo apt-get remove -y 'php.*'
-          sudo apt-get remove -y azure-cli google-cloud-sdk google-chrome-stable firefox powershell mono-devel
+          sudo apt-get remove -y azure-cli google-chrome-stable firefox powershell mono-devel
           df -h
           sudo apt-get autoremove -y >/dev/null 2>&1
           sudo apt-get clean
