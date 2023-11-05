@@ -193,8 +193,10 @@ def pack_model(
     use_cuda_fp16=True,
     desc_act=False,
     warmup_triton: bool = False,
+    cuda_GPU: int = 0,
     force_layer_back_to_cpu: bool = False
 ):
+    GPU = cuda_GPU == 0 and CUDA_0 or f'cuda:{cuda_GPU}'
     QuantLinear = dynamically_import_QuantLinear(use_triton=use_triton, desc_act=desc_act, group_size=group_size, bits=bits, disable_exllama=False, disable_exllamav2=True)
 
     if force_layer_back_to_cpu:
@@ -220,7 +222,7 @@ def pack_model(
         logger.warning(
             "using autotune_warmup will move model to GPU, make sure you have enough VRAM to load the whole model."
         )
-        QuantLinear.warmup(model.to(CUDA_0), seqlen=model.seqlen)
+        QuantLinear.warmup(model.to(GPU), seqlen=model.seqlen)
 
 
 def check_and_get_model_type(model_dir, trust_remote_code=False):

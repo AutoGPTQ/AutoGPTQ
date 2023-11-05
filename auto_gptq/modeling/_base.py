@@ -215,13 +215,16 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         use_triton: bool = False,
         use_cuda_fp16: bool = True,
         autotune_warmup_after_quantized: bool = False,
-        cache_examples_on_gpu: bool = True
+        cache_examples_on_gpu: bool = True,
+        cuda_GPU: int = 0
     ):
         if self.quantized:
             raise EnvironmentError("can't execute quantize because the model is quantized.")
         if use_triton and not TRITON_AVAILABLE:
             logger.warning("triton is not installed, reset use_triton to False")
             use_triton = False
+
+        GPU = cuda_GPU == 0 and CUDA_0 or f'cuda:{cuda_GPU}'
 
         device_map = self.hf_device_map
         if device_map:
@@ -230,7 +233,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                     logger.info(f"truly offloading {name} to cpu with hook.")
                     module = get_module_by_name_suffix(self.model, name)
                     remove_hook_from_module(module, recurse=True)
-                    accelerate.cpu_offload_with_hook(module, CUDA_0)
+                    accelerate.cpu_offload_with_hook(module, GPU)
 
         layer_inputs = []
         attention_masks = []
@@ -277,7 +280,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
 
         force_layer_back_to_cpu = False
         if get_device(layers[0]) == CPU:
-            layers[0] = layers[0].to(CUDA_0)
+            layers[0] = layers[0].to(GPU)
             force_layer_back_to_cpu = True
 
         cur_layer_device = get_device(layers[0])
@@ -326,7 +329,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             layer = layers[i]
             force_layer_back_to_cpu = False
             if get_device(layer) == CPU:
-                move_to_device(layer, CUDA_0)
+                move_to_device(layer, GPU)
                 force_layer_back_to_cpu = True
             cur_layer_device = get_device(layer)
 
@@ -422,7 +425,8 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             use_cuda_fp16=use_cuda_fp16,
             desc_act=self.quantize_config.desc_act,
             warmup_triton=autotune_warmup_after_quantized,
-            force_layer_back_to_cpu=force_layer_back_to_cpu
+            force_layer_back_to_cpu=force_layer_back_to_cpu,
+            cuda_GPU=cuda_GPU
         )
         if device_map:
             self.model = remove_hook_from_module(self.model, recurse=True)
