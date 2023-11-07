@@ -18,7 +18,12 @@ from ..nn_modules.qlinear import GeneralQuantLinear
 from ..nn_modules.qlinear.qlinear_cuda import QuantLinear as QuantLinearCuda
 from ..nn_modules.qlinear.qlinear_cuda_old import QuantLinear as QuantLinearCudaOld
 from ..nn_modules.qlinear.qlinear_exllama import QuantLinear as QuantLinearExllama
-from ..nn_modules.qlinear.qlinear_qigen import QuantLinear as QuantLinearQigen
+
+try:
+    from ..nn_modules.qlinear.qlinear_qigen import QuantLinear as QuantLinearQigen
+except ImportError:
+    QuantLinearQigen = None
+
 from ..nn_modules.qlinear.qlinear_triton import QuantLinear as QuantLinearTriton
 
 LinearLayer = Union[torch.nn.Linear, GeneralQuantLinear, QuantLinearCuda,
@@ -140,8 +145,11 @@ class GPTQLoraModel(LoraModel):
         gptq_quantlinears = {
             GeneralQuantLinear, QuantLinearCuda,
             QuantLinearCudaOld, QuantLinearExllama,
-            QuantLinearQigen, QuantLinearTriton
+            QuantLinearTriton
         }
+        if QuantLinearQigen is not None:
+            gptq_quantlinears.add(QuantLinearQigen)
+
         is_gptq_layer = any([
             isinstance(target, cls)
             for cls in gptq_quantlinears
@@ -267,8 +275,11 @@ class GPTQAdaLoraModel(AdaLoraModel):
         gptq_quantlinears = {
             GeneralQuantLinear, QuantLinearCuda,
             QuantLinearCudaOld, QuantLinearExllama,
-            QuantLinearQigen, QuantLinearTriton
+            QuantLinearTriton
         }
+        if QuantLinearQigen is not None:
+            gptq_quantlinears.add(QuantLinearQigen)
+        
         is_gptq_layer = any([
             isinstance(target, cls)
             for cls in gptq_quantlinears

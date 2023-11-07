@@ -38,14 +38,18 @@ try:
     import cQIGen as qinfer
 
     QIGEN_AVAILABLE = True
-except:
+    QIGEN_EXCEPTION = None
+except Exception as e:
     QIGEN_AVAILABLE = False
+    QIGEN_EXCEPTION = e
 
 logger = getLogger(__name__)
 
 
 def dynamically_import_QuantLinear(use_triton: bool, desc_act: bool, group_size: int, bits: int, disable_exllama: Optional[bool] = None, disable_exllamav2:bool = False, use_qigen: bool = False):
     if use_qigen:
+        if not QIGEN_AVAILABLE:
+            raise ValueError(f"QIGen appears to be not available with the error: {QIGEN_EXCEPTION}. Please check your installation or use `use_qigen=False`.")
         from ..nn_modules.qlinear.qlinear_qigen import QuantLinear
     else:
         if use_triton:
