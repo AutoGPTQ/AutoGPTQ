@@ -19,10 +19,13 @@ def get_device(obj: Union[torch.Tensor, nn.Module]):
     return next(obj.parameters()).device
 
 
-def move_to_device(obj: Union[torch.Tensor, nn.Module], device: torch.device):
-    if get_device(obj) != device:
-        obj = obj.to(device)
-    return obj
+def move_to_device(obj: Optional[Union[torch.Tensor, nn.Module]], device: torch.device):
+    if obj is None:
+        return obj
+    else:
+        if get_device(obj) != device:
+            obj = obj.to(device)
+        return obj
 
 
 def find_layers(module, layers=None, name=''):

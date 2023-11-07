@@ -158,14 +158,6 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
     def hf_device_map(self):
         return getattr(self.model, "hf_device_map", None)
 
-    @staticmethod
-    def _resize_attention_mask(attention_mask: List[torch.LongTensor]):
-        return attention_mask
-
-    @staticmethod
-    def _resize_position_ids(position_ids: List[torch.LongTensor]):
-        return position_ids
-
     def _prepare_examples_for_quantization(
         self,
         examples: List[Dict[str, Union[List[int], torch.LongTensor]]],
@@ -255,7 +247,12 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                             inp = kwargs[kwarg_name]
                             break
                 layer_inputs.append(move_to_device(inp, self.data_device))
-                attention_masks.append(kwargs["attention_mask"].to(self.data_device))
+                
+                if kwargs["attention_mask"] is not None:
+                    attention_masks.append(kwargs["attention_mask"].to(self.data_device))
+                else:
+                    attention_masks.append(None)
+                
                 pos_ids = kwargs.get("position_ids", None)
                 if pos_ids is not None:
                     position_ids.append(move_to_device(pos_ids, self.data_device))
@@ -312,10 +309,6 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                 move_to_device(module, ori_outside_layer_module_devices[module_name])
 
         torch.cuda.empty_cache()
-
-        # resize attention mask and position ids for some special models
-        attention_masks = self._resize_attention_mask(attention_masks)
-        position_ids = self._resize_position_ids(position_ids)
 
         inside_layer_modules = self.inside_layer_modules
         if not self.quantize_config.true_sequential:
