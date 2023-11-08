@@ -13,8 +13,10 @@ logger = getLogger(__name__)
 
 try:
     import cQIGen as qinfer
-except ImportError as e:
-    raise ImportError(f"cQIGen is not installed. This error should not be raised, please open an issue in AutoGPTQ repository. {e}")
+except ImportError as exception_qinfer:
+    class FakeQInfer:
+        def __getattr__(self, name):
+            raise ImportError(f"cQIGen is not installed or not correctly installed. {exception_qinfer}")
 
 def mem_model(N, M, T, mu, tu, bits, l1, p, gs):
     m = GEKKO() # create GEKKO model

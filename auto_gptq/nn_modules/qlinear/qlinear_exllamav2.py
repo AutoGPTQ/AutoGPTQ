@@ -10,9 +10,12 @@ logger = getLogger(__name__)
 
 try:
     from exllamav2_kernels import make_q_matrix, gemm_half_q_half
-except ImportError:
-    logger.error('exllamav2_kernels not installed.')
-    raise
+except ImportError as exllama_v2_import_exception:
+    def error_raiser_exllama(*args, **kwargs):
+        raise ValueError(f"Trying to use the exllama v2 backend, but could not import the C++/CUDA dependencies with the following error: {exllama_v2_import_exception}")
+    
+    make_q_matrix = error_raiser_exllama
+    gemm_half_q_half = error_raiser_exllama
 
 # Dummy tensor to pass instead of g_idx since there is no way to pass "None" to a C++ extension
 none_tensor = torch.empty((1, 1), device="meta")

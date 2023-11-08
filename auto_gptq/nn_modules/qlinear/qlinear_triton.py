@@ -15,10 +15,19 @@ try:
         quant_matmul_248, transpose_quant_matmul_248, quant_matmul_inference_only_248,
         QuantLinearFunction, QuantLinearInferenceOnlyFunction
     )
-except ImportError:
-    logger.error('triton not installed.')
-    raise
+except ImportError as triton_import_exception:
+    def error_raiser_triton(*args, **kwargs):
+        raise ValueError(f"Trying to use the triton backend, but could not import triton dependencies with the following error: {triton_import_exception}")
+    
+    class FakeTriton:
+        def __getattr__(self, name):
+            raise ImportError(f"Trying to use the triton backend, but could not import triton dependencies with the following error: {triton_import_exception}")
 
+    quant_matmul_248 = error_raiser_triton
+    transpose_quant_matmul_248 = error_raiser_triton
+    quant_matmul_inference_only_248 = error_raiser_triton
+    QuantLinearFunction = FakeTriton
+    QuantLinearInferenceOnlyFunction = FakeTriton
 
 class QuantLinear(nn.Module, TritonModuleMixin):
     QUANT_TYPE = "triton"
