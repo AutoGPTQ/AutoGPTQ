@@ -17,13 +17,29 @@ from ..modeling._base import BaseGPTQForCausalLM
 from ..nn_modules.qlinear import GeneralQuantLinear
 from ..nn_modules.qlinear.qlinear_cuda import QuantLinear as QuantLinearCuda
 from ..nn_modules.qlinear.qlinear_cuda_old import QuantLinear as QuantLinearCudaOld
-from ..nn_modules.qlinear.qlinear_exllama import QuantLinear as QuantLinearExllama
-from ..nn_modules.qlinear.qlinear_qigen import QuantLinear as QuantLinearQigen
-from ..nn_modules.qlinear.qlinear_triton import QuantLinear as QuantLinearTriton
 
 LinearLayer = Union[torch.nn.Linear, GeneralQuantLinear, QuantLinearCuda,
-                    QuantLinearCudaOld, QuantLinearExllama, QuantLinearQigen,
-                    QuantLinearTriton]
+                    QuantLinearCudaOld]
+from logging import getLogger
+logger = getLogger(__name__)
+try:
+    from ..nn_modules.qlinear.qlinear_exllama import QuantLinear as QuantLinearExllama
+    LinearLayer = Union[LinearLayer, QuantLinearExllama]
+except ImportError:
+    pass
+
+try:
+    from ..nn_modules.qlinear.qlinear_qigen import QuantLinear as QuantLinearQigen
+    LinearLayer = Union[LinearLayer, QuantLinearQigen]
+except ImportError:
+    pass
+
+try:
+    from ..nn_modules.qlinear.qlinear_cuda import QuantLinear as QuantLinearTriton
+    LinearLayer = Union[LinearLayer, QuantLinearTriton]
+except ImportError:
+    pass
+
 
 class GPTQLoraConfig(LoraConfig):
     injected_fused_attention: bool = False

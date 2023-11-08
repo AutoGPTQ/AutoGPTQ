@@ -1,7 +1,6 @@
 import gc
 import torch
 
-from ..nn_modules.qlinear.qlinear_exllama import QuantLinear as ExllamaQuantLinear
 
 def exllama_set_max_input_length(model, max_input_length: int):
     """
@@ -13,6 +12,7 @@ def exllama_set_max_input_length(model, max_input_length: int):
 
     # The import is set here to avoid a global import. Arguably this is quite ugly, it would be better to have lazy loading.
     from exllama_kernels import prepare_buffers, cleanup_buffers_cuda
+    from ..nn_modules.qlinear.qlinear_exllama import QuantLinear as ExllamaQuantLinear
 
     if not model.quantize_config.desc_act:
         raise ValueError("The method exllama_set_max_input_length should be called only when using the exllama backend **with act-order**.")
