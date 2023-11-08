@@ -5,7 +5,11 @@ from auto_gptq.utils.import_utils import dynamically_import_QuantLinear
 
 from auto_gptq.nn_modules.qlinear.qlinear_exllama import QuantLinear
 
-from exllama_kernels import prepare_buffers, set_tuning_params
+try:
+    from exllama_kernels import prepare_buffers, set_tuning_params
+except ImportError as e:
+    print(f"[WARNING] Could not load exllama_kernels: {e}")
+
 from auto_gptq import AutoGPTQForCausalLM, exllama_set_max_input_length
 from auto_gptq.modeling._utils import autogptq_post_init
 from auto_gptq.modeling._const import EXLLAMA_DEFAULT_MAX_INPUT_LENGTH
