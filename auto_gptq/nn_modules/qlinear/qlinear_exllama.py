@@ -12,9 +12,12 @@ logger = getLogger(__name__)
 
 try:
     from exllama_kernels import make_q4, q4_matmul
-except ImportError:
-    logger.error('exllama_kernels not installed.')
-    raise
+except ImportError as exllama_import_exception:
+    def error_raiser_exllama(*args, **kwargs):
+        raise ValueError(f"Trying to use the exllama backend, but could not import the C++/CUDA dependencies with the following error: {exllama_import_exception}")
+    
+    make_q4 = error_raiser_exllama
+    q4_matmul = error_raiser_exllama
 
 # Dummy tensor to pass instead of g_idx since there is no way to pass "None" to a C++ extension
 none_tensor = torch.empty((1, 1), device="meta")
