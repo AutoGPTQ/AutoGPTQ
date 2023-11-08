@@ -23,7 +23,7 @@ def exllama_set_max_input_length(model, max_input_length: int):
             uses_exllama = True
     
     if not uses_exllama:
-        raise ValueError(f"The function exllama_set_max_input_length was called, but the model (instance of {model.__class__.__name__}) does not use the exllama backend for GPTQ. It is likely that an other implementation is used (exllamav2, cuda, cuda-old, triton) and that the call to exllama_set_max_input_length is unnecessary.")
+        raise ValueError(f"The function exllama_set_max_input_length was called, but the model (instance of {model.__class__.__name__}) does not use the exllama backend for GPTQ. An other implementation is used (exllamav2, cuda, cuda-old, triton) and that the call to exllama_set_max_input_length is unnecessary. Please remove the call to exllama_set_max_input_length or use the exllama v1 backend.")
 
     device_to_buffers_size = {}
     for device, buffers in model.device_to_buffers.items():
