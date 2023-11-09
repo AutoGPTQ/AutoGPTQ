@@ -39,8 +39,20 @@ jobs:
       - name: Install Dependencies
         run: |
           conda install cuda-toolkit -c "nvidia/label/cuda-${env:CUDA_VERSION}.0"
-          conda install pytorch "pytorch-cuda=${env:CUDA_VERSION}" -c pytorch -c nvidia
+
+          # Refer to https://pytorch.org/get-started/locally/
+          if ("${{ runner.os }}" -eq "Linux")
+          {
+            python -m pip install torch
+          }else{
+            python -m pip install torch --index-url https://download.pytorch.org/whl/cu121
+          }
+
           python -m pip install --upgrade build setuptools wheel ninja numpy gekko pandas
+
+      - name: Check install
+        run: |
+          python -c "import torch; print('torch version:', torch.__version__)"
 
       - name: Build Wheel
         run: |
