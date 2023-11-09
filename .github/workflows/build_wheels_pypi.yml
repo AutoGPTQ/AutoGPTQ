@@ -41,7 +41,7 @@ jobs:
           conda install cuda-toolkit -c "nvidia/label/cuda-${env:CUDA_VERSION}.0"
 
           # Refer to https://pytorch.org/get-started/locally/
-          if ("${{ runner.os }}" == "Linux")
+          if ("${{ runner.os }}" -eq "Linux")
           {
             python -m pip install torch
           }else{
