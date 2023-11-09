@@ -48,8 +48,6 @@ jobs:
       - name: Check install
         run: |
           python -c "import torch; print('torch version:', torch.__version__)"
-          echo "nvidia packages:"
-          python -m pip list | grep nvidia
 
       - name: Build Wheel
         run: |
