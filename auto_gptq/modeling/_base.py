@@ -813,12 +813,22 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         model_name_or_path = str(model_name_or_path)
         is_local = isdir(model_name_or_path)
 
+        is_sharded = False
+
         resolved_archive_file = None
         true_model_basename = None
         searched_files = []
         if is_local:
             for ext in extensions:
                 for possible_model_basename in possible_model_basenames:
+                    #check for sharded model
+                    if isfile(join(model_name_or_path, possible_model_basename + ext + '.index.json')):
+                        with open(join(model_name_or_path, possible_model_basename + ext + '.index.json')) as f:
+                            index_json = json.load(f)
+                            #find the first shard from index.json
+                            model_name = [shard for shard in index_json['weight_map'].values() if '00001' in shard][0]
+                            possible_model_basename = model_name[:len(model_name)-len(ext)]
+                            is_sharded = True
                     model_save_name = join(model_name_or_path, possible_model_basename)
                     searched_files.append(possible_model_basename + ext)
                     if isfile(model_save_name + ext):
@@ -828,8 +838,19 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         else:  # remote
             for ext in extensions:
                 for possible_model_basename in possible_model_basenames:
-                    resolved_archive_file = cached_file(model_name_or_path, possible_model_basename + ext, **cached_file_kwargs)
-                    searched_files.append(possible_model_basename + ext)
+                    # check for sharded model
+                    if cached_index := cached_file(model_name_or_path, possible_model_basename + ext + '.index.json'):
+                        with open(str(cached_index)) as f:
+                            index_json = json.load(f)
+                            # find the shards from index.json
+                            shards = list(set([shard for shard in index_json['weight_map'].values()]))
+                            for shard in shards:
+                                resolved_archive_file = cached_file(model_name_or_path, shard, **cached_file_kwargs)
+                                searched_files.append(shard)
+                            is_sharded = True
+                    else:
+                        resolved_archive_file = cached_file(model_name_or_path, possible_model_basename + ext, **cached_file_kwargs)
+                        searched_files.append(possible_model_basename + ext)
                     if resolved_archive_file is not None:
                         true_model_basename = possible_model_basename
                         break
@@ -942,7 +963,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             accelerate.utils.modeling.load_checkpoint_in_model(
                 model,
                 dtype=torch_dtype,  # This is very hacky but works due to https://github.com/huggingface/accelerate/blob/bd72a5f1a80d5146554458823f8aeda0a9db5297/src/accelerate/utils/modeling.py#L292
-                checkpoint=model_save_name,
+                checkpoint=(model_name_or_path if is_local else os.path.dirname(model_save_name)) if is_sharded else model_save_name,  # for sharded we want local dir
                 device_map=device_map,
                 offload_state_dict=True,
                 offload_buffers=True
