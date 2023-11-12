@@ -812,7 +812,6 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
 
         model_name_or_path = str(model_name_or_path)
         is_local = isdir(model_name_or_path)
-
         is_sharded = False
 
         resolved_archive_file = None
@@ -861,20 +860,17 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         quantize_config.model_file_base_name = true_model_basename
 
         if resolved_archive_file is None:
-            raise FileNotFoundError(
-                f"Could not find a model in {model_name_or_path} with a name in {', '.join(searched_files)}. Please specify the argument model_basename to use a custom file name.")
+            raise FileNotFoundError(f"Could not find a model in {model_name_or_path} with a name in {', '.join(searched_files)}. Please specify the argument model_basename to use a custom file name.")
 
         model_save_name = resolved_archive_file
 
         if (not disable_exllama or not disable_exllamav2) and trainable:
-            logger.warning(
-                "QuantLinear with the exllama backend not does support the trainable mode yet, switching to cuda/cuda_old/triton backend.")
+            logger.warning("QuantLinear with the exllama backend not does support the trainable mode yet, switching to cuda/cuda_old/triton backend.")
             disable_exllama = True
             disable_exllamav2 = True
 
         elif not use_triton and trainable:
-            logger.warning(
-                "QuantLinear with cuda backend not support trainable mode yet, Switch to the pytorch backend.")
+            logger.warning("QuantLinear with cuda backend not support trainable mode yet, Switch to the pytorch backend.")
 
         # == step2: convert model to gptq-model (replace Linear with QuantLinear) == #
         def skip(*args, **kwargs):
@@ -959,19 +955,16 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                 )
 
             if low_cpu_mem_usage:
-                make_sure_no_tensor_in_meta_device(model, use_triton, quantize_config.desc_act,
-                                                   quantize_config.group_size, bits=quantize_config.bits)
+                make_sure_no_tensor_in_meta_device(model, use_triton, quantize_config.desc_act, quantize_config.group_size, bits=quantize_config.bits)
 
             # Patch until 0.25.0 is released and includes this fix: https://github.com/huggingface/accelerate/pull/2116
-            if version.parse(accelerate.__version__) < version.parse(
-                    "0.24.99") or accelerate.__version__ == "0.25.0.dev0":
+            if version.parse(accelerate.__version__) < version.parse("0.24.99") or accelerate.__version__ == "0.25.0.dev0":
                 original_set_module_tensor_to_device = accelerate.utils.modeling.set_module_tensor_to_device
                 accelerate.utils.modeling.set_module_tensor_to_device = set_module_tensor_to_device_patched
 
             accelerate.utils.modeling.load_checkpoint_in_model(
                 model,
-                dtype=torch_dtype,
-                # This is very hacky but works due to https://github.com/huggingface/accelerate/blob/bd72a5f1a80d5146554458823f8aeda0a9db5297/src/accelerate/utils/modeling.py#L292
+                dtype=torch_dtype,  # This is very hacky but works due to https://github.com/huggingface/accelerate/blob/bd72a5f1a80d5146554458823f8aeda0a9db5297/src/accelerate/utils/modeling.py#L292
                 checkpoint=model_index_file if is_sharded else model_save_name,  # for sharded we use index.json
                 device_map=device_map,
                 offload_state_dict=True,
