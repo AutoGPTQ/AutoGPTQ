@@ -17,6 +17,7 @@ from .baichuan import BaiChuanGPTQForCausalLM
 from .internlm import InternLMGPTQForCausalLM
 from .qwen import QwenGPTQForCausalLM
 from .mistral import MistralGPTQForCausalLM
+from .yi import YiGPTQForCausalLM
 
 GPTQ_CAUSAL_LM_MODEL_MAP = {
     "bloom": BloomGPTQForCausalLM,
@@ -35,6 +36,7 @@ GPTQ_CAUSAL_LM_MODEL_MAP = {
     "internlm": InternLMGPTQForCausalLM,
     "qwen": QwenGPTQForCausalLM,
     "mistral": MistralGPTQForCausalLM,
+    "Yi": YiGPTQForCausalLM,
 }
 
 
