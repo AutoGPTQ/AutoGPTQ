@@ -839,7 +839,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             for ext in extensions:
                 for possible_model_basename in possible_model_basenames:
                     # check for sharded model
-                    if cached_index := cached_file(model_name_or_path, possible_model_basename + ext + '.index.json'):
+                    if cached_index := cached_file(model_name_or_path, possible_model_basename + ext + '.index.json', **cached_file_kwargs):
                         with open(str(cached_index)) as f:
                             index_json = json.load(f)
                             # find the shards from index.json
@@ -850,8 +850,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                             model_index_file = cached_index
                             is_sharded = True
                     else:
-                        resolved_archive_file = cached_file(model_name_or_path, possible_model_basename + ext,
-                                                            **cached_file_kwargs)
+                        resolved_archive_file = cached_file(model_name_or_path, possible_model_basename + ext, **cached_file_kwargs)
                         searched_files.append(possible_model_basename + ext)
                     if resolved_archive_file is not None:
                         true_model_basename = possible_model_basename
