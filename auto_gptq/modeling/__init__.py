@@ -14,4 +14,5 @@ from .baichuan import *
 from .internlm import *
 from .qwen import *
 from .mistral import *
+from .yi import *
 from .xverse import *
