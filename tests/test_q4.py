@@ -329,7 +329,7 @@ class TestsQ4CUDA(unittest.TestCase):
         1.1514, 2.3262, 1.2451, 1.8447, 2.2051, 1.5254, 1.5342, 2.1016, 1.6523,
         1.6279, 1.1680, 1.3037, 2.1035]).to(torch.float16)
 
-    @parameterized.expand([False, True])
+    @parameterized.expand([(False,), (True,)])
     def test_cuda_old(self, use_half2: bool):
 
         group_size = 128
@@ -647,7 +647,7 @@ class TestsQ4ExllamaV2(unittest.TestCase):
 
         self.assertEqual(predicted_text, reference_output)
 
-    def test_exllama_buffer_size(self):
+    def test_exllama_v2_buffer_size(self):
         # prompt = "I'm in Paris and" * 450
         prompt = "I'm in Paris and" * 1000
         device = torch.device("cuda:0")
