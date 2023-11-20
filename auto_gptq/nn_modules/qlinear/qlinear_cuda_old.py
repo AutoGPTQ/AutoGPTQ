@@ -204,7 +204,7 @@ class QuantLinear(nn.Module):
             out = torch.zeros(x.shape[0], out_shape[-1], dtype=torch.float, device=x.device)
             if self.use_cuda_fp16:
                 if x_dtype != torch.float16:
-                    raise ValueError("The cuda-old kernel with use_cuda_fp16=True requires a float16 input activation. Make sure you loaded your model with torch_dtype=torch.float16, or please pass use_cuda_fp16=False.")
+                    logger.warning_once(f"The cuda-old kernel for GPTQ with use_cuda_fp16=True requires a float16 input activation, while {x_dtype} was passed. Casting to float16.\nMake sure you loaded your model with torch_dtype=torch.float16, that the model definition does not inadvertently cast to float32, or disable AMP Autocast that may produce float32 intermediate activations in the model.")
                 
                 if self.bits == 2:
                     self.autogptq_cuda.vecquant2matmul_faster_old(x, self.qweight, out, self.scales.float(), self.qzeros, self.group_size, self.half_indim)
