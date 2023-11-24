@@ -277,10 +277,10 @@ class FusedLlamaMLPForQuantizedModel(FusedBaseMLPModule):
     @classmethod
     def inject_to_model(cls, model, use_triton=False, **kwargs):
         if not use_triton:
-            logger.warning(f"skip module injection for {cls.__name__} not support integrate without triton yet.")
+            logger.warning(f"Skipping module injection for {cls.__name__} as currently not supported with use_triton=False.")
             return
         elif not TRITON_AVAILABLE:
-            logger.warning(f"skip module injection for triton is not installed.")
+            logger.warning(f"Skipping module injection for {cls.__name__} as Triton is not available. Please check your installation.")
             return
 
         for name, m in model.named_modules():

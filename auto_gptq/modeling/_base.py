@@ -6,7 +6,7 @@ from dataclasses import dataclass, field, fields
 from logging import getLogger
 from os.path import join, isfile, isdir
 from typing import Dict, List, Optional, Union
-
+from packaging import version
 import accelerate
 import torch
 import torch.nn as nn
@@ -25,6 +25,7 @@ from ..nn_modules.qlinear import GeneralQuantLinear
 from ..nn_modules._fused_base import FusedBaseAttentionModule, FusedBaseMLPModule
 from ..quantization import GPTQ
 from ..utils.data_utils import collate_data
+from ..utils.patch_utils import set_module_tensor_to_device_patched
 from ..utils.import_utils import (
     dynamically_import_QuantLinear, TRITON_AVAILABLE, AUTOGPTQ_CUDA_AVAILABLE, EXLLAMA_KERNELS_AVAILABLE, QIGEN_AVAILABLE, EXLLAMAV2_KERNELS_AVAILABLE
 )
@@ -157,14 +158,6 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
     def hf_device_map(self):
         return getattr(self.model, "hf_device_map", None)
 
-    @staticmethod
-    def _resize_attention_mask(attention_mask: List[torch.LongTensor]):
-        return attention_mask
-
-    @staticmethod
-    def _resize_position_ids(position_ids: List[torch.LongTensor]):
-        return position_ids
-
     def _prepare_examples_for_quantization(
         self,
         examples: List[Dict[str, Union[List[int], torch.LongTensor]]],
@@ -254,7 +247,12 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                             inp = kwargs[kwarg_name]
                             break
                 layer_inputs.append(move_to_device(inp, self.data_device))
-                attention_masks.append(kwargs["attention_mask"].to(self.data_device))
+                
+                if kwargs["attention_mask"] is not None:
+                    attention_masks.append(kwargs["attention_mask"].to(self.data_device))
+                else:
+                    attention_masks.append(None)
+                
                 pos_ids = kwargs.get("position_ids", None)
                 if pos_ids is not None:
                     position_ids.append(move_to_device(pos_ids, self.data_device))
@@ -311,10 +309,6 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                 move_to_device(module, ori_outside_layer_module_devices[module_name])
 
         torch.cuda.empty_cache()
-
-        # resize attention mask and position ids for some special models
-        attention_masks = self._resize_attention_mask(attention_masks)
-        position_ids = self._resize_position_ids(position_ids)
 
         inside_layer_modules = self.inside_layer_modules
         if not self.quantize_config.true_sequential:
@@ -437,7 +431,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         if not self.hf_device_map:
             return self.model.device
         else:
-            device = [d for d in self.hf_device_map.values() if d not in {'cpu', 'disk'}][0]
+            device = [d for d in self.hf_device_map.values() if d not in {'disk'}][0]
             return torch.device(device)
 
     def to(self, device: Union[str, torch.device]):
@@ -527,7 +521,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                 repo_type="model",
             )
 
-    def save_quantized(self, save_dir: str, use_safetensors: bool = False, safetensors_metadata: Optional[Dict[str, str]] = None):
+    def save_quantized(self, save_dir: str, use_safetensors: bool = True, safetensors_metadata: Optional[Dict[str, str]] = None):
         """save quantized model and configs to local disk"""
         os.makedirs(save_dir, exist_ok=True)
 
@@ -586,7 +580,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         self.quantize_config.model_name_or_path = save_dir
         self.quantize_config.model_file_base_name = model_base_name
 
-    def save_pretrained(self, save_dir: str, use_safetensors: bool = False, safetensors_metadata: Optional[Dict[str, str]] = None, **kwargs):
+    def save_pretrained(self, save_dir: str, use_safetensors: bool = True, safetensors_metadata: Optional[Dict[str, str]] = None, **kwargs):
         """alias of save_quantized"""
         logger.warning("you are using save_pretrained, which will re-direct to save_quantized.")
         self.save_quantized(save_dir, use_safetensors, safetensors_metadata)
@@ -704,16 +698,23 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         use_cuda_fp16: bool = True,
         quantize_config: Optional[BaseQuantizeConfig] = None,
         model_basename: Optional[str] = None,
-        use_safetensors: bool = False,
+        use_safetensors: bool = True,
         trust_remote_code: bool = False,
         warmup_triton: bool = False,
         trainable: bool = False,
-        disable_exllama: bool = True,
+        disable_exllama: Optional[bool] = None,
         disable_exllamav2: bool = False,
         **kwargs
     ):
         """load quantized model from local disk"""
-       
+
+        # If disable_exllamav2 is True, we want to fall back on the exllama kernel and not the cuda/cuda_old ones.
+        if disable_exllama is None:
+            if disable_exllamav2:
+                disable_exllama = False
+            else:
+                disable_exllama = True
+
         # Parameters related to loading from Hugging Face Hub
         cache_dir = kwargs.pop("cache_dir", None)
         force_download = kwargs.pop("force_download", False)
@@ -783,7 +784,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                 "You have activated both exllama and exllamav2 kernel. Setting disable_exllama to True and keeping disable_exllamav2 to False"
             )
             disable_exllama = True
-            
+                    
         # == step1: prepare configs and file names == #
         config = AutoConfig.from_pretrained(model_name_or_path, trust_remote_code=trust_remote_code, **cached_file_kwargs)
 
@@ -795,13 +796,14 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         
         if model_basename is None:
             if quantize_config.model_file_base_name:
-                model_basename = quantize_config.model_file_base_name
+                possible_model_basenames = [quantize_config.model_file_base_name]
             else:
-                model_basename = f"gptq_model-{quantize_config.bits}bit-{quantize_config.group_size}g"
+                possible_model_basenames = [f"gptq_model-{quantize_config.bits}bit-{quantize_config.group_size}g", "model"]
+        else:
+            possible_model_basenames = [model_basename]
         
         quantize_config.model_name_or_path = model_name_or_path
-        quantize_config.model_file_base_name = model_basename
-
+        
         extensions = []
         if use_safetensors:
             extensions.append(".safetensors")
@@ -812,25 +814,35 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         is_local = isdir(model_name_or_path)
 
         resolved_archive_file = None
+        true_model_basename = None
+        searched_files = []
         if is_local:
-            model_save_name = join(model_name_or_path, model_basename)
             for ext in extensions:
-                if isfile(model_save_name + ext):
-                    resolved_archive_file = model_save_name + ext
-                    break
+                for possible_model_basename in possible_model_basenames:
+                    model_save_name = join(model_name_or_path, possible_model_basename)
+                    searched_files.append(possible_model_basename + ext)
+                    if isfile(model_save_name + ext):
+                        resolved_archive_file = model_save_name + ext
+                        true_model_basename = possible_model_basename
+                        break
         else:  # remote
             for ext in extensions:
-                resolved_archive_file = cached_file(model_name_or_path, model_basename + ext, **cached_file_kwargs)
-                if resolved_archive_file is not None:
-                    break
+                for possible_model_basename in possible_model_basenames:
+                    resolved_archive_file = cached_file(model_name_or_path, possible_model_basename + ext, **cached_file_kwargs)
+                    searched_files.append(possible_model_basename + ext)
+                    if resolved_archive_file is not None:
+                        true_model_basename = possible_model_basename
+                        break
         
-        if resolved_archive_file is None: # Could not find a model file to use
-            raise FileNotFoundError(f"Could not find model in {model_name_or_path}")
+        quantize_config.model_file_base_name = true_model_basename
+        
+        if resolved_archive_file is None:
+            raise FileNotFoundError(f"Could not find a model in {model_name_or_path} with a name in {', '.join(searched_files)}. Please specify the argument model_basename to use a custom file name.")
                 
         model_save_name = resolved_archive_file
 
         if (not disable_exllama or not disable_exllamav2) and trainable:
-            logger.warning("QuantLinear with exllama backend not support trainable mode yet, Switch to the pytorch backend.")
+            logger.warning("QuantLinear with the exllama backend not does support the trainable mode yet, switching to cuda/cuda_old/triton backend.")
             disable_exllama = True
             disable_exllamav2 = True
             
@@ -846,7 +858,11 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                 torch_dtype = torch.float16
             else:
                 torch_dtype = torch.float32
-            
+        
+        if torch_dtype != torch.float16:
+            logger.warning("Overriding use_cuda_fp16 to False since torch_dtype is not torch.float16.")
+            use_cuda_fp16 = False
+        
         if not use_qigen:
             torch.nn.init.kaiming_uniform_ = skip
             torch.nn.init.uniform_ = skip
@@ -918,13 +934,23 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             if low_cpu_mem_usage:
                 make_sure_no_tensor_in_meta_device(model, use_triton, quantize_config.desc_act, quantize_config.group_size, bits=quantize_config.bits)
 
+            # Patch until 0.25.0 is released and includes this fix: https://github.com/huggingface/accelerate/pull/2116
+            if version.parse(accelerate.__version__) < version.parse("0.24.99") or accelerate.__version__ == "0.25.0.dev0":
+                original_set_module_tensor_to_device = accelerate.utils.modeling.set_module_tensor_to_device
+                accelerate.utils.modeling.set_module_tensor_to_device = set_module_tensor_to_device_patched
+
             accelerate.utils.modeling.load_checkpoint_in_model(
                 model,
+                dtype=torch_dtype,  # This is very hacky but works due to https://github.com/huggingface/accelerate/blob/bd72a5f1a80d5146554458823f8aeda0a9db5297/src/accelerate/utils/modeling.py#L292
                 checkpoint=model_save_name,
                 device_map=device_map,
                 offload_state_dict=True,
                 offload_buffers=True
             )
+
+            if version.parse(accelerate.__version__) < version.parse("0.24.99") or accelerate.__version__ == "0.25.0.dev0":
+                accelerate.utils.modeling.set_module_tensor_to_device = original_set_module_tensor_to_device
+
             model = simple_dispatch_model(model, device_map)
         else:
             if quantize_config.desc_act:

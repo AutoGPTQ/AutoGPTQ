@@ -12,9 +12,12 @@ logger = getLogger(__name__)
 
 try:
     from exllama_kernels import make_q4, q4_matmul
-except ImportError:
-    logger.error('exllama_kernels not installed.')
-    raise
+except ImportError as exllama_import_exception:
+    def error_raiser_exllama(*args, **kwargs):
+        raise ValueError(f"Trying to use the exllama backend, but could not import the C++/CUDA dependencies with the following error: {exllama_import_exception}")
+    
+    make_q4 = error_raiser_exllama
+    q4_matmul = error_raiser_exllama
 
 # Dummy tensor to pass instead of g_idx since there is no way to pass "None" to a C++ extension
 none_tensor = torch.empty((1, 1), device="meta")
@@ -164,7 +167,12 @@ class QuantLinear(nn.Module):
         self.qzeros = torch.from_numpy(qzeros)
 
     def forward(self, x):
-        out = ext_q4_matmul(x.half(), self.q4, self.width)
+        if x.dtype != torch.float16:
+            logger.warning_once(f"The exllama kernel for GPTQ requires a float16 input activation, while {x.dtype} was passed. Casting to float16.\nMake sure you loaded your model with torch_dtype=torch.float16, that the model definition does not inadvertently cast to float32, or disable AMP Autocast that may produce float32 intermediate activations in the model.")
+
+            x = x.half()
+
+        out = ext_q4_matmul(x, self.q4, self.width)
 
         if self.bias is not None:
             out.add_(self.bias)

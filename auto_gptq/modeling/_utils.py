@@ -19,10 +19,13 @@ def get_device(obj: Union[torch.Tensor, nn.Module]):
     return next(obj.parameters()).device
 
 
-def move_to_device(obj: Union[torch.Tensor, nn.Module], device: torch.device):
-    if get_device(obj) != device:
-        obj = obj.to(device)
-    return obj
+def move_to_device(obj: Optional[Union[torch.Tensor, nn.Module]], device: torch.device):
+    if obj is None:
+        return obj
+    else:
+        if get_device(obj) != device:
+            obj = obj.to(device)
+        return obj
 
 
 def find_layers(module, layers=None, name=''):
@@ -56,13 +59,20 @@ def make_quant(
     group_size,
     name='',
     use_triton: bool = False,
-    disable_exllama: bool = True,
+    disable_exllama: Optional[bool] = None,
     disable_exllamav2: bool = False, 
     use_qigen: bool = False,
     use_cuda_fp16: bool = True,
     desc_act: bool = False,
     trainable: bool = False
-):  
+):
+    # If disable_exllamav2 is True, we want to fall back on the exllama kernel and not the cuda/cuda_old ones.
+    if disable_exllama is None:
+        if disable_exllamav2:
+            disable_exllama = False
+        else:
+            disable_exllama = True
+
     QuantLinear = dynamically_import_QuantLinear(use_triton=use_triton, desc_act=desc_act, group_size=group_size, bits=bits, disable_exllama=disable_exllama, disable_exllamav2=disable_exllamav2, use_qigen=use_qigen)
 
     if isinstance(module, QuantLinear):
@@ -84,10 +94,10 @@ def make_quant(
                 out_features = tmp.weight.shape[1]
             if (not(desc_act) or group_size == -1) and not use_triton and not use_qigen:
                 new_layer = QuantLinear(
-                    bits, group_size, in_features, out_features, True, use_cuda_fp16=use_cuda_fp16, trainable=trainable
+                    bits, group_size, in_features, out_features, True, use_cuda_fp16=use_cuda_fp16, trainable=trainable, weight_dtype=tmp.weight.dtype
                 )
             else:
-                new_layer = QuantLinear(bits, group_size, in_features, out_features, True, trainable=trainable)
+                new_layer = QuantLinear(bits, group_size, in_features, out_features, True, trainable=trainable, weight_dtype=tmp.weight.dtype)
             new_layer.device = ori_layer_device
             setattr(module, attr, new_layer.to(ori_layer_device))
     for name1, child in module.named_children():
@@ -300,7 +310,10 @@ def autogptq_post_init(model, use_act_order: bool, max_input_length: Optional[in
 
     if model_uses_exllama:
         # To be honest this is quite ugly, not proud of this.
-        from exllama_kernels import prepare_buffers, set_tuning_params
+        try:
+            from exllama_kernels import prepare_buffers, set_tuning_params
+        except ImportError as e:
+            raise ImportError(f"Could not import exllama backend dependencies prepare_buffers, set_tuning_params with the following error: {e}")
         
         device_to_buffers = {}
 

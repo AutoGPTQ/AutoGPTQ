@@ -30,7 +30,8 @@ class QuantLinear(nn.Module):
         outfeatures,
         bias,
         kernel_switch_threshold=128,
-        trainable=False
+        trainable=False,
+        weight_dtype=torch.float16,
     ):
         super().__init__()
         global _autogptq_cuda_available
@@ -55,14 +56,14 @@ class QuantLinear(nn.Module):
         )
         self.register_buffer(
             'scales',
-            torch.zeros((math.ceil(infeatures / self.group_size), outfeatures), dtype=torch.float16)
+            torch.zeros((math.ceil(infeatures / self.group_size), outfeatures), dtype=weight_dtype)
         )
         self.register_buffer(
             'g_idx',
             torch.tensor([i // self.group_size for i in range(infeatures)], dtype=torch.int32)
         )
         if bias:
-            self.register_buffer('bias', torch.zeros((outfeatures), dtype=torch.float16))
+            self.register_buffer('bias', torch.zeros((outfeatures), dtype=weight_dtype))
         else:
             self.bias = None
 
@@ -105,9 +106,9 @@ class QuantLinear(nn.Module):
         scales = scales.t().contiguous()
         zeros = zeros.t().contiguous()
         scale_zeros = zeros * scales
-        self.scales = scales.clone().half()
+        self.scales = scales.clone().to(dtype=linear.weight.dtype)
         if linear.bias is not None:
-            self.bias = linear.bias.clone().half()
+            self.bias = linear.bias.clone().to(dtype=linear.weight.dtype)
 
         intweight = []
         for idx in range(self.infeatures):
@@ -196,7 +197,8 @@ class QuantLinear(nn.Module):
     def forward(self, x: torch.Tensor):
         out_shape = x.shape[:-1] + (self.outfeatures,)
         x = x.reshape(-1, x.shape[-1])
-        if self.autogptq_cuda_available and (
+        x_dtype = x.dtype
+        if x.device.type == "cuda" and self.autogptq_cuda_available and (
             self.kernel_switch_threshold == 0 or x.shape[0] < self.kernel_switch_threshold
         ):
             out = torch.zeros((x.shape[0], self.outfeatures), device=x.device, dtype=torch.float32)
@@ -219,7 +221,7 @@ class QuantLinear(nn.Module):
                     torch.unsqueeze(self.qzeros, 2).expand(-1, -1, 32 // self.bits),
                     self.wf.unsqueeze(0)
                 ).to(torch.int16 if self.bits == 8 else torch.int8)
-                torch.bitwise_and(zeros, (2 ** self.bits) - 1, out=zeros)
+                zeros = torch.bitwise_and(zeros, (2 ** self.bits) - 1)
 
                 zeros = zeros + 1
                 zeros = zeros.reshape(self.scales.shape)
@@ -228,7 +230,7 @@ class QuantLinear(nn.Module):
                     torch.unsqueeze(self.qweight, 1).expand(-1, 32 // self.bits, -1),
                     self.wf.unsqueeze(-1)
                 ).to(torch.int16 if self.bits == 8 else torch.int8)
-                torch.bitwise_and(weight, (2 ** self.bits) - 1, out=weight)
+                weight = torch.bitwise_and(weight, (2 ** self.bits) - 1)
             elif self.bits == 3:
                 zeros = self.qzeros.reshape(
                     self.qzeros.shape[0], self.qzeros.shape[1] // 3, 3, 1
@@ -267,8 +269,9 @@ class QuantLinear(nn.Module):
                     g_idx_i = self.g_idx[i*num_dim:(i+1)*num_dim]
                     weights.append(scale_i[g_idx_i.long()] * (weight_i - zeros_i[g_idx_i.long()]))
                 weights = torch.cat(weights,dim=1)
-            out = torch.matmul(x.half(), weights)
-        out = out.half().reshape(out_shape)
+            out = torch.matmul(x, weights)
+        out = out.to(x_dtype)
+        out= out.reshape(out_shape)
         out = out + self.bias if self.bias is not None else out
         return out
 
