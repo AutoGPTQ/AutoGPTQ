@@ -144,7 +144,16 @@ class FusedLlamaAttentionForQuantizedModel(FusedBaseAttentionModule):
         """
         QuantLinear = dynamically_import_QuantLinear(use_triton=use_triton, desc_act=desc_act, group_size=group_size, bits=bits, disable_exllama=disable_exllama, disable_exllamav2=disable_exllamav2)
 
-        for name, m in model.named_modules():
+        # model.named_modules() may create a generator that keep reference of all submodules
+        # directly iterating will prevent releasing the old q/k/v_proj until the end of the entire loop,
+        # which roughly doubles the amount of VRAM usage of qkv_layer
+        model_named_modules = list(model.named_modules())
+        # module name in reverse dictionary order, so submodule is accessed (then set to None) before its parent
+        model_named_modules.sort(key=lambda t: t[0], reverse=True)
+
+        for idx, (name, m) in enumerate(model_named_modules):
+            model_named_modules[idx] = None
+
             if not isinstance(m, LlamaAttention):
                 continue
 
