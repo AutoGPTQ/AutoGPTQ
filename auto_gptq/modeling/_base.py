@@ -838,6 +838,8 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                         break
         
         quantize_config.model_file_base_name = true_model_basename
+        print(quantize_config.model_file_base_name, 'q')
+        print(searched_files)
         
         if resolved_archive_file is None:
             raise FileNotFoundError(f"Could not find a model in {model_name_or_path} with a name in {', '.join(searched_files)}. Please specify the argument model_basename to use a custom file name.")
