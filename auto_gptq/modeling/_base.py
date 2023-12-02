@@ -816,6 +816,8 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         resolved_archive_file = None
         true_model_basename = None
         searched_files = []
+        print(extensions, possible_model_basenames)
+        print("local", is_local)
         if is_local:
             for ext in extensions:
                 for possible_model_basename in possible_model_basenames:
@@ -829,6 +831,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             for ext in extensions:
                 for possible_model_basename in possible_model_basenames:
                     resolved_archive_file = cached_file(model_name_or_path, possible_model_basename + ext, **cached_file_kwargs)
+                    print("res", resolved_archive_file)
                     searched_files.append(possible_model_basename + ext)
                     if resolved_archive_file is not None:
                         true_model_basename = possible_model_basename
