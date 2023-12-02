@@ -1,4 +1,4 @@
-from auto_gptq.modeling import BaseGPTQForCausalLM
+from AutoGPTQ.auto_gptq.modeling import BaseGPTQForCausalLM
 
 
 class GPTBigCodeGPTQForCausalLM(BaseGPTQForCausalLM):
