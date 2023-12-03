@@ -816,8 +816,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         resolved_archive_file = None
         true_model_basename = None
         searched_files = []
-        print(extensions, possible_model_basenames)
-        print("local", is_local)
+
         if is_local:
             for ext in extensions:
                 for possible_model_basename in possible_model_basenames:
@@ -834,7 +833,6 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                     resolved_archive_file = cached_file(model_name_or_path, possible_model_basename + ext, **cached_file_kwargs)
                     if resolved_archive_file is None:
                         resolved_archive_file = temp
-                    print("res", resolved_archive_file, "meh")
                     searched_files.append(possible_model_basename + ext)
                     if resolved_archive_file is not None:
                         temp = resolved_archive_file
@@ -842,9 +840,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                         break
         
         quantize_config.model_file_base_name = true_model_basename
-        print(quantize_config.model_file_base_name, 'q')
-        print(searched_files, 's')
-        print("final res", resolved_archive_file)
+
         
         if resolved_archive_file is None:
             raise FileNotFoundError(f"Could not find a model in {model_name_or_path} with a name in {', '.join(searched_files)}. Please specify the argument model_basename to use a custom file name.")
