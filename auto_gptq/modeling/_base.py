@@ -826,11 +826,15 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                         true_model_basename = possible_model_basename
                         break
         else:  # remote
+            temp = None
             for ext in extensions:
                 for possible_model_basename in possible_model_basenames:
                     resolved_archive_file = cached_file(model_name_or_path, possible_model_basename + ext, **cached_file_kwargs)
+                    if resolved_archive_file is None:
+                        resolved_archive_file = temp
                     searched_files.append(possible_model_basename + ext)
                     if resolved_archive_file is not None:
+                        temp = resolved_archive_file
                         true_model_basename = possible_model_basename
                         break
         
