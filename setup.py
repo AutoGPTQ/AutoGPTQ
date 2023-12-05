@@ -98,7 +98,7 @@ if BUILD_CUDA_EXT:
        
     if platform.system() != 'Windows':
         print("Generating qigen kernels...")
-        p = int(subprocess.run("cat /proc/cpuinfo | grep cores | head -1", shell=True, check=True, text=True, stdout=subprocess.PIPE).stdout.split(" ")[2])
+        p = int(subprocess.run(["grep", "-c", "^processor", "/proc/cpuinfo"], stdout=subprocess.PIPE, text=True).stdout.strip())
         try:
             subprocess.check_output(["python", "./autogptq_extension/qigen/generate.py", "--module", "--search", "--p", str(p)])
         except subprocess.CalledProcessError as e:
