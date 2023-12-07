@@ -37,6 +37,8 @@ common_setup_kwargs = {
 
 PYPI_RELEASE = os.environ.get('PYPI_RELEASE', None)
 BUILD_CUDA_EXT = int(os.environ.get('BUILD_CUDA_EXT', '1')) == 1
+DISABLE_QIGEN = int(os.environ.get('DISABLE_QIGEN', '0')) == 1
+
 if BUILD_CUDA_EXT:
     try:
         import torch
@@ -96,7 +98,7 @@ additional_setup_kwargs = dict()
 if BUILD_CUDA_EXT:
     from torch.utils import cpp_extension
        
-    if platform.system() != 'Windows' and platform.machine() != 'aarch64':
+    if platform.system() != "Windows" and platform.machine() != "aarch64" and not DISABLE_QIGEN:
         print("Generating qigen kernels...")
         cores_info = subprocess.run("cat /proc/cpuinfo | grep cores | head -1", shell=True, check=True, text=True, stdout=subprocess.PIPE).stdout.split(" ")
         if (len(cores_info) == 3 and cores_info[1].startswith("cores")) or (len(cores_info) == 2):
@@ -133,7 +135,7 @@ if BUILD_CUDA_EXT:
         )
     ]
     
-    if platform.system() != 'Windows' and platform.machine() != 'aarch64':
+    if platform.system() != "Windows" and platform.machine() != "aarch64" and not DISABLE_QIGEN:
         extensions.append(
             cpp_extension.CppExtension(
                 "cQIGen",
