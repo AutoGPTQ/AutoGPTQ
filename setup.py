@@ -96,9 +96,13 @@ additional_setup_kwargs = dict()
 if BUILD_CUDA_EXT:
     from torch.utils import cpp_extension
        
-    if platform.system() != 'Windows':
+    if platform.system() != 'Windows' and platform.machine() != 'aarch64':
         print("Generating qigen kernels...")
-        p = int(subprocess.run("cat /proc/cpuinfo | grep cores | head -1", shell=True, check=True, text=True, stdout=subprocess.PIPE).stdout.split(" ")[2])
+        cores_info = subprocess.run("cat /proc/cpuinfo | grep cores | head -1", shell=True, check=True, text=True, stdout=subprocess.PIPE).stdout.split(" ")
+        if (len(cores_info) == 3 and cores_info[1].startswith("cores")) or (len(cores_info) == 2):
+            p = int([cores_info[-1]])
+        else:
+            p = os.cpu_count()
         try:
             subprocess.check_output(["python", "./autogptq_extension/qigen/generate.py", "--module", "--search", "--p", str(p)])
         except subprocess.CalledProcessError as e:
@@ -129,7 +133,7 @@ if BUILD_CUDA_EXT:
         )
     ]
     
-    if platform.system() != 'Windows':
+    if platform.system() != 'Windows' and platform.machine() != 'aarch64':
         extensions.append(
             cpp_extension.CppExtension(
                 "cQIGen",
