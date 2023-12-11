@@ -888,7 +888,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                 layers = find_layers(model)
                 ignore_layers = [cls.lm_head_name] + cls.outside_layer_modules
                 for name in list(layers.keys()):
-                    if any([name.startswith(ignore_layer) for ignore_layer in ignore_layers]) or layers[name].out_features % 32:
+                    if any([name.startswith(ignore_layer) for ignore_layer in ignore_layers]):
                         logger.info(f"{name} not been quantized, will be ignored when make_quant.")
                         del layers[name]
 
