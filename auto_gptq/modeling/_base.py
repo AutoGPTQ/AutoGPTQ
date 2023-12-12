@@ -325,7 +325,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
 
             full = find_layers(layer)
             for names in inside_layer_modules:
-                subset = {n: full[n] for n in names}
+                subset = {n: full[n] for n in names if n in full}
                 gptq = {}
                 for name in subset:
                     gptq[name] = GPTQ(subset[name])
