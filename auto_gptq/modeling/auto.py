@@ -19,6 +19,7 @@ from .qwen import QwenGPTQForCausalLM
 from .mistral import MistralGPTQForCausalLM
 from .yi import YiGPTQForCausalLM
 from .xverse import XverseGPTQForCausalLM
+from .decilm import DeciLMGPTQForCausalLM
 
 GPTQ_CAUSAL_LM_MODEL_MAP = {
     "bloom": BloomGPTQForCausalLM,
@@ -39,6 +40,7 @@ GPTQ_CAUSAL_LM_MODEL_MAP = {
     "mistral": MistralGPTQForCausalLM,
     "Yi": YiGPTQForCausalLM,
     "xverse": XverseGPTQForCausalLM,
+    "deci_lm": DeciLMGPTQForCausalLM,
 }
 
 
