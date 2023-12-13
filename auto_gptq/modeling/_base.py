@@ -325,7 +325,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
 
             full = find_layers(layer)
             for names in inside_layer_modules:
-                subset = {n: full[n] for n in names}
+                subset = {n: full[n] for n in names if n in full}
                 gptq = {}
                 for name in subset:
                     gptq[name] = GPTQ(subset[name])
@@ -826,11 +826,15 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                         true_model_basename = possible_model_basename
                         break
         else:  # remote
+            temp = None
             for ext in extensions:
                 for possible_model_basename in possible_model_basenames:
                     resolved_archive_file = cached_file(model_name_or_path, possible_model_basename + ext, **cached_file_kwargs)
+                    if resolved_archive_file is None:
+                        resolved_archive_file = temp
                     searched_files.append(possible_model_basename + ext)
                     if resolved_archive_file is not None:
+                        temp = resolved_archive_file
                         true_model_basename = possible_model_basename
                         break
         
@@ -884,7 +888,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                 layers = find_layers(model)
                 ignore_layers = [cls.lm_head_name] + cls.outside_layer_modules
                 for name in list(layers.keys()):
-                    if any([name.startswith(ignore_layer) for ignore_layer in ignore_layers]):
+                    if any([name.startswith(ignore_layer) for ignore_layer in ignore_layers]) or all([not name.endswith(ignore_layer) for sublist in cls.inside_layer_modules for ignore_layer in sublist]):
                         logger.info(f"{name} not been quantized, will be ignored when make_quant.")
                         del layers[name]
 
