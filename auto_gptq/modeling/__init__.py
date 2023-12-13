@@ -17,3 +17,4 @@ from .mistral import *
 from .yi import *
 from .xverse import *
 from .decilm import *
+from .stablelmepoch import *

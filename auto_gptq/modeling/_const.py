@@ -23,6 +23,7 @@ SUPPORTED_MODELS = [
     "qwen",
     "xverse",
     "deci_lm",
+    "stablelm_epoch",
 ]
 if compare_transformers_version("v4.28.0", op="ge"):
     SUPPORTED_MODELS.append("llama")
