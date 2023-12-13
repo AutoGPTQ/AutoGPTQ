@@ -665,3 +665,26 @@ class TestsQ4ExllamaV2(unittest.TestCase):
         self.assertTrue(inp["input_ids"].shape[1] > 2048)  # 2048 is the default max_input_length for LLama
         
         res = model_q.generate(**inp, num_beams=1, min_new_tokens=3, max_new_tokens=3)
+
+
+class TestsMixtral(unittest.TestCase):
+    def test_mixtral_generation(self):
+        prompt = "I am in Paris and"
+        device = torch.device("cuda:0")
+
+        # Reference generated with the cuda-old kernel
+        reference_output = '''<s> I am in Paris andpublishedющиеcs performancesension manual offset亡VIDEO Kel RepubliczwDrawlichen LondresPSungspfn CreahooEESlider laughselvesлександTrytpl recallслу Ор coldsubset########serdeacion providestrm thoughts président oktobermulticol../редβ themselvesterraряд conflictscommandMass diagonal選 ptrTY還 Havepliedument relate redu'''
+
+        model_id = "TheBlokeAI/Mixtral-tiny-GPTQ"
+        model_basename = "model"
+
+        model_q = AutoGPTQForCausalLM.from_quantized(model_id, use_safetensors=True, device="cuda:0", use_triton=False, inject_fused_attention=False, inject_fused_mlp=False, model_basename=model_basename)
+        tokenizer = AutoTokenizer.from_pretrained(model_id)
+
+        inp = tokenizer(prompt, return_tensors="pt").to(device)
+
+        res = model_q.generate(**inp, num_beams=1, min_new_tokens=60, max_new_tokens=60, do_sample=False)
+
+        predicted_text = tokenizer.decode(res[0])
+
+        self.assertEqual(predicted_text, reference_output)
