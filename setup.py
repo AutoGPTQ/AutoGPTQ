@@ -37,7 +37,7 @@ common_setup_kwargs = {
 
 PYPI_RELEASE = os.environ.get('PYPI_RELEASE', None)
 BUILD_CUDA_EXT = int(os.environ.get('BUILD_CUDA_EXT', '1')) == 1
-DISABLE_QIGEN = int(os.environ.get('DISABLE_QIGEN', '0')) == 1
+DISABLE_QIGEN = int(os.environ.get('DISABLE_QIGEN', '1')) == 1
 
 if BUILD_CUDA_EXT:
     try:
