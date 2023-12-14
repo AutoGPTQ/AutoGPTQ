@@ -14,13 +14,15 @@ import transformers
 from accelerate.hooks import remove_hook_from_module
 from safetensors.torch import save_file as safe_save
 from safetensors.torch import load_file as safe_load
+from safetensors import safe_open
 from transformers import AutoConfig, AutoModelForCausalLM, PreTrainedModel
 from transformers.utils.hub import PushToHubMixin, cached_file, create_repo, create_commit, CommitOperationAdd
 from transformers.utils.generic import ContextManagers
 from transformers.modeling_utils import no_init_weights
-
+import tempfile
 from ._const import *
 from ._utils import *
+from ._utils import unpack_awq, pack_from_tensors
 from ..nn_modules.qlinear import GeneralQuantLinear
 from ..nn_modules._fused_base import FusedBaseAttentionModule, FusedBaseMLPModule
 from ..quantization import GPTQ
@@ -29,9 +31,15 @@ from ..utils.patch_utils import set_module_tensor_to_device_patched
 from ..utils.import_utils import (
     dynamically_import_QuantLinear, TRITON_AVAILABLE, AUTOGPTQ_CUDA_AVAILABLE, EXLLAMA_KERNELS_AVAILABLE, QIGEN_AVAILABLE, EXLLAMAV2_KERNELS_AVAILABLE
 )
+from tqdm import tqdm
 
 logger = getLogger(__name__)
 
+
+SYNONYMS = {
+    "w_bit": "bits",
+    "q_group_size": "group_size",
+}
 
 @dataclass
 class BaseQuantizeConfig(PushToHubMixin):
@@ -44,6 +52,7 @@ class BaseQuantizeConfig(PushToHubMixin):
     true_sequential: bool = field(default=True)
     model_name_or_path: Optional[str] = field(default=None)
     model_file_base_name: Optional[str] = field(default=None)
+    awq_gemm_checkpoint: Optional[bool] = field(default=False)
 
     def __post_init__(self):
         fields_info = fields(self)
@@ -97,10 +106,19 @@ class BaseQuantizeConfig(PushToHubMixin):
             args_from_json = json.load(f)
             filtered_args = {}
             for key, val in args_from_json.items():
-                if key in field_names:
+                if key == "version" and val == "GEMM":
+                    filtered_args["awq_gemm_checkpoint"] = True
+                elif key in field_names:
                     filtered_args[key] = val
+                elif key in SYNONYMS and SYNONYMS[key] in field_names:
+                    filtered_args[SYNONYMS[key]] = val
                 else:
                     logger.warning(f"ignoring unknown parameter in {quantize_config_filename}: {key}.")
+            
+            if filtered_args["awq_gemm_checkpoint"]:
+                # AWQ does not reorder the rows.
+                filtered_args["desc_act"] = False
+
             return cls(**filtered_args)
 
     def to_dict(self):
@@ -943,6 +961,62 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                 original_set_module_tensor_to_device = accelerate.utils.modeling.set_module_tensor_to_device
                 accelerate.utils.modeling.set_module_tensor_to_device = set_module_tensor_to_device_patched
 
+            if quantize_config.awq_gemm_checkpoint:
+                if not is_local:
+                    raise NotImplementedError("Please use a local checkpoint for AWQ conversion.")
+                
+                if os.path.isfile(os.path.join(model_name_or_path, "autogptq_model.safetensors")):
+                    model_save_name = os.path.join(model_name_or_path, "autogptq_model.safetensors")
+                else:
+                    if "safetensors" not in model_save_name:
+                        raise NotImplementedError(f"Conversion from AWQ checkpoints is implemented only for safetensors checkpoints, found {model_save_name}")
+                    if quantize_config.bits != 4:
+                        raise NotImplementedError(f"Conversion from AWQ checkpoints is supported only for 4 bits models. Found {quantize_config.bits} bits.")
+                    gptq_layers = set()
+                    non_gptq_params = set()
+                    with safe_open(model_save_name, framework="pt") as f:
+                        state_dict_keys = list(f.keys())
+                        for state_dict_key in f.keys():
+                            if "qweight" not in state_dict_key and "qzeros" not in state_dict_key and "scales" not in state_dict_key:
+                                non_gptq_params.add(state_dict_key)
+                                continue
+                            
+                            # e.g. prefix "model.layers.3.self_attn.k_proj"
+                            prefix, _ = state_dict_key.rsplit('.', 1)
+                            gptq_layers.add(prefix)
+
+                        new_state_dict = {}
+
+                        for state_dict_key in non_gptq_params:
+                            new_state_dict[state_dict_key] = f.get_tensor(state_dict_key)
+
+                        gptq_layers = sorted(gptq_layers)
+                        max_layer_name_length = len(max(gptq_layers, key=len))
+                        pbar = tqdm(gptq_layers)
+                        i = 0
+                        for gptq_layer_name in pbar:
+                            i += 1
+                            desc = f"Unpacking {gptq_layer_name} + '...'"
+                            desc = desc + " " * (max_layer_name_length - len(desc))
+
+                            awq_qweight = f.get_tensor(gptq_layer_name + ".qweight")
+                            awq_qzeros = f.get_tensor(gptq_layer_name + ".qzeros")
+                            awq_scales = f.get_tensor(gptq_layer_name + ".scales")
+
+                            unpacked_qweight, unpacked_qzeros = unpack_awq(awq_qweight, awq_qzeros, awq_scales, bits=quantize_config.bits, group_size=quantize_config.group_size)
+
+                            desc = f"Repacking {gptq_layer_name}..."
+                            desc = desc + " " * (max_layer_name_length + 12 - len(desc))
+                            pbar.set_description(desc)
+                            gptq_qweight, gptq_qzeros = pack_from_tensors(unpacked_qweight, unpacked_qzeros, awq_scales, bits=quantize_config.bits, group_size=quantize_config.group_size)
+
+                            new_state_dict[gptq_layer_name + ".qweight"] = gptq_qweight
+                            new_state_dict[gptq_layer_name + ".qzeros"] = gptq_qzeros
+                            new_state_dict[gptq_layer_name + ".scales"] = awq_scales
+
+                    model_save_name = os.path.join(model_name_or_path, "autogptq_model.safetensors")
+                    safe_save(new_state_dict, model_save_name)
+            
             accelerate.utils.modeling.load_checkpoint_in_model(
                 model,
                 dtype=torch_dtype,  # This is very hacky but works due to https://github.com/huggingface/accelerate/blob/bd72a5f1a80d5146554458823f8aeda0a9db5297/src/accelerate/utils/modeling.py#L292
