@@ -938,8 +938,8 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             if low_cpu_mem_usage:
                 make_sure_no_tensor_in_meta_device(model, use_triton, quantize_config.desc_act, quantize_config.group_size, bits=quantize_config.bits)
 
-            # Patch until 0.25.0 is released and includes this fix: https://github.com/huggingface/accelerate/pull/2116
-            if version.parse(accelerate.__version__) < version.parse("0.24.99") or accelerate.__version__ == "0.25.0.dev0":
+            # Patch until 0.26.0 is released and includes this fix: https://github.com/huggingface/accelerate/pull/2116
+            if version.parse(accelerate.__version__) < version.parse("0.25.99"):
                 original_set_module_tensor_to_device = accelerate.utils.modeling.set_module_tensor_to_device
                 accelerate.utils.modeling.set_module_tensor_to_device = set_module_tensor_to_device_patched
 
