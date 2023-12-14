@@ -73,7 +73,6 @@ class FusedLlamaAttentionForQuantizedModel(FusedBaseAttentionModule):
         query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin, position_ids)
         # [bsz, nh, t, hd]
 
-        is_causal = past_key_value is None
         if past_key_value is not None:
             cache_kwargs = {"sin": sin, "cos": cos}  # Specific to RoPE models
             key_states, value_states = past_key_value.update(key_states, value_states, self.layer_idx, cache_kwargs)
@@ -90,8 +89,8 @@ class FusedLlamaAttentionForQuantizedModel(FusedBaseAttentionModule):
                 query_states,
                 key_states,
                 value_states,
-                attn_mask=None if is_causal else attention_mask,
-                is_causal=is_causal
+                attn_mask=attention_mask,
+                is_causal=attention_mask is None and q_len > 1
             )
             attn_weights = None
         else:
