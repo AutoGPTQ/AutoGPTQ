@@ -62,12 +62,14 @@ For perplexity comparison, you can turn to [here](https://github.com/qwopqwop200
 ## Installation
 
 ### Quick Installation
-You can install the latest stable release of AutoGPTQ from pip with pre-built wheels compatible with **PyTorch 2.1**:
+You can install the latest stable release of AutoGPTQ from pip with pre-built wheels:
 
-* For CUDA 12.1: `pip install auto-gptq`
-* For CUDA 11.8: `pip install auto-gptq --extra-index-url https://huggingface.github.io/autogptq-index/whl/cu118/`
-* For RoCm 5.6.1: `pip install auto-gptq --extra-index-url https://huggingface.github.io/autogptq-index/whl/rocm561/`
-* For RoCm 5.7.1: `pip install auto-gptq --extra-index-url https://huggingface.github.io/autogptq-index/whl/rocm571/`
+| CUDA/ROCm version | Installation                                                                                      | Built against PyTorch |
+|-------------------|---------------------------------------------------------------------------------------------------|-----------------------|
+| CUDA 11.8         | `pip install auto-gptq --extra-index-url https://huggingface.github.io/autogptq-index/whl/cu118/`   | 2.1.1+cu118           |
+| CUDA 12.1         | `pip install auto-gptq`                                                                            | 2.1.1+cu121           |
+| ROCm 5.6          | `pip install auto-gptq --extra-index-url https://huggingface.github.io/autogptq-index/whl/rocm561/` | 2.1.1+rocm5.6        |
+| ROCm 5.7          | `pip install auto-gptq --extra-index-url https://huggingface.github.io/autogptq-index/whl/rocm571/` | nightly               |
 
 AutoGPTQ can be installed with the Triton dependency with `pip install auto-gptq[triton]` in order to be able to use the Triton backend (currently only supports linux, no 3-bits quantization).
 
