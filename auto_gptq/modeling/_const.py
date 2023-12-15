@@ -21,6 +21,9 @@ SUPPORTED_MODELS = [
     "baichuan",
     "internlm",
     "qwen",
+    "xverse",
+    "deci_lm",
+    "stablelm_epoch",
 ]
 if compare_transformers_version("v4.28.0", op="ge"):
     SUPPORTED_MODELS.append("llama")
@@ -28,6 +31,9 @@ if compare_transformers_version("v4.33.0", op="ge"):
     SUPPORTED_MODELS.append("falcon")
 if compare_transformers_version("v4.34.0", op="ge"):
     SUPPORTED_MODELS.append("mistral")
+    SUPPORTED_MODELS.append("Yi")
+if compare_transformers_version("v4.36.0", op="ge"):
+    SUPPORTED_MODELS.append("mixtral")
 
 
 EXLLAMA_DEFAULT_MAX_INPUT_LENGTH = 2048

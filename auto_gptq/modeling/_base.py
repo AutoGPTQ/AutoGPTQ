@@ -325,7 +325,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
 
             full = find_layers(layer)
             for names in inside_layer_modules:
-                subset = {n: full[n] for n in names}
+                subset = {n: full[n] for n in names if n in full}
                 gptq = {}
                 for name in subset:
                     gptq[name] = GPTQ(subset[name])
@@ -836,6 +836,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                         true_model_basename = possible_model_basename
                         break
         else:  # remote
+            temp = None
             for ext in extensions:
                 for possible_model_basename in possible_model_basenames:
                     # check for sharded model
@@ -851,40 +852,43 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                             is_sharded = True
                     else:
                         resolved_archive_file = cached_file(model_name_or_path, possible_model_basename + ext, **cached_file_kwargs)
-                        searched_files.append(possible_model_basename + ext)
+                        if resolved_archive_file is None:
+                            resolved_archive_file = temp
+                    searched_files.append(possible_model_basename + ext)
                     if resolved_archive_file is not None:
+                        temp = resolved_archive_file
                         true_model_basename = possible_model_basename
                         break
-
+        
         quantize_config.model_file_base_name = true_model_basename
-
+        
         if resolved_archive_file is None:
             raise FileNotFoundError(f"Could not find a model in {model_name_or_path} with a name in {', '.join(searched_files)}. Please specify the argument model_basename to use a custom file name.")
-
+                
         model_save_name = resolved_archive_file
 
         if (not disable_exllama or not disable_exllamav2) and trainable:
             logger.warning("QuantLinear with the exllama backend not does support the trainable mode yet, switching to cuda/cuda_old/triton backend.")
             disable_exllama = True
             disable_exllamav2 = True
-
+            
         elif not use_triton and trainable:
             logger.warning("QuantLinear with cuda backend not support trainable mode yet, Switch to the pytorch backend.")
 
         # == step2: convert model to gptq-model (replace Linear with QuantLinear) == #
         def skip(*args, **kwargs):
             pass
-
+            
         if torch_dtype is None:
             if not use_qigen:
                 torch_dtype = torch.float16
             else:
                 torch_dtype = torch.float32
-
+        
         if torch_dtype != torch.float16:
             logger.warning("Overriding use_cuda_fp16 to False since torch_dtype is not torch.float16.")
             use_cuda_fp16 = False
-
+        
         if not use_qigen:
             torch.nn.init.kaiming_uniform_ = skip
             torch.nn.init.uniform_ = skip
@@ -906,7 +910,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                 layers = find_layers(model)
                 ignore_layers = [cls.lm_head_name] + cls.outside_layer_modules
                 for name in list(layers.keys()):
-                    if any([name.startswith(ignore_layer) for ignore_layer in ignore_layers]):
+                    if any([name.startswith(ignore_layer) for ignore_layer in ignore_layers]) or all([not name.endswith(ignore_layer) for sublist in cls.inside_layer_modules for ignore_layer in sublist]):
                         logger.info(f"{name} not been quantized, will be ignored when make_quant.")
                         del layers[name]
 

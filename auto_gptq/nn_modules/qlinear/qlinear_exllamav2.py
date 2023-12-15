@@ -151,6 +151,11 @@ class QuantLinear(nn.Module):
         )
     
     def forward(self, x, force_cuda = False):
+        if x.dtype != torch.float16:
+            logger.warning_once(f"The exllama v2 kernel for GPTQ requires a float16 input activation, while {x.dtype} was passed. Casting to float16.\nMake sure you loaded your model with torch_dtype=torch.float16, that the model definition does not inadvertently cast to float32, or disable AMP Autocast that may produce float32 intermediate activations in the model.")
+
+            x = x.half()
+
         output = ext_gemm_half_q_half(x, self.q_handle, self.outfeatures, force_cuda)
 
         if self.bias is not None:

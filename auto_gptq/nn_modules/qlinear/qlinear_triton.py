@@ -39,7 +39,8 @@ class QuantLinear(nn.Module, TritonModuleMixin):
         infeatures,
         outfeatures,
         bias,
-        trainable=False
+        trainable=False,
+        **kwargs
     ):
         super().__init__()
         if bits not in [2, 4, 8]:
