@@ -47,7 +47,7 @@ peft_config = GPTQAdaLoraConfig(
     inference_mode=False,
 )
 
-tokenizer = AutoTokenizer.from_pretrained(model_name_or_path, use_fast=args.use_fast_tokenizer)
+tokenizer = AutoTokenizer.from_pretrained(tokenizer_name_or_path, use_fast=args.use_fast_tokenizer)
 if not tokenizer.pad_token_id:
     tokenizer.pad_token_id = tokenizer.eos_token_id
 
