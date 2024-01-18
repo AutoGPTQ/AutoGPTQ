@@ -43,10 +43,18 @@ except Exception as e:
     QIGEN_AVAILABLE = False
     QIGEN_EXCEPTION = e
 
+try:
+    import marlin_cuda
+
+    MARLIN_AVAILABLE = True
+except Exception as e:
+    MARLIN_AVAILABLE = False
+
+
 logger = getLogger(__name__)
 
 
-def dynamically_import_QuantLinear(use_triton: bool, desc_act: bool, group_size: int, bits: int, disable_exllama: Optional[bool] = None, disable_exllamav2:bool = False, use_qigen: bool = False):
+def dynamically_import_QuantLinear(use_triton: bool, desc_act: bool, group_size: int, bits: int, disable_exllama: Optional[bool] = None, disable_exllamav2:bool = False, use_qigen: bool = False, disable_marlin: bool = True):
     if use_qigen:
         if not QIGEN_AVAILABLE:
             raise ValueError(f"QIGen appears to be not available with the error: {QIGEN_EXCEPTION}. Please check your installation or use `use_qigen=False`.")
@@ -64,8 +72,9 @@ def dynamically_import_QuantLinear(use_triton: bool, desc_act: bool, group_size:
                     disable_exllama = False
                 else:
                     disable_exllama = True
-            
-            if bits == 4 and not disable_exllamav2 and EXLLAMAV2_KERNELS_AVAILABLE:
+            if bits == 4 and not disable_marlin:
+                from ..nn_modules.qlinear.qlinear_marlin import QuantLinear
+            elif bits == 4 and not disable_exllamav2 and EXLLAMAV2_KERNELS_AVAILABLE:
                 from ..nn_modules.qlinear.qlinear_exllamav2 import QuantLinear
             elif bits == 4 and not disable_exllama and EXLLAMA_KERNELS_AVAILABLE:
                 from ..nn_modules.qlinear.qlinear_exllama import QuantLinear
@@ -73,7 +82,7 @@ def dynamically_import_QuantLinear(use_triton: bool, desc_act: bool, group_size:
                 from ..nn_modules.qlinear.qlinear_cuda_old import QuantLinear
             else:
                 from ..nn_modules.qlinear.qlinear_cuda import QuantLinear
-
+                
     return QuantLinear
 
 

@@ -135,14 +135,25 @@ if BUILD_CUDA_EXT:
         )
     ]
     
-    if platform.system() != "Windows" and platform.machine() != "aarch64" and not DISABLE_QIGEN:
+    if platform.system() != "Windows":
+        if platform.machine() != "aarch64" and not DISABLE_QIGEN:
+            extensions.append(
+                cpp_extension.CppExtension(
+                    "cQIGen",
+                    [
+                        'autogptq_extension/qigen/backend.cpp'
+                    ],
+                    extra_compile_args = ["-O3", "-mavx", "-mavx2", "-mfma", "-march=native", "-ffast-math", "-ftree-vectorize", "-faligned-new", "-std=c++17", "-fopenmp", "-fno-signaling-nans", "-fno-trapping-math"]
+                )
+            )
+            
         extensions.append(
-            cpp_extension.CppExtension(
-                "cQIGen",
+            cpp_extension.CUDAExtension(
+                'marlin_cuda', 
                 [
-                    'autogptq_extension/qigen/backend.cpp'
-                ],
-                extra_compile_args = ["-O3", "-mavx", "-mavx2", "-mfma", "-march=native", "-ffast-math", "-ftree-vectorize", "-faligned-new", "-std=c++17", "-fopenmp", "-fno-signaling-nans", "-fno-trapping-math"]
+                    'autogptq_extension/marlin/marlin_cuda.cpp', 
+                    'autogptq_extension/marlin/marlin_cuda_kernel.cu'
+                ]
             )
         )
         

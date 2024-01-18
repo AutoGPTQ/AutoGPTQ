@@ -692,6 +692,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         low_cpu_mem_usage: bool = False,
         use_triton: bool = False,
         use_qigen: bool = False,
+        use_marlin: bool = False,
         torch_dtype: Optional[torch.dtype] = None,
         inject_fused_attention: bool = True,
         inject_fused_mlp: bool = True,
@@ -954,7 +955,17 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
 
             if version.parse(accelerate.__version__) < version.parse("0.24.99") or accelerate.__version__ == "0.25.0.dev0":
                 accelerate.utils.modeling.set_module_tensor_to_device = original_set_module_tensor_to_device
-
+            if use_marlin:
+                QuantLinear = dynamically_import_QuantLinear(use_triton=use_triton,
+                                                             desc_act=quantize_config.desc_act,
+                                                             group_size=quantize_config.group_size,
+                                                             bits=quantize_config.bits,
+                                                             disable_exllama=disable_exllama,
+                                                             disable_exllamav2=disable_exllamav2)
+                model, model_is_marlin = convert_to_marlin(model, QuantLinear, quantize_config)
+                logger.info('disabling fused attention and mlp injection because marlin is active') # TODO: remove this when marlin is fixed
+                inject_fused_attention = False
+                inject_fused_mlp = False
             model = simple_dispatch_model(model, device_map)
         else:
             if quantize_config.desc_act:
