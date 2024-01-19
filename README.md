@@ -30,7 +30,7 @@ Getting back to the topic, I'm very excited to see that in the past few months, 
 - 2023-08-23 - (News) - 🤗 Transformers, optimum and peft have integrated `auto-gptq`, so now running and training GPTQ models can be more available to everyone! See [this blog](https://huggingface.co/blog/gptq-integration) and it's resources for more details!
 - 2023-08-21 - (News) - Team of Qwen officially released 4bit quantized version of Qwen-7B based on `auto-gptq`, and provided [a detailed benchmark results](https://huggingface.co/Qwen/Qwen-7B-Chat-Int4#%E9%87%8F%E5%8C%96-quantization)
 - 2023-08-06 - (Update) - Support exllama's q4 CUDA kernel to have at least 1.3x speed up for int4 quantized models when doing inference.
-- 2023-08-04 - (Update) - Support RoCm so that AMD GPU users can use auto-gptq with CUDA extensions.
+- 2023-08-04 - (Update) - Support ROCm so that AMD GPU users can use auto-gptq with CUDA extensions.
 - 2023-07-26 - (Update) - An elegant [PPL benchmark script](examples/benchmark/perplexity.py) to get results that can be fairly compared with other libraries such as `llama.cpp`.
 - 2023-06-05 - (Update) - Integrate with 🤗 peft to use gptq quantized model to train adapters, support LoRA, AdaLoRA, AdaptionPrompt, etc.
 - 2023-05-30 - (Update) - Support download/upload quantized model from/to 🤗 Hub.
@@ -82,15 +82,15 @@ git clone https://github.com/PanQiWei/AutoGPTQ.git && cd AutoGPTQ
 A few packages are required in order to build from source: `pip install numpy gekko pandas`.
 
 ```
-Then, install from source:
+Then, install locally from source:
 ```shell
-pip install -v .
+pip install -vvv -e .
 ```
 You can set `BUILD_CUDA_EXT=0` to disable pytorch extension building, but this is **strongly discouraged** as AutoGPTQ then falls back on a slow python implementation.
 
-#### On RoCm systems
+#### On ROCm systems
 
-To install from source for AMD GPUs supporting RoCm, please specify the `ROCM_VERSION` environment variable. Example:
+To install from source for AMD GPUs supporting ROCm, please specify the `ROCM_VERSION` environment variable. Example:
 
 ```
 ROCM_VERSION=5.6 pip install -v -e .
@@ -98,11 +98,11 @@ ROCM_VERSION=5.6 pip install -v -e .
 
 The compilation can be speeded up by specifying the `PYTORCH_ROCM_ARCH` variable ([reference](https://github.com/pytorch/pytorch/blob/7b73b1e8a73a1777ebe8d2cd4487eb13da55b3ba/setup.py#L132)) in order to build for a single target device, for example `gfx90a` for MI200 series devices.
 
-For RoCm systems, the packages `rocsparse-dev`, `hipsparse-dev`, `rocthrust-dev`, `rocblas-dev` and `hipblas-dev` are required to build.
+For ROCm systems, the packages `rocsparse-dev`, `hipsparse-dev`, `rocthrust-dev`, `rocblas-dev` and `hipblas-dev` are required to build.
 
 The following combinations are tested:
 
-| RoCm version | PyTorch version |
+| ROCm version | PyTorch version |
 |--------------|-----------------|
 | 5.4.2        | 2.0.1           |
 | 5.6          | 2.1.0           |

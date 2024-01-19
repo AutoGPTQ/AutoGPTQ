@@ -3,7 +3,7 @@ import json
 import warnings
 import os
 from dataclasses import dataclass, field, fields
-from logging import getLogger
+import logging
 from os.path import join, isfile, isdir
 from typing import Dict, List, Optional, Union
 from packaging import version
@@ -14,24 +14,36 @@ import transformers
 from accelerate.hooks import remove_hook_from_module
 from safetensors.torch import save_file as safe_save
 from safetensors.torch import load_file as safe_load
+from safetensors import safe_open
 from transformers import AutoConfig, AutoModelForCausalLM, PreTrainedModel
 from transformers.utils.hub import PushToHubMixin, cached_file, create_repo, create_commit, CommitOperationAdd
 from transformers.utils.generic import ContextManagers
 from transformers.modeling_utils import no_init_weights
-
+import tempfile
 from ._const import *
 from ._utils import *
+from ._utils import unpack_awq, pack_from_tensors
 from ..nn_modules.qlinear import GeneralQuantLinear
 from ..nn_modules._fused_base import FusedBaseAttentionModule, FusedBaseMLPModule
 from ..quantization import GPTQ
 from ..utils.data_utils import collate_data
-from ..utils.patch_utils import set_module_tensor_to_device_patched
 from ..utils.import_utils import (
     dynamically_import_QuantLinear, TRITON_AVAILABLE, AUTOGPTQ_CUDA_AVAILABLE, EXLLAMA_KERNELS_AVAILABLE, QIGEN_AVAILABLE, EXLLAMAV2_KERNELS_AVAILABLE
 )
+from tqdm import tqdm
+import huggingface_hub
 
-logger = getLogger(__name__)
+logger = logging.getLogger(__name__)
+handler = logging.StreamHandler()
+formatter = logging.Formatter('%(levelname)s - %(message)s')
+handler.setFormatter(formatter)
+logger.addHandler(handler)
+logger.setLevel(logging.INFO)
 
+SYNONYMS = {
+    "w_bit": "bits",
+    "q_group_size": "group_size",
+}
 
 @dataclass
 class BaseQuantizeConfig(PushToHubMixin):
@@ -44,6 +56,7 @@ class BaseQuantizeConfig(PushToHubMixin):
     true_sequential: bool = field(default=True)
     model_name_or_path: Optional[str] = field(default=None)
     model_file_base_name: Optional[str] = field(default=None)
+    awq_gemm_checkpoint: Optional[bool] = field(default=False)
 
     def __post_init__(self):
         fields_info = fields(self)
@@ -72,35 +85,49 @@ class BaseQuantizeConfig(PushToHubMixin):
         subfolder = kwargs.pop("subfolder", None)
         commit_hash = kwargs.pop("_commit_hash", None)
 
-        quantize_config_filename = "quantize_config.json"
-        if os.path.isdir(save_dir):  # Local
-            resolved_config_file = join(save_dir, quantize_config_filename)
-        else: # Remote
-            resolved_config_file = cached_file(
-                save_dir,
-                quantize_config_filename,
-                cache_dir=cache_dir,
-                force_download=force_download,
-                resume_download=resume_download,
-                proxies=proxies,
-                use_auth_token=use_auth_token,
-                revision=revision,
-                local_files_only=local_files_only,
-                subfolder=subfolder,
-                _raise_exceptions_for_missing_entries=False,
-                _raise_exceptions_for_connection_errors=False,
-                _commit_hash=commit_hash,
-            )
+        for quantize_config_filename in ["quantize_config.json", "quant_config.json"]:
+            if os.path.isdir(save_dir):  # Local
+                resolved_config_file = join(save_dir, quantize_config_filename)
+            else: # Remote
+                resolved_config_file = cached_file(
+                    save_dir,
+                    quantize_config_filename,
+                    cache_dir=cache_dir,
+                    force_download=force_download,
+                    resume_download=resume_download,
+                    proxies=proxies,
+                    use_auth_token=use_auth_token,
+                    revision=revision,
+                    local_files_only=local_files_only,
+                    subfolder=subfolder,
+                    _raise_exceptions_for_missing_entries=False,
+                    _raise_exceptions_for_connection_errors=False,
+                    _commit_hash=commit_hash,
+                )
+            if resolved_config_file is not None:
+                break
+
+        if resolved_config_file is None:
+            raise ValueError("No quantize_config.json or quant_config.json file was found in the model repository.")
         
         field_names = [field.name for field in fields(cls)]
         with open(resolved_config_file, "r", encoding="utf-8") as f:
             args_from_json = json.load(f)
-            filtered_args = {}
+            filtered_args = {"awq_gemm_checkpoint": False}
             for key, val in args_from_json.items():
-                if key in field_names:
+                if key == "version" and val == "GEMM":
+                    filtered_args["awq_gemm_checkpoint"] = True
+                elif key in field_names:
                     filtered_args[key] = val
+                elif key in SYNONYMS and SYNONYMS[key] in field_names:
+                    filtered_args[SYNONYMS[key]] = val
                 else:
                     logger.warning(f"ignoring unknown parameter in {quantize_config_filename}: {key}.")
+            
+            if filtered_args["awq_gemm_checkpoint"]:
+                # AWQ does not reorder the rows.
+                filtered_args["desc_act"] = False
+
             return cls(**filtered_args)
 
     def to_dict(self):
@@ -889,7 +916,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                 ignore_layers = [cls.lm_head_name] + cls.outside_layer_modules
                 for name in list(layers.keys()):
                     if any([name.startswith(ignore_layer) for ignore_layer in ignore_layers]) or all([not name.endswith(ignore_layer) for sublist in cls.inside_layer_modules for ignore_layer in sublist]):
-                        logger.info(f"{name} not been quantized, will be ignored when make_quant.")
+                        logger.info(f"The layer {name} is not quantized.")
                         del layers[name]
 
                 make_quant(
@@ -938,10 +965,86 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             if low_cpu_mem_usage:
                 make_sure_no_tensor_in_meta_device(model, use_triton, quantize_config.desc_act, quantize_config.group_size, bits=quantize_config.bits)
 
-            # Patch until 0.26.0 is released and includes this fix: https://github.com/huggingface/accelerate/pull/2116
-            if version.parse(accelerate.__version__) < version.parse("0.25.99"):
-                original_set_module_tensor_to_device = accelerate.utils.modeling.set_module_tensor_to_device
-                accelerate.utils.modeling.set_module_tensor_to_device = set_module_tensor_to_device_patched
+            if quantize_config.awq_gemm_checkpoint:
+                if is_local:
+                    is_cached = os.path.isfile(os.path.join(model_name_or_path, "autogptq_model.safetensors"))
+                else:
+                    namespace, subfolder = model_name_or_path.split("/")
+                    assets_path = huggingface_hub.cached_assets_path(library_name="autogptq", namespace=namespace, subfolder=subfolder)
+                    weight_path = os.path.join(assets_path, "autogptq_model.safetensors")
+
+                    is_cached = os.path.isfile(weight_path)
+
+                if is_cached:
+                    if is_local:
+                        model_save_name = os.path.join(model_name_or_path, "autogptq_model.safetensors")
+                    else:
+                        namespace, subfolder = model_name_or_path.split("/")
+                        assets_path = huggingface_hub.cached_assets_path(library_name="autogptq", namespace=namespace, subfolder=subfolder)
+                        model_save_name = os.path.join(assets_path, "autogptq_model.safetensors")
+
+                    logger.info(f"Loading an AWQ model, detected a cached repacked weight at {model_save_name}.")
+                else:
+                    logger.info("Loading an AWQ model. This requires repacking the weights, and no repacking cached weight was found. Grab a coffee!")
+
+                    if "safetensors" not in model_save_name:
+                        raise NotImplementedError(f"Conversion from AWQ checkpoints is implemented only for safetensors checkpoints, found {model_save_name}")
+                    if quantize_config.bits != 4:
+                        raise NotImplementedError(f"Conversion from AWQ checkpoints is supported only for 4 bits models. Found {quantize_config.bits} bits.")
+                    gptq_layers = set()
+                    non_gptq_params = set()
+                    with safe_open(model_save_name, framework="pt") as f:
+                        state_dict_keys = list(f.keys())
+                        for state_dict_key in f.keys():
+                            if "qweight" not in state_dict_key and "qzeros" not in state_dict_key and "scales" not in state_dict_key:
+                                non_gptq_params.add(state_dict_key)
+                                continue
+                            
+                            # e.g. prefix "model.layers.3.self_attn.k_proj"
+                            prefix, _ = state_dict_key.rsplit('.', 1)
+                            gptq_layers.add(prefix)
+
+                        new_state_dict = {}
+
+                        for state_dict_key in non_gptq_params:
+                            new_state_dict[state_dict_key] = f.get_tensor(state_dict_key)
+
+                        gptq_layers = sorted(gptq_layers)
+                        max_layer_name_length = len(max(gptq_layers, key=len))
+                        pbar = tqdm(gptq_layers)
+                        i = 0
+                        for gptq_layer_name in pbar:
+                            i += 1
+                            desc = f"Unpacking {gptq_layer_name} + '...'"
+                            desc = desc + " " * (max_layer_name_length - len(desc))
+
+                            awq_qweight = f.get_tensor(gptq_layer_name + ".qweight")
+                            awq_qzeros = f.get_tensor(gptq_layer_name + ".qzeros")
+                            awq_scales = f.get_tensor(gptq_layer_name + ".scales")
+
+                            # TODO: add FAST unpacking
+                            unpacked_qweight, unpacked_qzeros = unpack_awq(awq_qweight, awq_qzeros, awq_scales, bits=quantize_config.bits, group_size=quantize_config.group_size)
+
+                            # TODO: add FAST repacking, this is too slow
+                            desc = f"Repacking {gptq_layer_name}..."
+                            desc = desc + " " * (max_layer_name_length + 12 - len(desc))
+                            pbar.set_description(desc)
+                            gptq_qweight, gptq_qzeros = pack_from_tensors(unpacked_qweight, unpacked_qzeros, awq_scales, bits=quantize_config.bits, group_size=quantize_config.group_size)
+
+                            new_state_dict[gptq_layer_name + ".qweight"] = gptq_qweight
+                            new_state_dict[gptq_layer_name + ".qzeros"] = gptq_qzeros
+                            new_state_dict[gptq_layer_name + ".scales"] = awq_scales
+
+                    # Cache the converted model.
+                    if is_local:
+                        model_save_name = os.path.join(model_name_or_path, "autogptq_model.safetensors")
+                        safe_save(new_state_dict, model_save_name)
+                    else:
+                        namespace, subfolder = model_name_or_path.split("/")
+                        assets_path = huggingface_hub.cached_assets_path(library_name="autogptq", namespace=namespace, subfolder=subfolder)
+                        model_save_name = os.path.join(assets_path, "autogptq_model.safetensors")
+
+                        safe_save(new_state_dict, model_save_name)
 
             accelerate.utils.modeling.load_checkpoint_in_model(
                 model,
@@ -951,9 +1054,6 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                 offload_state_dict=True,
                 offload_buffers=True
             )
-
-            if version.parse(accelerate.__version__) < version.parse("0.24.99") or accelerate.__version__ == "0.25.0.dev0":
-                accelerate.utils.modeling.set_module_tensor_to_device = original_set_module_tensor_to_device
 
             model = simple_dispatch_model(model, device_map)
         else:
