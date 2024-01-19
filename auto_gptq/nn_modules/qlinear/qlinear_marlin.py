@@ -162,17 +162,17 @@ class QuantLinear(nn.Module):
         return C
 
 
-# got this code form https://github.com/rib-2/marlin/tree/conversion
-def _validate_compatibility(quantization_config):
+# Adapted from https://github.com/rib-2/marlin/tree/conversion
+def _validate_marlin_compatibility(quantization_config):
     if quantization_config.bits != 4:
-        return False
+        return f"The quantized model uses a bitwidth different than 4 (found {quantization_config.bits})"
     if quantization_config.group_size != 128 and quantization_config.group_size != -1:
-        return False
+        return f"The quantized model uses a group size that is not 128 or -1 (found quantization_config.group_size)"
     if not quantization_config.sym:
-        return False
+        return f"The quantized model uses asymmetric quantization"
     if quantization_config.desc_act:
-        return False
-    return True
+        return f"The quantized model uses act-order (also called desc-act) scheme"
+    return None
 
 @torch.no_grad()
 def unpack_4bit_to_32bit_signed(qweight, qzeros):
@@ -204,4 +204,4 @@ def dequantize_weight(layer):
 
     return unpacked_qweight.T
 
-__all__ = ["QuantLinear", "_validate_compatibility", "dequantize_weight"]
+__all__ = ["QuantLinear", "_validate_marlin_compatibility", "dequantize_weight"]
