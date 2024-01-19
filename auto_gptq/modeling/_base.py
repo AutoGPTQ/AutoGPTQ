@@ -972,6 +972,9 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
 
             # TODO: move this logic in an awq_utils.py file.
             if quantize_config.awq_gemm_checkpoint:
+                if use_marlin:
+                    raise ValueError("Tried to load an AWQ kernel with use_marlin=True. This is currently not supported. Please open an issue in AutoGPTQ repository.")
+
                 if is_local:
                     is_cached = os.path.isfile(os.path.join(model_name_or_path, "autogptq_model.safetensors"))
                 else:
@@ -1052,6 +1055,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
 
                         safe_save(new_state_dict, model_save_name)
 
+            """
             # TODO: Move this logic in a marlin_utils.py file.
             if use_marlin:
                 if torch_dtype != torch.float16:
@@ -1111,7 +1115,9 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                     logger.info("Disabling fused attention and mlp injection because Marlin kernel is used")
                     inject_fused_attention = False
                     inject_fused_mlp = False
+            """
 
+            # TODO: Why does this break with marlin?
             accelerate.utils.modeling.load_checkpoint_in_model(
                 model,
                 dtype=torch_dtype,  # This is very hacky but works due to https://github.com/huggingface/accelerate/blob/bd72a5f1a80d5146554458823f8aeda0a9db5297/src/accelerate/utils/modeling.py#L292
@@ -1120,6 +1126,18 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                 offload_state_dict=True,
                 offload_buffers=True
             )
+
+            if use_marlin:
+                QuantLinear = dynamically_import_QuantLinear(use_triton=use_triton,
+                                                             desc_act=quantize_config.desc_act,
+                                                             group_size=quantize_config.group_size,
+                                                             bits=quantize_config.bits,
+                                                             disable_exllama=disable_exllama,
+                                                             disable_exllamav2=disable_exllamav2)
+                model = convert_to_marlin(model, QuantLinear, quantize_config, repack=True)
+                logger.info('disabling fused attention and mlp injection because marlin is active') # TODO: remove this when marlin is fixed
+                inject_fused_attention = False
+                inject_fused_mlp = False
 
             # TODO: Why are we using this custom function and not dispatch_model?
             model = simple_dispatch_model(model, device_map)

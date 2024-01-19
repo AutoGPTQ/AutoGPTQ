@@ -174,13 +174,23 @@ def _validate_marlin_compatibility(quantization_config):
         return f"The quantized model uses act-order (also called desc-act) scheme"
     return None
 
+# Copied from https://github.com/IST-DASLab/marlin/pull/1
 @torch.no_grad()
 def unpack_4bit_to_32bit_signed(qweight, qzeros):
     # Unpack 4-bit values and interpret them as signed integers
-    unpacked_weights = torch.zeros((qweight.shape[0] * 8, qweight.shape[1]), dtype=torch.int8, device=qweight.device,
-                                   requires_grad=False)
-    unpacked_zeros = torch.zeros((qzeros.shape[0], qzeros.shape[1] * 8), dtype=torch.int8, device=qzeros.device,
-                                 requires_grad=False)
+    unpacked_weights = torch.zeros(
+        (qweight.shape[0] * 8, qweight.shape[1]),
+        dtype=torch.int8,
+        device=qweight.device,
+        requires_grad=False
+    )
+
+    unpacked_zeros = torch.zeros(
+        (qzeros.shape[0], qzeros.shape[1] * 8),
+        dtype=torch.int8,
+        device=qzeros.device,
+        requires_grad=False
+    )
 
     for row in range(unpacked_weights.shape[0]):
         i = row % 8
@@ -192,7 +202,7 @@ def unpack_4bit_to_32bit_signed(qweight, qzeros):
 
     return unpacked_weights, unpacked_zeros + 1
 
-
+# Copied from https://github.com/IST-DASLab/marlin/pull/1
 @torch.no_grad()
 def dequantize_weight(layer):
     qweight, qzeros, scales = layer.qweight, layer.qzeros, layer.scales
