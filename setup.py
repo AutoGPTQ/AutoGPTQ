@@ -10,7 +10,7 @@ os.environ["CC"] = "g++"
 os.environ["CXX"] = "g++"
 
 common_setup_kwargs = {
-    "version": "0.6.0.dev0",
+    "version": "0.7.0.dev0",
     "name": "auto_gptq",
     "author": "PanQiWei",
     "description": "An easy-to-use LLMs quantization package with user-friendly apis, based on GPTQ algorithm.",
@@ -74,7 +74,7 @@ if BUILD_CUDA_EXT:
             common_setup_kwargs['version'] += f"+cu{CUDA_VERSION}"
 
 requirements = [
-    "accelerate>=0.22.0",
+    "accelerate>=0.26.0",
     "datasets",
     "sentencepiece",
     "numpy",
