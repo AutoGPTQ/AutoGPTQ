@@ -87,7 +87,6 @@ class QuantLinear(nn.Module):
         self.autogptq_cuda_available = _autogptq_cuda_available
         self.autogptq_cuda = autogptq_cuda_256
         if infeatures % 256 != 0 or outfeatures % 256 != 0:
-            raise ValueError("noooo")
             self.autogptq_cuda = autogptq_cuda_64
         if infeatures % 64 != 0 or outfeatures % 64 != 0:
             self.autogptq_cuda_available = False
@@ -199,7 +198,6 @@ class QuantLinear(nn.Module):
         x_dtype = x.dtype
         out_shape = x.shape[:-1] + (self.outfeatures,)
         x = x.reshape(-1, x.shape[-1])
-
         if x.device.type == "cuda" and self.autogptq_cuda_available is True and (
             self.kernel_switch_threshold is False or x.shape[0] < self.kernel_switch_threshold
         ):
