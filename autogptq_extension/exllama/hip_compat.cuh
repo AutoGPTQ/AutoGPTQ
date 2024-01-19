@@ -9,9 +9,11 @@ __device__ __forceinline__ __half __compat_hrcp(__half x) {
         static_cast<_Float16>(__builtin_amdgcn_rcph(static_cast<__half_raw>(x).data))};
 }
 
+// ROCm 6.0 compatible from: /opt/rocm-6.0.0/include/hip/amd_detail/amd_hip_fp16.h:1708
 __device__ __forceinline__ __half2 __compat_h2rcp(__half2 x) {
-    return _Float16_2{static_cast<_Float16>(__builtin_amdgcn_rcph(x.x)),
-        static_cast<_Float16>(__builtin_amdgcn_rcph(x.y))};
+    return _Float16_2{
+        _Float16_2{static_cast<_Float16>(1.0f), 
+            static_cast<_Float16>(1.0f)} / x.data};
 }
 
 #define hrcp __compat_hrcp
