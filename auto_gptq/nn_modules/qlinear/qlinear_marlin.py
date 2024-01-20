@@ -110,7 +110,7 @@ class QuantLinear(nn.Module):
         # 128 is currently the minimum `tile_n`, hence it gives the maximum workspace size
         self.register_buffer('workspace', torch.zeros(self.outfeatures // 128, dtype=torch.int), persistent=False)
         if bias:
-            NotImplementedError('Marlin does not support bias.')
+            self.register_buffer('bias', torch.zeros((outfeatures), dtype=torch.half))
         else:
             self.bias = None
             
@@ -156,10 +156,14 @@ class QuantLinear(nn.Module):
         q = torch.from_numpy(q.astype(np.int32)).to(w.device)
         self.B[:, :] = q.to(self.B.device)
         self.s[:, :] = s.to(self.s.device)
+        if self.bias is not None:
+            self.bias[:] = linear.bias.data.to(self.bias.device)
 
     def forward(self, A):
+        A = A.half()
         C = torch.empty(A.shape[:-1] + (self.s.shape[1],), dtype=A.dtype, device=A.device)
-        mul(A.view((-1, A.shape[-1])), self.B, C.view((-1, C.shape[-1])), self.s, self.workspace)
+        mul(A.reshape((-1, A.shape[-1])), self.B, C.reshape((-1, C.shape[-1])), self.s, self.workspace)
+        C = C + self.bias if self.bias is not None else C 
         return C
 
 

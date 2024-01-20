@@ -139,7 +139,9 @@ def convert_to_marlin(model, model_quantlinear, quantization_config, repack: boo
         if not isinstance(module, model_quantlinear):
             continue
         if module.bias is not None and torch.count_nonzero(module.bias) > 0:
-            continue
+            bias = module.bias
+        else:
+            bias = None
         parent_name = ".".join(name.split(".")[:-1])
         layer_name = name[len(parent_name) + 1:]
 
@@ -150,13 +152,15 @@ def convert_to_marlin(model, model_quantlinear, quantization_config, repack: boo
             linear_module = nn.Linear(
                 in_features=dequantized_weight.shape[1],
                 out_features=dequantized_weight.shape[0],
-                bias=False,
+                bias=bias is not None,
                 dtype=torch.float16,
                 device="cuda"
             )
             linear_module.weight.data.copy_(dequantized_weight)
+            if bias is not None:
+                linear_module.bias.data.copy_(bias)
         else:
-            linear_module = nn.Linear(module.infeatures, module.outfeatures, bias=False, dtype=torch.float16, device="cuda")
+            linear_module = nn.Linear(module.infeatures, module.outfeatures, bias=bias is not None, dtype=torch.float16, device="cuda")
 
         # Create new linear method and copy to model.
         new_module = MarlinQuantLinear(
@@ -164,7 +168,7 @@ def convert_to_marlin(model, model_quantlinear, quantization_config, repack: boo
             group_size=module.group_size,
             infeatures=linear_module.in_features,
             outfeatures=linear_module.out_features,
-            bias=None,
+            bias=bias is not None,
             trainable=False,
         )
 
