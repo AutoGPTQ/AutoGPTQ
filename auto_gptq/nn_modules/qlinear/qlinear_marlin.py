@@ -162,7 +162,7 @@ class QuantLinear(nn.Module):
     def forward(self, A):
         A = A.half()
         C = torch.empty(A.shape[:-1] + (self.s.shape[1],), dtype=A.dtype, device=A.device)
-        mul(A.reshape((-1, A.shape[-1])), self.B, C.reshape((-1, C.shape[-1])), self.s, self.workspace)
+        mul(A.view((-1, A.shape[-1])), self.B, C.view((-1, C.shape[-1])), self.s, self.workspace)
         C = C + self.bias if self.bias is not None else C 
         return C
 
