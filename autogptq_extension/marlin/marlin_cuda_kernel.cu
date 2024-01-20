@@ -170,9 +170,13 @@ __device__ inline void barrier_acquire(int* lock, int count) {
 }
 
 // Release barrier and increment visitation count.
-__device__ inline void barrier_release(int* lock) {
+__device__ inline void barrier_release(int* lock, bool reset = false) {
   __syncthreads();
   if (threadIdx.x == 0) {
+    if (reset) {
+      lock[0] = 0;
+      return;
+    }
     int val = 1;
     // Make sure that all writes since acquiring this barrier are visible globally, while releasing the barrier. 
     asm volatile ("fence.acq_rel.gpu;\n");
@@ -647,7 +651,7 @@ __global__ void Marlin(
       if (slice_count > 1) { // only globally reduce if there is more than one block in a slice
         barrier_acquire(&locks[slice_col], slice_idx);
         global_reduce(slice_idx == 0, last);
-        barrier_release(&locks[slice_col]);
+        barrier_release(&locks[slice_col], last);
       }
       if (last) // only the last block in a slice actually writes the result
         write_result();
@@ -678,13 +682,14 @@ const int SHARED_MEM = 96 * 1024; // max shared memory on compute capability 8.6
     thread_m_blocks == THREAD_M_BLOCKS && thread_n_blocks == THREAD_N_BLOCKS && thread_k_blocks == THREAD_K_BLOCKS && \
     group_blocks == GROUP_BLOCKS \
   ) { \
-    cudaMemset(locks, 0, 4 * cols); \
     cudaFuncSetAttribute( \
       Marlin<THREADS, THREAD_M_BLOCKS, THREAD_N_BLOCKS, THREAD_K_BLOCKS, STAGES, GROUP_BLOCKS>, \
       cudaFuncAttributeMaxDynamicSharedMemorySize, \
       SHARED_MEM \
     ); \
-    Marlin<THREADS, THREAD_M_BLOCKS, THREAD_N_BLOCKS, THREAD_K_BLOCKS, STAGES, GROUP_BLOCKS><<<blocks, THREADS, SHARED_MEM>>>( \
+    Marlin< \
+      THREADS, THREAD_M_BLOCKS, THREAD_N_BLOCKS, THREAD_K_BLOCKS, STAGES, GROUP_BLOCKS \
+    ><<<blocks, THREADS, SHARED_MEM, stream>>>( \
       A_ptr, B_ptr, C_ptr, s_ptr, \
       prob_m, prob_n, prob_k, \
       locks \
@@ -705,6 +710,7 @@ int marlin_cuda(
   void* workspace,
   int groupsize = -1,
   int dev = 0,
+  cudaStream_t stream = 0,
   int thread_k = -1,
   int thread_n = -1,
   int sms = -1

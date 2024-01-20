@@ -17,6 +17,8 @@
 
 #include <torch/all.h>
 #include <torch/python.h>
+#include <ATen/cuda/CUDAContext.h>
+#include <cuda_runtime.h>
 
 int marlin_cuda(
   const void* A,
@@ -29,6 +31,7 @@ int marlin_cuda(
   void* workspace,
   int groupsize = -1,
   int dev = 0,
+  cudaStream_t stream = 0,
   int thread_k = -1,
   int thread_n = -1,
   int sms = -1
@@ -53,6 +56,7 @@ void mul(
   int groupsize = (s.size(0) == 1) ? -1 : prob_k / s.size(0);
   if (groupsize != -1 && groupsize * s.size(0) != prob_k)
     AT_ERROR("k=", prob_k, " not compatible with ", s.size(0), " groups.");
+  int dev = A.get_device();
   int err = marlin_cuda(
     A.data_ptr(),
     B.data_ptr(),
@@ -61,7 +65,8 @@ void mul(
     prob_m, prob_n, prob_k,
     workspace.data_ptr(),
     groupsize,
-    A.get_device(),
+    dev,
+    at::cuda::getCurrentCUDAStream(dev),
     thread_k,
     thread_n,
     sms

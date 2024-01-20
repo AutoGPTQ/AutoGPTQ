@@ -95,7 +95,7 @@ class QuantLinear(nn.Module):
             raise ValueError('`infeatures` must be divisible by 128 and `outfeatures` by 256.')
         if bits not in [4]:
             raise NotImplementedError("Only 4 bits are supported.")
-        if group_size not in [-1, 128]:
+        if group_size not in [-1, 128] and group_size != infeatures:
             raise ValueError('Only group_size -1 and 128 are supported.')
         if infeatures % group_size != 0:
             raise ValueError('`infeatures` must be divisible by `group_size`.')
@@ -107,12 +107,13 @@ class QuantLinear(nn.Module):
         self.group_size = group_size if group_size != -1 else infeatures
         self.register_buffer('B', torch.empty((self.infeatures // 16, self.outfeatures * 16 // 8), dtype=torch.int))
         self.register_buffer('s', torch.empty((self.infeatures // group_size, self.outfeatures), dtype=torch.half))
-        # Essentially all reasonable GPUs have less than 256 SMs so this should be safe for now
-        self.register_buffer('workspace', torch.empty(256, dtype=torch.int), persistent=False)
+        # 128 is currently the minimum `tile_n`, hence it gives the maximum workspace size
+        self.register_buffer('workspace', torch.zeros(self.outfeatures // 128, dtype=torch.int), persistent=False)
         if bias:
             NotImplementedError('Marlin does not support bias.')
         else:
             self.bias = None
+            
     def post_init(self):
         pass
 
