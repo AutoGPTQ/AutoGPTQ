@@ -132,6 +132,9 @@ class BaseQuantizeConfig(PushToHubMixin):
                 # AWQ does not reorder the rows.
                 filtered_args["desc_act"] = False
 
+            if "sym" not in args_from_json:
+                logger.warning(f"The quantzation configuration {quantize_config_filename} does not contain an entry `sym` (symetric quantization). This may result in silent errors.")
+
             return cls(**filtered_args)
 
     def to_dict(self):
@@ -1055,7 +1058,6 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
 
                         safe_save(new_state_dict, model_save_name)
 
-            """
             # TODO: Move this logic in a marlin_utils.py file.
             if use_marlin:
                 if torch_dtype != torch.float16:
@@ -1097,6 +1099,19 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                     model = convert_to_marlin(model, quant_linear_class, quantize_config, repack=False)
 
                 else:
+                    # Loading the GPTQ checkpoint to do the conversion.
+                    # TODO: Avoid loading the model with wrong QuantLinear, and directly use
+                    # Marlin ones. The repacking can be done directly on the safetensors, just
+                    # as for AWQ checkpoints.
+                    accelerate.utils.modeling.load_checkpoint_in_model(
+                        model,
+                        dtype=torch_dtype,  # This is very hacky but works due to https://github.com/huggingface/accelerate/blob/bd72a5f1a80d5146554458823f8aeda0a9db5297/src/accelerate/utils/modeling.py#L292
+                        checkpoint=model_save_name,
+                        device_map=device_map,
+                        offload_state_dict=True,
+                        offload_buffers=True
+                    )
+
                     model = convert_to_marlin(model, quant_linear_class, quantize_config, repack=True)
 
                     # Cache the converted model.
@@ -1115,9 +1130,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                     logger.info("Disabling fused attention and mlp injection because Marlin kernel is used")
                     inject_fused_attention = False
                     inject_fused_mlp = False
-            """
 
-            # TODO: Why does this break with marlin?
             accelerate.utils.modeling.load_checkpoint_in_model(
                 model,
                 dtype=torch_dtype,  # This is very hacky but works due to https://github.com/huggingface/accelerate/blob/bd72a5f1a80d5146554458823f8aeda0a9db5297/src/accelerate/utils/modeling.py#L292
@@ -1126,18 +1139,6 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                 offload_state_dict=True,
                 offload_buffers=True
             )
-
-            if use_marlin:
-                QuantLinear = dynamically_import_QuantLinear(use_triton=use_triton,
-                                                             desc_act=quantize_config.desc_act,
-                                                             group_size=quantize_config.group_size,
-                                                             bits=quantize_config.bits,
-                                                             disable_exllama=disable_exllama,
-                                                             disable_exllamav2=disable_exllamav2)
-                model = convert_to_marlin(model, QuantLinear, quantize_config, repack=True)
-                logger.info('disabling fused attention and mlp injection because marlin is active') # TODO: remove this when marlin is fixed
-                inject_fused_attention = False
-                inject_fused_mlp = False
 
             # TODO: Why are we using this custom function and not dispatch_model?
             model = simple_dispatch_model(model, device_map)
