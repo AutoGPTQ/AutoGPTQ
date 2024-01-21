@@ -1097,7 +1097,6 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
 
                     # We will use the cached checkpoint to load parameters and buffers in the model, so we only need to replace QuantLinear layers here.
                     model = convert_to_marlin(model, quant_linear_class, quantize_config, repack=False)
-
                 else:
                     # Loading the GPTQ checkpoint to do the conversion.
                     # TODO: Avoid loading the model with wrong QuantLinear, and directly use

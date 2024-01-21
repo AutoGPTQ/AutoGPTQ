@@ -138,10 +138,12 @@ def convert_to_marlin(model, model_quantlinear, quantization_config, repack: boo
     for name, module in tqdm(model.named_modules(), desc=message, total=len(list(model.named_modules()))):
         if not isinstance(module, model_quantlinear):
             continue
+
         if module.bias is not None and torch.count_nonzero(module.bias) > 0:
             bias = module.bias
         else:
             bias = None
+
         parent_name = ".".join(name.split(".")[:-1])
         layer_name = name[len(parent_name) + 1:]
 
@@ -150,7 +152,7 @@ def convert_to_marlin(model, model_quantlinear, quantization_config, repack: boo
             dequantized_weight, dequantized_qzeros = dequantize_weight(module)
             dequantized_weight = dequantized_weight.to(torch.float16)
 
-            if not torch.all(dequantized_qzeros == 2**4 - 1):
+            if not torch.all(dequantized_qzeros == 8):
                 raise ValueError(f"Marlin kernel is compatible only with checkpoints using symetric quantization. Found non-symmetric quantization for the weight {name}.")
 
             linear_module = nn.Linear(
@@ -161,6 +163,7 @@ def convert_to_marlin(model, model_quantlinear, quantization_config, repack: boo
                 device="cuda"
             )
             linear_module.weight.data.copy_(dequantized_weight)
+
             if bias is not None:
                 linear_module.bias.data.copy_(bias)
         else:
