@@ -20,11 +20,15 @@ from transformers.utils.hub import PushToHubMixin, cached_file, create_repo, cre
 from transformers.utils.generic import ContextManagers
 from transformers.modeling_utils import no_init_weights
 import tempfile
+
+# TODO: Remove those star imports.
 from ._const import *
 from ._utils import *
+
 from ._utils import unpack_awq, pack_from_tensors
 from ..nn_modules.qlinear import GeneralQuantLinear
 from ..nn_modules._fused_base import FusedBaseAttentionModule, FusedBaseMLPModule
+from ..nn_modules.qlinear.qlinear_marlin import _validate_marlin_compatibility
 from ..quantization import GPTQ
 from ..utils.data_utils import collate_data
 from ..utils.import_utils import (
@@ -127,6 +131,9 @@ class BaseQuantizeConfig(PushToHubMixin):
             if filtered_args["awq_gemm_checkpoint"]:
                 # AWQ does not reorder the rows.
                 filtered_args["desc_act"] = False
+
+            if "sym" not in args_from_json:
+                logger.warning(f"The quantization configuration {quantize_config_filename} does not contain an entry `sym` (symetric quantization). This may result in silent errors.")
 
             return cls(**filtered_args)
 
@@ -719,6 +726,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         low_cpu_mem_usage: bool = False,
         use_triton: bool = False,
         use_qigen: bool = False,
+        use_marlin: bool = False,
         torch_dtype: Optional[torch.dtype] = None,
         inject_fused_attention: bool = True,
         inject_fused_mlp: bool = True,
@@ -965,7 +973,11 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             if low_cpu_mem_usage:
                 make_sure_no_tensor_in_meta_device(model, use_triton, quantize_config.desc_act, quantize_config.group_size, bits=quantize_config.bits)
 
+            # TODO: move this logic in an awq_utils.py file.
             if quantize_config.awq_gemm_checkpoint:
+                if use_marlin:
+                    raise ValueError("Tried to load an AWQ kernel with use_marlin=True. This is currently not supported. Please open an issue in AutoGPTQ repository.")
+
                 if is_local:
                     is_cached = os.path.isfile(os.path.join(model_name_or_path, "autogptq_model.safetensors"))
                 else:
@@ -1022,10 +1034,10 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                             awq_qzeros = f.get_tensor(gptq_layer_name + ".qzeros")
                             awq_scales = f.get_tensor(gptq_layer_name + ".scales")
 
-                            # TODO: add FAST unpacking
+                            # TODO: add FAST unpacking.
                             unpacked_qweight, unpacked_qzeros = unpack_awq(awq_qweight, awq_qzeros, awq_scales, bits=quantize_config.bits, group_size=quantize_config.group_size)
 
-                            # TODO: add FAST repacking, this is too slow
+                            # TODO: add FAST repacking, this is too slow.
                             desc = f"Repacking {gptq_layer_name}..."
                             desc = desc + " " * (max_layer_name_length + 12 - len(desc))
                             pbar.set_description(desc)
@@ -1046,6 +1058,78 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
 
                         safe_save(new_state_dict, model_save_name)
 
+            # TODO: Move this logic in a marlin_utils.py file.
+            if use_marlin:
+                if torch_dtype != torch.float16:
+                    raise ValueError("Marlin kernel requires torch_dtype=torch.float16.")
+
+                unsupported_reason = _validate_marlin_compatibility(quantize_config)
+                if unsupported_reason is not None:
+                    raise ValueError(f"The model {model_name_or_path} can not be converted to use the Marlin kernel for the following reason: {unsupported_reason}, which is not supported by Marlin kernel.")
+
+                quant_linear_class = dynamically_import_QuantLinear(
+                    use_triton=use_triton,
+                    desc_act=quantize_config.desc_act,
+                    group_size=quantize_config.group_size,
+                    bits=quantize_config.bits,
+                    disable_exllama=disable_exllama,
+                    disable_exllamav2=disable_exllamav2
+                )
+
+                if is_local:
+                    is_cached = os.path.isfile(os.path.join(model_name_or_path, "autogptq_model.safetensors"))
+                else:
+                    namespace, subfolder = model_name_or_path.split("/")
+                    assets_path = huggingface_hub.cached_assets_path(library_name="autogptq", namespace=namespace, subfolder=subfolder)
+                    weight_path = os.path.join(assets_path, "autogptq_model.safetensors")
+
+                    is_cached = os.path.isfile(weight_path)
+
+                if is_cached:
+                    if is_local:
+                        model_save_name = os.path.join(model_name_or_path, "autogptq_model.safetensors")
+                    else:
+                        namespace, subfolder = model_name_or_path.split("/")
+                        assets_path = huggingface_hub.cached_assets_path(library_name="autogptq", namespace=namespace, subfolder=subfolder)
+                        model_save_name = os.path.join(assets_path, "autogptq_model.safetensors")
+
+                    logger.info(f"Loading a GPTQ model, detected a cached repacked weight for Marlin kernel at {model_save_name}.")
+
+                    # We will use the cached checkpoint to load parameters and buffers in the model, so we only need to replace QuantLinear layers here.
+                    model = convert_to_marlin(model, quant_linear_class, quantize_config, repack=False)
+                else:
+                    # Loading the GPTQ checkpoint to do the conversion.
+                    # TODO: Avoid loading the model with wrong QuantLinear, and directly use
+                    # Marlin ones. The repacking can be done directly on the safetensors, just
+                    # as for AWQ checkpoints.
+                    accelerate.utils.modeling.load_checkpoint_in_model(
+                        model,
+                        dtype=torch_dtype,  # This is very hacky but works due to https://github.com/huggingface/accelerate/blob/bd72a5f1a80d5146554458823f8aeda0a9db5297/src/accelerate/utils/modeling.py#L292
+                        checkpoint=model_save_name,
+                        device_map=device_map,
+                        offload_state_dict=True,
+                        offload_buffers=True
+                    )
+
+                    model = convert_to_marlin(model, quant_linear_class, quantize_config, repack=True)
+
+                    # Cache the converted model.
+                    if is_local:
+                        model_save_name = os.path.join(model_name_or_path, "autogptq_model.safetensors")
+                        safe_save(model.state_dict(), model_save_name)
+                    else:
+                        namespace, subfolder = model_name_or_path.split("/")
+                        assets_path = huggingface_hub.cached_assets_path(library_name="autogptq", namespace=namespace, subfolder=subfolder)
+                        model_save_name = os.path.join(assets_path, "autogptq_model.safetensors")
+
+                        safe_save(model.state_dict(), model_save_name)
+
+                if inject_fused_attention or inject_fused_mlp:
+                    # TODO: Validate whether that can be used.
+                    logger.info("Disabling fused attention and mlp injection because Marlin kernel is used")
+                    inject_fused_attention = False
+                    inject_fused_mlp = False
+
             accelerate.utils.modeling.load_checkpoint_in_model(
                 model,
                 dtype=torch_dtype,  # This is very hacky but works due to https://github.com/huggingface/accelerate/blob/bd72a5f1a80d5146554458823f8aeda0a9db5297/src/accelerate/utils/modeling.py#L292
@@ -1055,8 +1139,11 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                 offload_buffers=True
             )
 
+            # TODO: Why are we using this custom function and not dispatch_model?
             model = simple_dispatch_model(model, device_map)
         else:
+            # Using QiGen.
+
             if quantize_config.desc_act:
                 NotImplementedError('desc_act=True is not yet supported.')
             model = AutoModelForCausalLM.from_config(
@@ -1097,7 +1184,8 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                 checkpoint
             )
             model.load_state_dict(checkpoint)
-            # == step4: set seqlen == #
+
+        # == step4: set seqlen == #
         model_config = model.config.to_dict()
         seq_len_keys = ["max_position_embeddings", "seq_length", "n_positions"]
         if any([k in model_config for k in seq_len_keys]):
@@ -1140,6 +1228,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         model = autogptq_post_init(model, use_act_order=quantize_config.desc_act)
 
         model.eval()
+
         # == step6: (optional) warmup triton == #
         if use_triton and warmup_triton:
             from ..nn_modules.qlinear.qlinear_triton import QuantLinear

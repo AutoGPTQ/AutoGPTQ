@@ -230,10 +230,10 @@ class QuantLinear(nn.Module):
         else:
             if self.wf.device != self.qzeros.device:
                 self.wf = self.wf.to(self.qzeros.device)
-                
+
             if self.bits in [2,4,8]:
                 zeros = torch.bitwise_right_shift(torch.unsqueeze(self.qzeros, 2).expand(-1, -1, 32 // self.bits), self.wf.unsqueeze(0)).to(torch.int16 if self.bits == 8 else torch.int8)
-                
+
                 zeros = zeros + 1
                 zeros = torch.bitwise_and(zeros, (2 ** self.bits) - 1)  # NOTE: It appears that casting here after the `zeros = zeros + 1` is important.
 
@@ -241,7 +241,7 @@ class QuantLinear(nn.Module):
 
                 scales = self.scales
                 scales = scales.reshape(-1, 1, scales.shape[-1])
-                
+
                 weight = torch.bitwise_right_shift(torch.unsqueeze(self.qweight, 1).expand(-1, 32 // self.bits, -1), self.wf.unsqueeze(-1)).to(torch.int16 if self.bits == 8 else torch.int8)
                 weight = torch.bitwise_and(weight,(2 ** self.bits) - 1)
                 weight = weight.reshape(-1, self.group_size, weight.shape[2])
@@ -252,13 +252,13 @@ class QuantLinear(nn.Module):
                 zeros[:,:,1,11] = (zeros[:,:,1,11]&0x1) | ((zeros[:,:,2,0] << 1)&0x6)
                 zeros = zeros & 0x7
                 zeros = torch.cat([zeros[:,:,0,:11], zeros[:,:,1,1:12], zeros[:,:,2,1:11]], dim=2)
-                
+
                 zeros = zeros + 1
-                zeros = zeros.reshape(-1, 1, zeros.shape[1] * zeros.shape[2]) 
-                
+                zeros = zeros.reshape(-1, 1, zeros.shape[1] * zeros.shape[2])
+
                 scales = self.scales
                 scales = scales.reshape(-1, 1, scales.shape[-1])
-                
+
                 weight = self.qweight.reshape(self.qweight.shape[0]//3, 3, 1, self.qweight.shape[1]).expand(-1, -1, 12, -1)
                 weight = (weight >> self.wf.unsqueeze(-1))&0x7
                 weight[:,0,10] = (weight[:,0,10]&0x3) | ((weight[:,1,0] << 2)&0x4)
@@ -268,7 +268,7 @@ class QuantLinear(nn.Module):
                 weight = weight.reshape(-1, self.group_size, weight.shape[2])
             else:
                 raise NotImplementedError("Only 2,3,4,8 bits are supported.")
-            
+
             weight = (scales * (weight - zeros))
             weight = weight.reshape(weight.shape[0] * weight.shape[1], weight.shape[2])
             out = torch.matmul(x, weight)

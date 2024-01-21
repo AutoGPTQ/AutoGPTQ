@@ -38,6 +38,7 @@ common_setup_kwargs = {
 PYPI_RELEASE = os.environ.get('PYPI_RELEASE', None)
 BUILD_CUDA_EXT = int(os.environ.get('BUILD_CUDA_EXT', '1')) == 1
 DISABLE_QIGEN = int(os.environ.get('DISABLE_QIGEN', '0')) == 1
+COMPILE_MARLIN = int(os.environ.get('COMPILE_MARLIN', '0')) == 1
 
 if BUILD_CUDA_EXT:
     try:
@@ -50,8 +51,8 @@ if BUILD_CUDA_EXT:
     ROCM_VERSION = os.environ.get('ROCM_VERSION', None)
     if ROCM_VERSION and not torch.version.hip:
         print(
-            f"Trying to compile auto-gptq for RoCm, but PyTorch {torch.__version__} "
-            "is installed without RoCm support."
+            f"Trying to compile auto-gptq for ROCm, but PyTorch {torch.__version__} "
+            "is installed without ROCm support."
         )
         sys.exit(1)
 
@@ -135,17 +136,39 @@ if BUILD_CUDA_EXT:
         )
     ]
     
-    if platform.system() != "Windows" and platform.machine() != "aarch64" and not DISABLE_QIGEN:
-        extensions.append(
-            cpp_extension.CppExtension(
-                "cQIGen",
-                [
-                    'autogptq_extension/qigen/backend.cpp'
-                ],
-                extra_compile_args = ["-O3", "-mavx", "-mavx2", "-mfma", "-march=native", "-ffast-math", "-ftree-vectorize", "-faligned-new", "-std=c++17", "-fopenmp", "-fno-signaling-nans", "-fno-trapping-math"]
+    if platform.system() != "Windows":
+        if platform.machine() != "aarch64" and not DISABLE_QIGEN:
+            extensions.append(
+                cpp_extension.CppExtension(
+                    "cQIGen",
+                    [
+                        'autogptq_extension/qigen/backend.cpp'
+                    ],
+                    extra_compile_args = ["-O3", "-mavx", "-mavx2", "-mfma", "-march=native", "-ffast-math", "-ftree-vectorize", "-faligned-new", "-std=c++17", "-fopenmp", "-fno-signaling-nans", "-fno-trapping-math"]
+                )
             )
-        )
-        
+
+        # Marlin is not ROCm-compatible, CUDA only
+        if not ROCM_VERSION and COMPILE_MARLIN:
+            torch_cuda_archs = os.environ.get("TORCH_CUDA_ARCH_LIST", None)
+
+            if not torch_cuda_archs:
+                raise ValueError('The environment variable `TORCH_CUDA_ARCH_LIST` needs to be specified to compile AutoGPTQ with Marlin kernel. Example: `TORCH_CUDA_ARCH_LIST="8.0 8.6+PTX"`.')
+
+            archs_list = torch_cuda_archs.split(" ")
+            if any(arch.startswith("6") or arch.startswith("7") for arch in archs_list):
+                raise ValueError('Marlin kernel can not be compiled CUDA compute capability <8.0. Please specifiy a correct `TORCH_CUDA_ARCH_LIST` environment variable. Example: `TORCH_CUDA_ARCH_LIST="8.0 8.6+PTX"`')
+
+            extensions.append(
+                cpp_extension.CUDAExtension(
+                    'marlin_cuda',
+                    [
+                        'autogptq_extension/marlin/marlin_cuda.cpp',
+                        'autogptq_extension/marlin/marlin_cuda_kernel.cu'
+                    ]
+                )
+            )
+
     if os.name == "nt":
         # On Windows, fix an error LNK2001: unresolved external symbol cublasHgemm bug in the compilation
         cuda_path = os.environ.get("CUDA_PATH", None)

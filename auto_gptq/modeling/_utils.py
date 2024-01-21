@@ -1,5 +1,8 @@
 from logging import getLogger
 from typing import Union, Optional
+from tqdm import tqdm
+import copy
+import gc
 
 import accelerate
 import torch
@@ -10,7 +13,8 @@ import transformers
 from ._const import SUPPORTED_MODELS, CPU, CUDA_0, EXLLAMA_DEFAULT_MAX_INPUT_LENGTH
 from ..utils.import_utils import dynamically_import_QuantLinear
 import numpy as np
-
+from ..nn_modules.qlinear.qlinear_marlin import dequantize_weight
+from ..nn_modules.qlinear.qlinear_marlin import QuantLinear as MarlinQuantLinear
 logger = getLogger(__name__)
 
 
@@ -116,6 +120,79 @@ def make_quant(
             disable_exllamav2=disable_exllamav2,
             use_qigen=use_qigen
         )
+
+@torch.no_grad()
+def convert_to_marlin(model, model_quantlinear, quantization_config, repack: bool):
+    """
+    Converts GPTQ-packed weights to the Marlin format. This assumes that the model already meets Marlin kernel constraints.
+
+    Arguments:
+        repack (`bool`):
+            Whether to repack the qweights from `model` into the Marlin's QuantLinear layers.
+    """
+    if repack:
+        message = "Repacking weights to be compatible with Marlin kernel..."
+    else:
+        message = "Overriding QuantLinear layers to use Marlin's QuantLinear..."
+
+    for name, module in tqdm(model.named_modules(), desc=message, total=len(list(model.named_modules()))):
+        if not isinstance(module, model_quantlinear):
+            continue
+
+        if module.bias is not None and torch.count_nonzero(module.bias) > 0:
+            bias = module.bias
+        else:
+            bias = None
+
+        parent_name = ".".join(name.split(".")[:-1])
+        layer_name = name[len(parent_name) + 1:]
+
+        # Dequantize the weight.
+        if repack:
+            dequantized_weight, dequantized_qzeros = dequantize_weight(module)
+            dequantized_weight = dequantized_weight.to(torch.float16)
+
+            if not torch.all(dequantized_qzeros == 8):
+                raise ValueError(f"Marlin kernel is compatible only with checkpoints using symetric quantization. Found non-symmetric quantization for the weight {name}.")
+
+            linear_module = nn.Linear(
+                in_features=dequantized_weight.shape[1],
+                out_features=dequantized_weight.shape[0],
+                bias=bias is not None,
+                dtype=torch.float16,
+                device="cuda"
+            )
+            linear_module.weight.data.copy_(dequantized_weight)
+
+            if bias is not None:
+                linear_module.bias.data.copy_(bias)
+        else:
+            linear_module = nn.Linear(module.infeatures, module.outfeatures, bias=bias is not None, dtype=torch.float16, device="cuda")
+
+        # Create new linear method and copy to model.
+        new_module = MarlinQuantLinear(
+            bits=4,
+            group_size=module.group_size,
+            infeatures=linear_module.in_features,
+            outfeatures=linear_module.out_features,
+            bias=bias is not None,
+            trainable=False,
+        )
+
+        if repack:
+            new_module.pack(linear_module, scales=copy.deepcopy(module.scales.data.t()).to("cuda"))
+
+        # Save to parent.
+        parent_module = model.get_submodule(parent_name)
+        setattr(parent_module, layer_name, new_module)
+
+        # Free cuda memory.
+        del module
+        if repack:
+            del dequantized_weight
+        torch.cuda.empty_cache()
+        gc.collect()
+    return model
 
 def preprocess_checkpoint_qigen(
     module,
@@ -570,5 +647,6 @@ __all__ = [
     "autogptq_post_init",
     "check_and_get_model_type",
     "simple_dispatch_model",
-    "make_sure_no_tensor_in_meta_device"
+    "make_sure_no_tensor_in_meta_device",
+    "convert_to_marlin",
 ]
