@@ -212,6 +212,6 @@ def dequantize_weight(layer):
     unpacked_qzeros = unpacked_qzeros.repeat_interleave(group_size, dim=0)
     unpacked_qweight = (unpacked_qweight - unpacked_qzeros) * scales
 
-    return unpacked_qweight.T
+    return unpacked_qweight.T, unpacked_qzeros
 
 __all__ = ["QuantLinear", "_validate_marlin_compatibility", "dequantize_weight"]

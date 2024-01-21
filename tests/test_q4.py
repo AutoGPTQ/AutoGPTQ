@@ -574,13 +574,13 @@ class TestsMixtral(unittest.TestCase):
 
 class TestQ4Marlin(unittest.TestCase):
     def test_generation(self):
-        # Reference generated with the cuda-old kernel
-        reference_output = "<s> I am in Paris and I am going to the Louvre Museum. What time does it open and what is the best way to get there?\nThe Louvre Museum in Paris is open from 9:00 AM to 6:00 PM every day except for Tuesdays. The best way to get"
+        # Reference generated with the cuda-old kernel and TheBloke/Llama-2-7B-Chat-GPTQ
+        reference_output = "<s> I am in Paris and I am feeling very sad and lonely. everybody I know is busy and I don't have any friends here. I am staying in a small apartment in the 11th arrondissement and I am feeling very isolated. I miss my friends and family back home and I don'"
 
         prompt = "I am in Paris and"
         device = torch.device("cuda:0")
 
-        model_id = "TheBloke/WizardLM-7B-uncensored-GPTQ"
+        model_id = "TheBloke/Llama-2-7B-Chat-GPTQ"
         model_q = AutoGPTQForCausalLM.from_quantized(model_id, device="cuda:0", use_triton=False, inject_fused_attention=False, inject_fused_mlp=False, disable_exllama=True, disable_exllamav2=True, use_marlin=True)
 
         has_marlin = False
