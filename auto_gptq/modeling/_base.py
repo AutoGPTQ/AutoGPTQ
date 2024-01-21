@@ -133,7 +133,7 @@ class BaseQuantizeConfig(PushToHubMixin):
                 filtered_args["desc_act"] = False
 
             if "sym" not in args_from_json:
-                logger.warning(f"The quantzation configuration {quantize_config_filename} does not contain an entry `sym` (symetric quantization). This may result in silent errors.")
+                logger.warning(f"The quantization configuration {quantize_config_filename} does not contain an entry `sym` (symetric quantization). This may result in silent errors.")
 
             return cls(**filtered_args)
 
