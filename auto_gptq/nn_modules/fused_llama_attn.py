@@ -170,7 +170,8 @@ class FusedLlamaAttentionForQuantizedModel(FusedBaseAttentionModule):
                 else:
                     g_idx = None
             else:
-                g_idx = torch.cat([q_proj.g_idx, k_proj.g_idx, v_proj.g_idx], dim=0)
+                assert(torch.equal(q_proj.g_idx, k_proj.g_idx) and torch.equal(q_proj.g_idx, v_proj.g_idx))
+                g_idx = q_proj.g_idx
             
             bias = torch.cat([q_proj.bias, k_proj.bias, v_proj.bias], dim=0) if q_proj.bias is not None else None
 
