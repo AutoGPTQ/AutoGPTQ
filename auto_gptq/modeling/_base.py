@@ -3,7 +3,7 @@ import json
 import warnings
 import os
 from dataclasses import dataclass, field, fields
-from logging import getLogger
+import logging
 from os.path import join, isfile, isdir
 from typing import Dict, List, Optional, Union
 from packaging import version
@@ -14,24 +14,40 @@ import transformers
 from accelerate.hooks import remove_hook_from_module
 from safetensors.torch import save_file as safe_save
 from safetensors.torch import load_file as safe_load
+from safetensors import safe_open
 from transformers import AutoConfig, AutoModelForCausalLM, PreTrainedModel
 from transformers.utils.hub import PushToHubMixin, cached_file, create_repo, create_commit, CommitOperationAdd
 from transformers.utils.generic import ContextManagers
 from transformers.modeling_utils import no_init_weights
+import tempfile
 
+# TODO: Remove those star imports.
 from ._const import *
 from ._utils import *
+
+from ._utils import unpack_awq, pack_from_tensors
 from ..nn_modules.qlinear import GeneralQuantLinear
 from ..nn_modules._fused_base import FusedBaseAttentionModule, FusedBaseMLPModule
+from ..nn_modules.qlinear.qlinear_marlin import _validate_marlin_compatibility
 from ..quantization import GPTQ
 from ..utils.data_utils import collate_data
-from ..utils.patch_utils import set_module_tensor_to_device_patched
 from ..utils.import_utils import (
     dynamically_import_QuantLinear, TRITON_AVAILABLE, AUTOGPTQ_CUDA_AVAILABLE, EXLLAMA_KERNELS_AVAILABLE, QIGEN_AVAILABLE, EXLLAMAV2_KERNELS_AVAILABLE
 )
+from tqdm import tqdm
+import huggingface_hub
 
-logger = getLogger(__name__)
+logger = logging.getLogger(__name__)
+handler = logging.StreamHandler()
+formatter = logging.Formatter('%(levelname)s - %(message)s')
+handler.setFormatter(formatter)
+logger.addHandler(handler)
+logger.setLevel(logging.INFO)
 
+SYNONYMS = {
+    "w_bit": "bits",
+    "q_group_size": "group_size",
+}
 
 @dataclass
 class BaseQuantizeConfig(PushToHubMixin):
@@ -44,6 +60,7 @@ class BaseQuantizeConfig(PushToHubMixin):
     true_sequential: bool = field(default=True)
     model_name_or_path: Optional[str] = field(default=None)
     model_file_base_name: Optional[str] = field(default=None)
+    awq_gemm_checkpoint: Optional[bool] = field(default=False)
 
     def __post_init__(self):
         fields_info = fields(self)
@@ -72,35 +89,52 @@ class BaseQuantizeConfig(PushToHubMixin):
         subfolder = kwargs.pop("subfolder", None)
         commit_hash = kwargs.pop("_commit_hash", None)
 
-        quantize_config_filename = "quantize_config.json"
-        if os.path.isdir(save_dir):  # Local
-            resolved_config_file = join(save_dir, quantize_config_filename)
-        else: # Remote
-            resolved_config_file = cached_file(
-                save_dir,
-                quantize_config_filename,
-                cache_dir=cache_dir,
-                force_download=force_download,
-                resume_download=resume_download,
-                proxies=proxies,
-                use_auth_token=use_auth_token,
-                revision=revision,
-                local_files_only=local_files_only,
-                subfolder=subfolder,
-                _raise_exceptions_for_missing_entries=False,
-                _raise_exceptions_for_connection_errors=False,
-                _commit_hash=commit_hash,
-            )
+        for quantize_config_filename in ["quantize_config.json", "quant_config.json"]:
+            if os.path.isdir(save_dir):  # Local
+                resolved_config_file = join(save_dir, quantize_config_filename)
+            else: # Remote
+                resolved_config_file = cached_file(
+                    save_dir,
+                    quantize_config_filename,
+                    cache_dir=cache_dir,
+                    force_download=force_download,
+                    resume_download=resume_download,
+                    proxies=proxies,
+                    use_auth_token=use_auth_token,
+                    revision=revision,
+                    local_files_only=local_files_only,
+                    subfolder=subfolder,
+                    _raise_exceptions_for_missing_entries=False,
+                    _raise_exceptions_for_connection_errors=False,
+                    _commit_hash=commit_hash,
+                )
+            if resolved_config_file is not None:
+                break
+
+        if resolved_config_file is None:
+            raise ValueError("No quantize_config.json or quant_config.json file was found in the model repository.")
         
         field_names = [field.name for field in fields(cls)]
         with open(resolved_config_file, "r", encoding="utf-8") as f:
             args_from_json = json.load(f)
-            filtered_args = {}
+            filtered_args = {"awq_gemm_checkpoint": False}
             for key, val in args_from_json.items():
-                if key in field_names:
+                if key == "version" and val == "GEMM":
+                    filtered_args["awq_gemm_checkpoint"] = True
+                elif key in field_names:
                     filtered_args[key] = val
+                elif key in SYNONYMS and SYNONYMS[key] in field_names:
+                    filtered_args[SYNONYMS[key]] = val
                 else:
                     logger.warning(f"ignoring unknown parameter in {quantize_config_filename}: {key}.")
+            
+            if filtered_args["awq_gemm_checkpoint"]:
+                # AWQ does not reorder the rows.
+                filtered_args["desc_act"] = False
+
+            if "sym" not in args_from_json:
+                logger.warning(f"The quantization configuration {quantize_config_filename} does not contain an entry `sym` (symetric quantization). This may result in silent errors.")
+
             return cls(**filtered_args)
 
     def to_dict(self):
@@ -232,6 +266,14 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
 
         examples = self._prepare_examples_for_quantization(examples, batch_size)
 
+        def nested_move_to_device(v, device):
+            if isinstance(v, torch.Tensor):
+                return move_to_device(v, device)
+            elif isinstance(v, (list, tuple)):
+                return type(v)([nested_move_to_device(e, device) for e in v])
+            else:
+                return v
+
         class LayerHijacker(nn.Module):
             """hijack layer's forward pass to cache data"""
 
@@ -259,10 +301,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                 one_kwargs = dict()
                 for k, v in kwargs.items():  # make sure other arguments also be captured
                     if k not in ["hidden_states", "attention_mask", "position_ids"]:
-                        if isinstance(v, torch.Tensor):
-                            one_kwargs[k] = move_to_device(v, self.data_device)
-                        else:
-                            one_kwargs[k] = v
+                        one_kwargs[k] = nested_move_to_device(v, self.data_device)
                 layer_input_kwargs.append(one_kwargs)
                 raise ValueError
 
@@ -325,7 +364,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
 
             full = find_layers(layer)
             for names in inside_layer_modules:
-                subset = {n: full[n] for n in names}
+                subset = {n: full[n] for n in names if n in full}
                 gptq = {}
                 for name in subset:
                     gptq[name] = GPTQ(subset[name])
@@ -355,10 +394,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                     if layer_position_ids is not None:
                         additional_layer_inputs["position_ids"] = layer_position_ids
                     for k, v in layer_input_kwargs[j].items():
-                        if isinstance(v, torch.Tensor):
-                            additional_layer_inputs[k] = move_to_device(v, cur_layer_device)
-                        else:
-                            additional_layer_inputs[k] = v
+                        additional_layer_inputs[k] = nested_move_to_device(v, cur_layer_device)
                     layer(layer_input, **additional_layer_inputs)
                 for h in handles:
                     h.remove()
@@ -389,10 +425,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                 if layer_position_ids is not None:
                     additional_layer_inputs["position_ids"] = layer_position_ids
                 for k, v in layer_input_kwargs[j].items():
-                    if isinstance(v, torch.Tensor):
-                        additional_layer_inputs[k] = move_to_device(v, cur_layer_device)
-                    else:
-                        additional_layer_inputs[k] = v
+                    additional_layer_inputs[k] = nested_move_to_device(v, cur_layer_device)
                 layer_output = move_to_device(
                     layer(layer_input, **additional_layer_inputs)[0],
                     cur_layer_device if cache_examples_on_gpu else CPU
@@ -692,6 +725,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         low_cpu_mem_usage: bool = False,
         use_triton: bool = False,
         use_qigen: bool = False,
+        use_marlin: bool = False,
         torch_dtype: Optional[torch.dtype] = None,
         inject_fused_attention: bool = True,
         inject_fused_mlp: bool = True,
@@ -826,11 +860,15 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                         true_model_basename = possible_model_basename
                         break
         else:  # remote
+            temp = None
             for ext in extensions:
                 for possible_model_basename in possible_model_basenames:
                     resolved_archive_file = cached_file(model_name_or_path, possible_model_basename + ext, **cached_file_kwargs)
+                    if resolved_archive_file is None:
+                        resolved_archive_file = temp
                     searched_files.append(possible_model_basename + ext)
                     if resolved_archive_file is not None:
+                        temp = resolved_archive_file
                         true_model_basename = possible_model_basename
                         break
         
@@ -884,8 +922,8 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                 layers = find_layers(model)
                 ignore_layers = [cls.lm_head_name] + cls.outside_layer_modules
                 for name in list(layers.keys()):
-                    if any([name.startswith(ignore_layer) for ignore_layer in ignore_layers]):
-                        logger.info(f"{name} not been quantized, will be ignored when make_quant.")
+                    if any([name.startswith(ignore_layer) for ignore_layer in ignore_layers]) or all([not name.endswith(ignore_layer) for sublist in cls.inside_layer_modules for ignore_layer in sublist]):
+                        logger.info(f"The layer {name} is not quantized.")
                         del layers[name]
 
                 make_quant(
@@ -934,10 +972,162 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             if low_cpu_mem_usage:
                 make_sure_no_tensor_in_meta_device(model, use_triton, quantize_config.desc_act, quantize_config.group_size, bits=quantize_config.bits)
 
-            # Patch until 0.25.0 is released and includes this fix: https://github.com/huggingface/accelerate/pull/2116
-            if version.parse(accelerate.__version__) < version.parse("0.24.99") or accelerate.__version__ == "0.25.0.dev0":
-                original_set_module_tensor_to_device = accelerate.utils.modeling.set_module_tensor_to_device
-                accelerate.utils.modeling.set_module_tensor_to_device = set_module_tensor_to_device_patched
+            # TODO: move this logic in an awq_utils.py file.
+            if quantize_config.awq_gemm_checkpoint:
+                if use_marlin:
+                    raise ValueError("Tried to load an AWQ kernel with use_marlin=True. This is currently not supported. Please open an issue in AutoGPTQ repository.")
+
+                if is_local:
+                    is_cached = os.path.isfile(os.path.join(model_name_or_path, "autogptq_model.safetensors"))
+                else:
+                    namespace, subfolder = model_name_or_path.split("/")
+                    assets_path = huggingface_hub.cached_assets_path(library_name="autogptq", namespace=namespace, subfolder=subfolder)
+                    weight_path = os.path.join(assets_path, "autogptq_model.safetensors")
+
+                    is_cached = os.path.isfile(weight_path)
+
+                if is_cached:
+                    if is_local:
+                        model_save_name = os.path.join(model_name_or_path, "autogptq_model.safetensors")
+                    else:
+                        namespace, subfolder = model_name_or_path.split("/")
+                        assets_path = huggingface_hub.cached_assets_path(library_name="autogptq", namespace=namespace, subfolder=subfolder)
+                        model_save_name = os.path.join(assets_path, "autogptq_model.safetensors")
+
+                    logger.info(f"Loading an AWQ model, detected a cached repacked weight at {model_save_name}.")
+                else:
+                    logger.info("Loading an AWQ model. This requires repacking the weights, and no repacking cached weight was found. Grab a coffee!")
+
+                    if "safetensors" not in model_save_name:
+                        raise NotImplementedError(f"Conversion from AWQ checkpoints is implemented only for safetensors checkpoints, found {model_save_name}")
+                    if quantize_config.bits != 4:
+                        raise NotImplementedError(f"Conversion from AWQ checkpoints is supported only for 4 bits models. Found {quantize_config.bits} bits.")
+                    gptq_layers = set()
+                    non_gptq_params = set()
+                    with safe_open(model_save_name, framework="pt") as f:
+                        state_dict_keys = list(f.keys())
+                        for state_dict_key in f.keys():
+                            if "qweight" not in state_dict_key and "qzeros" not in state_dict_key and "scales" not in state_dict_key:
+                                non_gptq_params.add(state_dict_key)
+                                continue
+                            
+                            # e.g. prefix "model.layers.3.self_attn.k_proj"
+                            prefix, _ = state_dict_key.rsplit('.', 1)
+                            gptq_layers.add(prefix)
+
+                        new_state_dict = {}
+
+                        for state_dict_key in non_gptq_params:
+                            new_state_dict[state_dict_key] = f.get_tensor(state_dict_key)
+
+                        gptq_layers = sorted(gptq_layers)
+                        max_layer_name_length = len(max(gptq_layers, key=len))
+                        pbar = tqdm(gptq_layers)
+                        i = 0
+                        for gptq_layer_name in pbar:
+                            i += 1
+                            desc = f"Unpacking {gptq_layer_name} + '...'"
+                            desc = desc + " " * (max_layer_name_length - len(desc))
+
+                            awq_qweight = f.get_tensor(gptq_layer_name + ".qweight")
+                            awq_qzeros = f.get_tensor(gptq_layer_name + ".qzeros")
+                            awq_scales = f.get_tensor(gptq_layer_name + ".scales")
+
+                            # TODO: add FAST unpacking.
+                            unpacked_qweight, unpacked_qzeros = unpack_awq(awq_qweight, awq_qzeros, awq_scales, bits=quantize_config.bits, group_size=quantize_config.group_size)
+
+                            # TODO: add FAST repacking, this is too slow.
+                            desc = f"Repacking {gptq_layer_name}..."
+                            desc = desc + " " * (max_layer_name_length + 12 - len(desc))
+                            pbar.set_description(desc)
+                            gptq_qweight, gptq_qzeros = pack_from_tensors(unpacked_qweight, unpacked_qzeros, awq_scales, bits=quantize_config.bits, group_size=quantize_config.group_size)
+
+                            new_state_dict[gptq_layer_name + ".qweight"] = gptq_qweight
+                            new_state_dict[gptq_layer_name + ".qzeros"] = gptq_qzeros
+                            new_state_dict[gptq_layer_name + ".scales"] = awq_scales
+
+                    # Cache the converted model.
+                    if is_local:
+                        model_save_name = os.path.join(model_name_or_path, "autogptq_model.safetensors")
+                        safe_save(new_state_dict, model_save_name)
+                    else:
+                        namespace, subfolder = model_name_or_path.split("/")
+                        assets_path = huggingface_hub.cached_assets_path(library_name="autogptq", namespace=namespace, subfolder=subfolder)
+                        model_save_name = os.path.join(assets_path, "autogptq_model.safetensors")
+
+                        safe_save(new_state_dict, model_save_name)
+
+            # TODO: Move this logic in a marlin_utils.py file.
+            if use_marlin:
+                if torch_dtype != torch.float16:
+                    raise ValueError("Marlin kernel requires torch_dtype=torch.float16.")
+
+                unsupported_reason = _validate_marlin_compatibility(quantize_config)
+                if unsupported_reason is not None:
+                    raise ValueError(f"The model {model_name_or_path} can not be converted to use the Marlin kernel for the following reason: {unsupported_reason}, which is not supported by Marlin kernel.")
+
+                quant_linear_class = dynamically_import_QuantLinear(
+                    use_triton=use_triton,
+                    desc_act=quantize_config.desc_act,
+                    group_size=quantize_config.group_size,
+                    bits=quantize_config.bits,
+                    disable_exllama=disable_exllama,
+                    disable_exllamav2=disable_exllamav2
+                )
+
+                if is_local:
+                    is_cached = os.path.isfile(os.path.join(model_name_or_path, "autogptq_model.safetensors"))
+                else:
+                    namespace, subfolder = model_name_or_path.split("/")
+                    assets_path = huggingface_hub.cached_assets_path(library_name="autogptq", namespace=namespace, subfolder=subfolder)
+                    weight_path = os.path.join(assets_path, "autogptq_model.safetensors")
+
+                    is_cached = os.path.isfile(weight_path)
+
+                if is_cached:
+                    if is_local:
+                        model_save_name = os.path.join(model_name_or_path, "autogptq_model.safetensors")
+                    else:
+                        namespace, subfolder = model_name_or_path.split("/")
+                        assets_path = huggingface_hub.cached_assets_path(library_name="autogptq", namespace=namespace, subfolder=subfolder)
+                        model_save_name = os.path.join(assets_path, "autogptq_model.safetensors")
+
+                    logger.info(f"Loading a GPTQ model, detected a cached repacked weight for Marlin kernel at {model_save_name}.")
+
+                    # We will use the cached checkpoint to load parameters and buffers in the model, so we only need to replace QuantLinear layers here.
+                    model = convert_to_marlin(model, quant_linear_class, quantize_config, repack=False)
+                else:
+                    # Loading the GPTQ checkpoint to do the conversion.
+                    # TODO: Avoid loading the model with wrong QuantLinear, and directly use
+                    # Marlin ones. The repacking can be done directly on the safetensors, just
+                    # as for AWQ checkpoints.
+                    accelerate.utils.modeling.load_checkpoint_in_model(
+                        model,
+                        dtype=torch_dtype,  # This is very hacky but works due to https://github.com/huggingface/accelerate/blob/bd72a5f1a80d5146554458823f8aeda0a9db5297/src/accelerate/utils/modeling.py#L292
+                        checkpoint=model_save_name,
+                        device_map=device_map,
+                        offload_state_dict=True,
+                        offload_buffers=True
+                    )
+
+                    model = convert_to_marlin(model, quant_linear_class, quantize_config, repack=True)
+
+                    # Cache the converted model.
+                    if is_local:
+                        model_save_name = os.path.join(model_name_or_path, "autogptq_model.safetensors")
+                        safe_save(model.state_dict(), model_save_name)
+                    else:
+                        namespace, subfolder = model_name_or_path.split("/")
+                        assets_path = huggingface_hub.cached_assets_path(library_name="autogptq", namespace=namespace, subfolder=subfolder)
+                        model_save_name = os.path.join(assets_path, "autogptq_model.safetensors")
+
+                        safe_save(model.state_dict(), model_save_name)
+
+                if inject_fused_attention or inject_fused_mlp:
+                    # TODO: Validate whether that can be used.
+                    logger.info("Disabling fused attention and mlp injection because Marlin kernel is used")
+                    inject_fused_attention = False
+                    inject_fused_mlp = False
 
             accelerate.utils.modeling.load_checkpoint_in_model(
                 model,
@@ -948,11 +1138,11 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                 offload_buffers=True
             )
 
-            if version.parse(accelerate.__version__) < version.parse("0.24.99") or accelerate.__version__ == "0.25.0.dev0":
-                accelerate.utils.modeling.set_module_tensor_to_device = original_set_module_tensor_to_device
-
+            # TODO: Why are we using this custom function and not dispatch_model?
             model = simple_dispatch_model(model, device_map)
         else:
+            # Using QiGen.
+
             if quantize_config.desc_act:
                 NotImplementedError('desc_act=True is not yet supported.')
             model = AutoModelForCausalLM.from_config(
@@ -993,7 +1183,8 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                 checkpoint
             )
             model.load_state_dict(checkpoint)
-            # == step4: set seqlen == #
+
+        # == step4: set seqlen == #
         model_config = model.config.to_dict()
         seq_len_keys = ["max_position_embeddings", "seq_length", "n_positions"]
         if any([k in model_config for k in seq_len_keys]):
@@ -1036,6 +1227,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         model = autogptq_post_init(model, use_act_order=quantize_config.desc_act)
 
         model.eval()
+
         # == step6: (optional) warmup triton == #
         if use_triton and warmup_triton:
             from ..nn_modules.qlinear.qlinear_triton import QuantLinear
