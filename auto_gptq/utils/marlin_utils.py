@@ -67,16 +67,6 @@ def _get_cached_marlin_save_name(model_name_or_path):
         assets_path = huggingface_hub.cached_assets_path(library_name="autogptq", namespace=namespace, subfolder=subfolder)
         return os.path.join(assets_path, "autogptq_model.safetensors")
 
-# Gets The Serialized Path.
-#   -- if remote:   $HF_HOME/hub/models--
-#   -- if local:    {path}
-def _get_serialized_marlin_save_name(model_name_or_path):
-    if os.path.isdir(model_name_or_path):
-        return model_name_or_path
-    else:
-        namespace, subfolder = model_name_or_path.split("/")
-        return huggingface_hub.cached_assets_path(library_name="hub", namespace=namespace, subfolder=subfolder) 
-
 # Checks if a model stub is a marlin serialized model.
 def is_marlin_serialized(quantize_config):
     if not hasattr(quantize_config, "is_marlin_format"):
