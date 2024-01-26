@@ -267,10 +267,6 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                 one_kwargs = dict()
                 for k, v in kwargs.items():  # make sure other arguments also be captured
                     if k not in ["hidden_states", "attention_mask", "position_ids"]:
-                        # if isinstance(v, torch.Tensor):
-                        #     one_kwargs[k] = move_to_device(v, self.data_device)
-                        # else:
-                        #     one_kwargs[k] = v
                         one_kwargs[k] = nested_move_to_device(v, self.data_device)
                 layer_input_kwargs.append(one_kwargs)
                 raise ValueError
