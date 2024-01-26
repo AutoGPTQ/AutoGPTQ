@@ -360,10 +360,6 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                     if layer_position_ids is not None:
                         additional_layer_inputs["position_ids"] = layer_position_ids
                     for k, v in layer_input_kwargs[j].items():
-                        # if isinstance(v, torch.Tensor):
-                        #     additional_layer_inputs[k] = move_to_device(v, cur_layer_device)
-                        # else:
-                        #     additional_layer_inputs[k] = v
                         additional_layer_inputs[k] = nested_move_to_device(v, cur_layer_device)
                     layer(layer_input, **additional_layer_inputs)
                 for h in handles:
