@@ -266,6 +266,14 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
 
         examples = self._prepare_examples_for_quantization(examples, batch_size)
 
+        def nested_move_to_device(v, device):
+            if isinstance(v, torch.Tensor):
+                return move_to_device(v, device)
+            elif isinstance(v, (list, tuple)):
+                return type(v)([nested_move_to_device(e, device) for e in v])
+            else:
+                return v
+
         class LayerHijacker(nn.Module):
             """hijack layer's forward pass to cache data"""
 
@@ -293,10 +301,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                 one_kwargs = dict()
                 for k, v in kwargs.items():  # make sure other arguments also be captured
                     if k not in ["hidden_states", "attention_mask", "position_ids"]:
-                        if isinstance(v, torch.Tensor):
-                            one_kwargs[k] = move_to_device(v, self.data_device)
-                        else:
-                            one_kwargs[k] = v
+                        one_kwargs[k] = nested_move_to_device(v, self.data_device)
                 layer_input_kwargs.append(one_kwargs)
                 raise ValueError
 
@@ -389,10 +394,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                     if layer_position_ids is not None:
                         additional_layer_inputs["position_ids"] = layer_position_ids
                     for k, v in layer_input_kwargs[j].items():
-                        if isinstance(v, torch.Tensor):
-                            additional_layer_inputs[k] = move_to_device(v, cur_layer_device)
-                        else:
-                            additional_layer_inputs[k] = v
+                        additional_layer_inputs[k] = nested_move_to_device(v, cur_layer_device)
                     layer(layer_input, **additional_layer_inputs)
                 for h in handles:
                     h.remove()
@@ -423,10 +425,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                 if layer_position_ids is not None:
                     additional_layer_inputs["position_ids"] = layer_position_ids
                 for k, v in layer_input_kwargs[j].items():
-                    if isinstance(v, torch.Tensor):
-                        additional_layer_inputs[k] = move_to_device(v, cur_layer_device)
-                    else:
-                        additional_layer_inputs[k] = v
+                    additional_layer_inputs[k] = nested_move_to_device(v, cur_layer_device)
                 layer_output = move_to_device(
                     layer(layer_input, **additional_layer_inputs)[0],
                     cur_layer_device if cache_examples_on_gpu else CPU
