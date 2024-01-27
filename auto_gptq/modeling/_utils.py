@@ -139,7 +139,7 @@ def convert_to_marlin(model, model_quantlinear, quantization_config, repack: boo
         if not isinstance(module, model_quantlinear):
             continue
 
-        if module.bias is not None and torch.count_nonzero(module.bias) > 0:
+        if module.bias is not None:
             bias = module.bias
         else:
             bias = None

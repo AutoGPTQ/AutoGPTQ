@@ -1112,16 +1112,17 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
 
                     model = convert_to_marlin(model, quant_linear_class, quantize_config, repack=True)
 
+                    weights = {k: v.clone().contiguous() for k, v in model.state_dict().items()}
                     # Cache the converted model.
                     if is_local:
                         model_save_name = os.path.join(model_name_or_path, "autogptq_model.safetensors")
-                        safe_save(model.state_dict(), model_save_name)
+                        safe_save(weights, model_save_name)
                     else:
                         namespace, subfolder = model_name_or_path.split("/")
                         assets_path = huggingface_hub.cached_assets_path(library_name="autogptq", namespace=namespace, subfolder=subfolder)
                         model_save_name = os.path.join(assets_path, "autogptq_model.safetensors")
 
-                        safe_save(model.state_dict(), model_save_name)
+                        safe_save(weights, model_save_name)
 
                 if inject_fused_attention or inject_fused_mlp:
                     # TODO: Validate whether that can be used.
