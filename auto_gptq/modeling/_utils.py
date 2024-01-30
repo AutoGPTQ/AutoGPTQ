@@ -1,5 +1,8 @@
 from logging import getLogger
 from typing import Union, Optional
+from tqdm import tqdm
+import copy
+import gc
 
 import accelerate
 import torch
@@ -9,7 +12,9 @@ import transformers
 
 from ._const import SUPPORTED_MODELS, CPU, CUDA_0, EXLLAMA_DEFAULT_MAX_INPUT_LENGTH
 from ..utils.import_utils import dynamically_import_QuantLinear
-
+import numpy as np
+from ..nn_modules.qlinear.qlinear_marlin import dequantize_weight
+from ..nn_modules.qlinear.qlinear_marlin import QuantLinear as MarlinQuantLinear
 logger = getLogger(__name__)
 
 
@@ -115,6 +120,79 @@ def make_quant(
             disable_exllamav2=disable_exllamav2,
             use_qigen=use_qigen
         )
+
+@torch.no_grad()
+def convert_to_marlin(model, model_quantlinear, quantization_config, repack: bool):
+    """
+    Converts GPTQ-packed weights to the Marlin format. This assumes that the model already meets Marlin kernel constraints.
+
+    Arguments:
+        repack (`bool`):
+            Whether to repack the qweights from `model` into the Marlin's QuantLinear layers.
+    """
+    if repack:
+        message = "Repacking weights to be compatible with Marlin kernel..."
+    else:
+        message = "Overriding QuantLinear layers to use Marlin's QuantLinear..."
+
+    for name, module in tqdm(model.named_modules(), desc=message, total=len(list(model.named_modules()))):
+        if not isinstance(module, model_quantlinear):
+            continue
+
+        if module.bias is not None and torch.count_nonzero(module.bias) > 0:
+            bias = module.bias
+        else:
+            bias = None
+
+        parent_name = ".".join(name.split(".")[:-1])
+        layer_name = name[len(parent_name) + 1:]
+
+        # Dequantize the weight.
+        if repack:
+            dequantized_weight, dequantized_qzeros = dequantize_weight(module)
+            dequantized_weight = dequantized_weight.to(torch.float16)
+
+            if not torch.all(dequantized_qzeros == 8):
+                raise ValueError(f"Marlin kernel is compatible only with checkpoints using symetric quantization. Found non-symmetric quantization for the weight {name}.")
+
+            linear_module = nn.Linear(
+                in_features=dequantized_weight.shape[1],
+                out_features=dequantized_weight.shape[0],
+                bias=bias is not None,
+                dtype=torch.float16,
+                device="cuda"
+            )
+            linear_module.weight.data.copy_(dequantized_weight)
+
+            if bias is not None:
+                linear_module.bias.data.copy_(bias)
+        else:
+            linear_module = nn.Linear(module.infeatures, module.outfeatures, bias=bias is not None, dtype=torch.float16, device="cuda")
+
+        # Create new linear method and copy to model.
+        new_module = MarlinQuantLinear(
+            bits=4,
+            group_size=module.group_size,
+            infeatures=linear_module.in_features,
+            outfeatures=linear_module.out_features,
+            bias=bias is not None,
+            trainable=False,
+        )
+
+        if repack:
+            new_module.pack(linear_module, scales=copy.deepcopy(module.scales.data.t()).to("cuda"))
+
+        # Save to parent.
+        parent_module = model.get_submodule(parent_name)
+        setattr(parent_module, layer_name, new_module)
+
+        # Free cuda memory.
+        del module
+        if repack:
+            del dequantized_weight
+        torch.cuda.empty_cache()
+        gc.collect()
+    return model
 
 def preprocess_checkpoint_qigen(
     module,
@@ -390,6 +468,173 @@ def make_sure_no_tensor_in_meta_device(model, use_triton, desc_act, group_size, 
             m.register_buffer('bias', torch.zeros((m.outfeatures), dtype=torch.float16, device="cpu"))
 
 
+def awq_reverse_reorder_int_tensor(int_tensor, bits: int):
+    assert bits == 4
+
+    int_tensor = int_tensor.T.contiguous()
+    compress_ratio = (32 // bits)
+    assert int_tensor.shape[-1] % compress_ratio == 0
+    
+    order_map = [0, 2, 4, 6, 1, 3, 5, 7]
+    order_tensor = torch.tensor(
+        order_map, dtype=torch.int32, device=int_tensor.device).reshape(1, -1)
+    order_tensor = order_tensor.repeat(
+        int_tensor.shape[1]//compress_ratio, 1)
+    order_tensor = order_tensor + torch.arange(0, int_tensor.shape[1],
+                                                compress_ratio, dtype=torch.int32, device=int_tensor.device).reshape(-1, 1)
+    order_tensor = order_tensor.reshape(-1)
+
+    reverse_order_tensor = torch.arange(order_tensor.shape[0]).cuda()[order_tensor]
+    reverse_order_tensor = reverse_order_tensor[order_tensor]
+    int_tensor = int_tensor[:, reverse_order_tensor]
+    return int_tensor
+
+
+def unpack_awq(awq_qweight: torch.Tensor, awq_qzeros: torch.Tensor, awq_scales: torch.Tensor, bits: int, group_size: int):
+    """
+    Args:
+        awq_qweight (`torch.LongTensor`):
+            Expected shape: (in_features, out_features // (32 // bits))
+        awq_qzeros (`torch.LongTensor`):
+            Expected shape: (in_features // group_size, out_features // (32 // bits))
+        awq_scales (`torch.LongTensor`):
+            Expected shape: (in_features // group_size, out_features)
+    
+    Returns:
+        fp16_weight (`torch.LongTensor`):
+            With shape (in_features, out_features).
+        zeros (`torch.LongTensor`):
+            With shape (in_features // group_size, out_features).
+    """
+    assert bits == 4
+
+    qzeros = awq_qzeros.cuda()
+    qweight = awq_qweight.cuda()
+    qweight = qweight.T.contiguous()
+
+    scales = awq_scales
+    scales = scales.reshape(-1, 1, scales.shape[-1])
+
+    infeatures = awq_qweight.shape[0]
+
+    wf = torch.tensor(list(range(0, 32, bits)), dtype=torch.int32, device=qzeros.device).unsqueeze(0)
+    zeros = torch.bitwise_right_shift(torch.unsqueeze(qzeros, 2), wf.unsqueeze(0)).to(
+        torch.int16 if bits == 8 else torch.int8)
+
+    #zeros = zeros + 1
+
+    torch.bitwise_and(zeros, (2 ** bits) - 1, out=zeros)
+
+    zeros = zeros.reshape(-1, 1, zeros.shape[1] * zeros.shape[2])
+
+    weight = torch.bitwise_right_shift(torch.unsqueeze(
+        qweight, 1), wf.unsqueeze(-1)).to(torch.int16 if bits == 8 else torch.int8)
+    torch.bitwise_and(weight, (2 ** bits) - 1, out=weight)
+    weight = weight.reshape(-1, group_size, weight.shape[2])
+
+    weight = weight.view(-1, weight.shape[-1])
+    zeros = zeros.view(-1, zeros.shape[-1])
+
+    zeros = zeros.T.contiguous()
+    zeros = awq_reverse_reorder_int_tensor(zeros, bits)
+    weight = awq_reverse_reorder_int_tensor(weight, bits)
+
+    # Dequantize weights.
+    scales = awq_scales.cuda()
+    zeros = zeros.contiguous()
+    scale_zeros = zeros * scales
+
+    g_idx =  torch.tensor([i // group_size for i in range(infeatures)], dtype=torch.int32)
+    scale_mat = scales[g_idx]
+    scale_zeros_mat = scale_zeros[g_idx].half()
+
+    qdq_weight_T = weight * scale_mat - scale_zeros_mat.half()
+
+    fp16_weight = qdq_weight_T.T.cuda()
+
+    return fp16_weight, zeros
+
+def pack_from_tensors(unpacked_qweight: torch.Tensor, unpacked_qzeros: torch.Tensor, awq_scales: torch.Tensor, bits: int, group_size: int):
+    """
+    Args:
+        unpacked_qweight (`torch.LongTensor`):
+            Expected shape: (in_features, out_features)
+        unpacked_qzeros (`torch.LongTensor`):
+            Expected shape: (in_features // group_size, out_features)
+        awq_scales (`torch.LongTensor`):
+            Expected shape: (in_features // group_size, out_features)
+    
+    Returns:
+        qweight (`torch.LongTensor`):
+            With shape (in_features // (32 // bits), out_features)
+        qzeros (`torch.LongTensor`):
+            With shape (in_features // group_size, out_features // (32 // bits))
+    """
+    assert bits == 4
+    W = unpacked_qweight.clone().cpu()
+
+    # TODO: This should be checked somehow.
+    # if isinstance(linear, nn.Conv2d):
+    #     W = W.flatten(1)
+    # if isinstance(linear, transformers.pytorch_utils.Conv1D):
+    #     W = W.t()
+
+    awq_scales = awq_scales.t().contiguous()
+    unpacked_qzeros = unpacked_qzeros.contiguous()
+    unpacked_qzeros = unpacked_qzeros.cpu()
+
+    awq_scales = awq_scales.cpu()
+    scale_zeros = unpacked_qzeros.t() * awq_scales
+    scales = awq_scales.clone()
+
+    infeatures = unpacked_qweight.shape[1]
+
+    intweight = []
+    for idx in range(infeatures):
+        g_idx = idx // group_size
+
+        intweight.append(
+            torch.round(
+                (
+                    W[:, idx] + scale_zeros[:, g_idx]) / scales[:, g_idx]
+            ).to(torch.int)[:, None]
+        )
+    intweight = torch.cat(intweight, dim=1)
+    intweight = intweight.t().contiguous()
+    intweight = intweight.numpy().astype(np.uint32)
+
+    i = 0
+    row = 0
+    qweight = np.zeros(
+        (intweight.shape[0] // 32 * bits, intweight.shape[1]), dtype=np.uint32
+    )
+    while row < qweight.shape[0]:
+        for j in range(i, i + (32 // bits)):
+            qweight[row] |= intweight[j] << (bits * (j - i))
+        i += 32 // bits
+        row += 1
+
+    qweight = qweight.astype(np.int32)
+    qweight = torch.from_numpy(qweight)
+
+    unpacked_qzeros = unpacked_qzeros - 1
+    torch.bitwise_and(unpacked_qzeros, (2 ** bits) - 1, out=unpacked_qzeros)
+
+    unpacked_qzeros = unpacked_qzeros.numpy().astype(np.uint32)
+    qzeros = np.zeros((unpacked_qzeros.shape[0], unpacked_qzeros.shape[1] // 32 * bits), dtype=np.uint32)
+    i = 0
+    col = 0
+    while col < qzeros.shape[1]:
+        for j in range(i, i + (32 // bits)):
+            qzeros[:, col] |= unpacked_qzeros[:, j] << (bits * (j - i))
+        i += 32 // bits
+        col += 1
+
+    qzeros = qzeros.astype(np.int32)
+    qzeros = torch.from_numpy(qzeros)
+
+    return qweight, qzeros
+
 __all__ = [
     "get_device",
     "move_to_device",
@@ -402,5 +647,6 @@ __all__ = [
     "autogptq_post_init",
     "check_and_get_model_type",
     "simple_dispatch_model",
-    "make_sure_no_tensor_in_meta_device"
+    "make_sure_no_tensor_in_meta_device",
+    "convert_to_marlin",
 ]

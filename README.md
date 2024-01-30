@@ -30,7 +30,7 @@ Getting back to the topic, I'm very excited to see that in the past few months, 
 - 2023-08-23 - (News) - 🤗 Transformers, optimum and peft have integrated `auto-gptq`, so now running and training GPTQ models can be more available to everyone! See [this blog](https://huggingface.co/blog/gptq-integration) and it's resources for more details!
 - 2023-08-21 - (News) - Team of Qwen officially released 4bit quantized version of Qwen-7B based on `auto-gptq`, and provided [a detailed benchmark results](https://huggingface.co/Qwen/Qwen-7B-Chat-Int4#%E9%87%8F%E5%8C%96-quantization)
 - 2023-08-06 - (Update) - Support exllama's q4 CUDA kernel to have at least 1.3x speed up for int4 quantized models when doing inference.
-- 2023-08-04 - (Update) - Support RoCm so that AMD GPU users can use auto-gptq with CUDA extensions.
+- 2023-08-04 - (Update) - Support ROCm so that AMD GPU users can use auto-gptq with CUDA extensions.
 - 2023-07-26 - (Update) - An elegant [PPL benchmark script](examples/benchmark/perplexity.py) to get results that can be fairly compared with other libraries such as `llama.cpp`.
 - 2023-06-05 - (Update) - Integrate with 🤗 peft to use gptq quantized model to train adapters, support LoRA, AdaLoRA, AdaptionPrompt, etc.
 - 2023-05-30 - (Update) - Support download/upload quantized model from/to 🤗 Hub.
@@ -62,12 +62,14 @@ For perplexity comparison, you can turn to [here](https://github.com/qwopqwop200
 ## Installation
 
 ### Quick Installation
-You can install the latest stable release of AutoGPTQ from pip with pre-built wheels compatible with **PyTorch 2.1**:
+You can install the latest stable release of AutoGPTQ from pip with pre-built wheels:
 
-* For CUDA 12.1: `pip install auto-gptq`
-* For CUDA 11.8: `pip install auto-gptq --extra-index-url https://huggingface.github.io/autogptq-index/whl/cu118/`
-* For RoCm 5.6.1: `pip install auto-gptq --extra-index-url https://huggingface.github.io/autogptq-index/whl/rocm561/`
-* For RoCm 5.7.1: `pip install auto-gptq --extra-index-url https://huggingface.github.io/autogptq-index/whl/rocm571/`
+| CUDA/ROCm version | Installation                                                                                      | Built against PyTorch |
+|-------------------|---------------------------------------------------------------------------------------------------|-----------------------|
+| CUDA 11.8         | `pip install auto-gptq --extra-index-url https://huggingface.github.io/autogptq-index/whl/cu118/`   | 2.1.1+cu118           |
+| CUDA 12.1         | `pip install auto-gptq`                                                                            | 2.1.1+cu121           |
+| ROCm 5.6          | `pip install auto-gptq --extra-index-url https://huggingface.github.io/autogptq-index/whl/rocm561/` | 2.1.1+rocm5.6        |
+| ROCm 5.7          | `pip install auto-gptq --extra-index-url https://huggingface.github.io/autogptq-index/whl/rocm571/` | nightly               |
 
 AutoGPTQ can be installed with the Triton dependency with `pip install auto-gptq[triton]` in order to be able to use the Triton backend (currently only supports linux, no 3-bits quantization).
 
@@ -80,15 +82,15 @@ git clone https://github.com/PanQiWei/AutoGPTQ.git && cd AutoGPTQ
 A few packages are required in order to build from source: `pip install numpy gekko pandas`.
 
 ```
-Then, install from source:
+Then, install locally from source:
 ```shell
-pip install -v .
+pip install -vvv -e .
 ```
 You can set `BUILD_CUDA_EXT=0` to disable pytorch extension building, but this is **strongly discouraged** as AutoGPTQ then falls back on a slow python implementation.
 
-#### On RoCm systems
+#### On ROCm systems
 
-To install from source for AMD GPUs supporting RoCm, please specify the `ROCM_VERSION` environment variable. Example:
+To install from source for AMD GPUs supporting ROCm, please specify the `ROCM_VERSION` environment variable. Example:
 
 ```
 ROCM_VERSION=5.6 pip install -v -e .
@@ -96,15 +98,19 @@ ROCM_VERSION=5.6 pip install -v -e .
 
 The compilation can be speeded up by specifying the `PYTORCH_ROCM_ARCH` variable ([reference](https://github.com/pytorch/pytorch/blob/7b73b1e8a73a1777ebe8d2cd4487eb13da55b3ba/setup.py#L132)) in order to build for a single target device, for example `gfx90a` for MI200 series devices.
 
-For RoCm systems, the packages `rocsparse-dev`, `hipsparse-dev`, `rocthrust-dev`, `rocblas-dev` and `hipblas-dev` are required to build.
+For ROCm systems, the packages `rocsparse-dev`, `hipsparse-dev`, `rocthrust-dev`, `rocblas-dev` and `hipblas-dev` are required to build.
 
 The following combinations are tested:
 
-| RoCm version | PyTorch version |
+| ROCm version | PyTorch version |
 |--------------|-----------------|
 | 5.4.2        | 2.0.1           |
 | 5.6          | 2.1.0           |
 | 5.7          | nightly (2.2.0.dev2023)         |
+
+#### Marlin kernel
+
+An optimized int4 * fp16 kernel was recently proposed at https://github.com/IST-DASLab/marlin. This is integrated in AutoGPTQ when loading a model with `use_marlin=True`. This kernel is available only on devices with compute capability 8.0 or 8.6 (Ampere GPUs). Please compile AutoGPTQ from source with: `TORCH_CUDA_ARCH_LIST="8.0 8.6+PTX" COMPILE_MARLIN=1 DISABLE_QIGEN=1 pip install -vvv -e .`.
 
 ## Quick Tour
 
