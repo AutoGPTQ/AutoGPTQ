@@ -53,7 +53,7 @@ def prepare_model_for_marlin_load(
         
         # Cache the converted model.
         model_save_name = cache_marlin(model, model_name_or_path)
-
+    
     return model, model_save_name
 
 # Gets The Cached Weight Path.
@@ -180,4 +180,8 @@ def convert_to_marlin(model, model_quantlinear, quantization_config, repack: boo
             del dequantized_weight
         torch.cuda.empty_cache()
         gc.collect()
+    
+
+    # Set quantization config to be Marlin.
+    quantization_config.is_marlin_format = True
     return model

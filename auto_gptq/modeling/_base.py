@@ -174,7 +174,6 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         injected_fused_attention: bool = False,
         injected_fused_mlp: bool = False,
         trainable: bool = False,
-        is_marlin_format: bool = False,
     ):
         super().__init__()
 
@@ -188,7 +187,6 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         self.injected_fused_attention = injected_fused_attention
         self.injected_fused_mlp = injected_fused_mlp
         self.trainable = trainable
-        self.is_marlin_format = is_marlin_format
 
     @property
     def quantized(self):
@@ -602,6 +600,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             # otherwise it raises an OSError
             safetensors_metadata['format'] = "pt"
 
+            
             # Store the quantization configuration as safetensors metadata
             from auto_gptq import __version__
             safetensors_metadata['auto_gptq_version'] = str(__version__)
@@ -609,15 +608,12 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             safetensors_metadata['gptq_group_size'] = str(self.quantize_config.group_size)
             safetensors_metadata['gptq_desc_act'] = str(self.quantize_config.desc_act)
             safetensors_metadata['gptq_damp_percent'] = str(self.quantize_config.damp_percent)
-            safetensors_metadata['gptq_is_marlin_format'] = str(self.is_marlin_format)
+            safetensors_metadata['gptq_is_marlin_format'] = str(self.quantize_config.is_marlin_format)
 
             safe_save(state_dict, join(save_dir, model_save_name), safetensors_metadata)
         else:
             model_save_name = model_base_name + ".bin"
             torch.save(self.model.state_dict(), join(save_dir, model_save_name))
-
-        # If model is marlin format, update config to enable reloading.
-        self.quantize_config.is_marlin_format = self.is_marlin_format
 
         self.model.config.save_pretrained(save_dir)
         self.quantize_config.save_pretrained(save_dir)
@@ -1237,7 +1233,6 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             injected_fused_attention=inject_fused_attention,
             injected_fused_mlp=inject_fused_mlp and use_triton,
             trainable=trainable,
-            is_marlin_format=use_marlin,
         )
 
     def warmup_triton(self, enabled: bool = True):
