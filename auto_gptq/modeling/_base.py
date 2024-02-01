@@ -823,7 +823,6 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                 "You have activated both exllama and exllamav2 kernel. Setting disable_exllama to True and keeping disable_exllamav2 to False"
             )
             disable_exllama = True
-
                     
         # == step1: prepare configs and file names == #
         config = AutoConfig.from_pretrained(model_name_or_path, trust_remote_code=trust_remote_code, **cached_file_kwargs)
