@@ -88,6 +88,14 @@ def cache_marlin(model, model_name_or_path):
     safe_save(model.state_dict(), model_save_name)
     return model_save_name
 
+# Validate marlin suppor
+def _validate_marlin_device_support():
+    device_capacity = torch.cuda.get_device_capability()
+    return (
+        device_capacity[0] == 8 and 
+        (device_capacity[1] == 0 or device_capacity[1] == 6)
+    )
+
 # Adapted from https://github.com/rib-2/marlin/tree/conversion
 def _validate_marlin_compatibility(quantization_config):
     if quantization_config.bits != 4:
@@ -184,4 +192,8 @@ def convert_to_marlin(model, model_quantlinear, quantization_config, repack: boo
 
     # Set quantization config to be Marlin.
     quantization_config.is_marlin_format = True
+    if hasattr(model.config, "quantization_config"):
+        model.config.quantization_config["is_marlin_format"] = True
+    else:
+        raise ValueError("No quantization config found.")
     return model

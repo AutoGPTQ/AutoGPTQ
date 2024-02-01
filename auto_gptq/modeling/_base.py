@@ -30,11 +30,11 @@ from ..nn_modules.qlinear import GeneralQuantLinear
 from ..nn_modules._fused_base import FusedBaseAttentionModule, FusedBaseMLPModule
 from ..quantization import GPTQ
 from ..utils.marlin_utils import (
-    prepare_model_for_marlin_load, _validate_marlin_compatibility, 
+    prepare_model_for_marlin_load, _validate_marlin_compatibility, _validate_marlin_device_support
 )
 from ..utils.data_utils import collate_data
 from ..utils.import_utils import (
-    dynamically_import_QuantLinear, TRITON_AVAILABLE, AUTOGPTQ_CUDA_AVAILABLE, EXLLAMA_KERNELS_AVAILABLE, QIGEN_AVAILABLE, EXLLAMAV2_KERNELS_AVAILABLE
+    dynamically_import_QuantLinear, TRITON_AVAILABLE, AUTOGPTQ_CUDA_AVAILABLE, EXLLAMA_KERNELS_AVAILABLE, QIGEN_AVAILABLE, EXLLAMAV2_KERNELS_AVAILABLE, MARLIN_AVAILABLE
 )
 from tqdm import tqdm
 import huggingface_hub
@@ -825,6 +825,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                 "You have activated both exllama and exllamav2 kernel. Setting disable_exllama to True and keeping disable_exllamav2 to False"
             )
             disable_exllama = True
+
                     
         # == step1: prepare configs and file names == #
         config = AutoConfig.from_pretrained(model_name_or_path, trust_remote_code=trust_remote_code, **cached_file_kwargs)
@@ -835,11 +836,16 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         if quantize_config is None:
             quantize_config = BaseQuantizeConfig.from_pretrained(model_name_or_path, **cached_file_kwargs, **kwargs)
 
+        if not use_marlin and MARLIN_AVAILABLE:
+            unsupported_reason = _validate_marlin_compatibility(quantize_config)
+            if unsupported_reason is None and _validate_marlin_device_support():
+                logger.info("You passed a model that is compatible with Marlin GPTQ kernels but use_marlin is False. Pass use_marlin=True to use the optimized Marlin kernels for inference.")
+
         if hasattr(quantize_config, "is_marlin_format") and quantize_config.is_marlin_format:
             if not use_marlin:
                 raise ValueError(
-                    "You passed a GPTQ model saved in Marlin format but use_marlin=False. "
-                    "Pass use_marlin=True to utilize this model."
+                    "You passed a GPTQ model saved in Marlin format but set use_marlin=False. "
+                    "You use_marlin=True to utilize this model."
                 )
 
         if model_basename is None:
