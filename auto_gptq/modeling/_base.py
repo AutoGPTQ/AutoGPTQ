@@ -1232,7 +1232,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             is_triton_backend=use_triton,
             injected_fused_attention=inject_fused_attention,
             injected_fused_mlp=inject_fused_mlp and use_triton,
-            trainable=trainable,
+            trainable=trainable
         )
 
     def warmup_triton(self, enabled: bool = True):
