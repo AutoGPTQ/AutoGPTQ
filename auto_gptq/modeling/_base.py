@@ -64,7 +64,7 @@ class BaseQuantizeConfig(PushToHubMixin):
     model_name_or_path: Optional[str] = field(default=None)
     model_file_base_name: Optional[str] = field(default=None)
     awq_gemm_checkpoint: Optional[bool] = field(default=False)
-    
+
     def __post_init__(self):
         fields_info = fields(self)
 
