@@ -743,7 +743,6 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         trainable: bool = False,
         disable_exllama: Optional[bool] = None,
         disable_exllamav2: bool = False,
-        
         **kwargs
     ):
         """load quantized model from local disk"""
