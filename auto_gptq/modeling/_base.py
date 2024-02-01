@@ -173,7 +173,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         is_triton_backend: bool = False,
         injected_fused_attention: bool = False,
         injected_fused_mlp: bool = False,
-        trainable: bool = False,
+        trainable: bool = False
     ):
         super().__init__()
 
