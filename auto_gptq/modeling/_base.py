@@ -1080,6 +1080,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                     use_cuda_fp16=use_cuda_fp16,
                     desc_act=quantize_config.desc_act,
                     trainable=trainable,
+                    use_tritonv2=use_tritonv2,
                 )
                 model.tie_weights()
 
@@ -1122,7 +1123,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             if low_cpu_mem_usage:
                 make_sure_no_tensor_in_meta_device(
                     model,
-                    use_triton,
+                    use_triton or use_tritonv2,
                     quantize_config.desc_act,
                     quantize_config.group_size,
                     bits=quantize_config.bits,
@@ -1285,6 +1286,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                     bits=quantize_config.bits,
                     disable_exllama=disable_exllama,
                     disable_exllamav2=disable_exllamav2,
+                    use_tritonv2=use_tritonv2,
                 )
 
                 if is_local:
@@ -1481,7 +1483,10 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
 
         # == step6: (optional) warmup triton == #
         if (use_triton or use_tritonv2) and warmup_triton:
-            from ..nn_modules.qlinear.qlinear_triton import QuantLinear
+            if use_tritonv2:
+                from ..nn_modules.qlinear.qlinear_tritonv2 import QuantLinear
+            else:
+                from ..nn_modules.qlinear.qlinear_triton import QuantLinear
 
             QuantLinear.warmup(model, seqlen=model.seqlen)
 

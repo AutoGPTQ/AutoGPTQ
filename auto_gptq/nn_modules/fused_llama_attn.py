@@ -1,11 +1,15 @@
 import math
+
 import torch
 import torch.nn as nn
 from torch.nn import functional as F
-from transformers.models.llama.modeling_llama import LlamaAttention, apply_rotary_pos_emb
+from transformers.models.llama.modeling_llama import (
+    LlamaAttention,
+    apply_rotary_pos_emb,
+)
 
-from ._fused_base import FusedBaseAttentionModule
 from ..utils.import_utils import compare_pytorch_version, dynamically_import_QuantLinear
+from ._fused_base import FusedBaseAttentionModule
 
 
 class FusedLlamaAttentionForQuantizedModel(FusedBaseAttentionModule):
@@ -36,7 +40,11 @@ class FusedLlamaAttentionForQuantizedModel(FusedBaseAttentionModule):
         self.rotary_emb = rotary_emb
 
     def _shape(self, tensor, seq_len, bsz):
-        return tensor.view(bsz, seq_len, self.num_heads, self.head_dim).transpose(1, 2).contiguous()
+        return (
+            tensor.view(bsz, seq_len, self.num_heads, self.head_dim)
+            .transpose(1, 2)
+            .contiguous()
+        )
 
     def forward(
         self,
@@ -46,18 +54,26 @@ class FusedLlamaAttentionForQuantizedModel(FusedBaseAttentionModule):
         position_ids=None,
         output_attentions=False,
         use_cache=False,
-        **kwargs
+        **kwargs,
     ):
         """Input shape: Batch x Time x Channel"""
 
         bsz, q_len, _ = hidden_states.size()
 
         qkv_states = self.qkv_proj(hidden_states)
-        query_states, key_states, value_states = torch.split(qkv_states, self.hidden_size, dim=2)
+        query_states, key_states, value_states = torch.split(
+            qkv_states, self.hidden_size, dim=2
+        )
 
-        query_states = query_states.view(bsz, q_len, self.num_heads, self.head_dim).transpose(1, 2)
-        key_states = key_states.view(bsz, q_len, self.num_heads, self.head_dim).transpose(1, 2)
-        value_states = value_states.view(bsz, q_len, self.num_heads, self.head_dim).transpose(1, 2)
+        query_states = query_states.view(
+            bsz, q_len, self.num_heads, self.head_dim
+        ).transpose(1, 2)
+        key_states = key_states.view(
+            bsz, q_len, self.num_heads, self.head_dim
+        ).transpose(1, 2)
+        value_states = value_states.view(
+            bsz, q_len, self.num_heads, self.head_dim
+        ).transpose(1, 2)
 
         kv_seq_len = key_states.shape[-2]
         if past_key_value is not None:
@@ -68,15 +84,19 @@ class FusedLlamaAttentionForQuantizedModel(FusedBaseAttentionModule):
                     "with a layer index. Please open an issue in AutoGPTQ if you hit this."
                 )
             kv_seq_len += past_key_value.get_usable_length(kv_seq_len, self.layer_idx)
-        
+
         cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)
-        query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin, position_ids)
+        query_states, key_states = apply_rotary_pos_emb(
+            query_states, key_states, cos, sin, position_ids
+        )
         # [bsz, nh, t, hd]
 
         if past_key_value is not None:
             cache_kwargs = {"sin": sin, "cos": cos}  # Specific to RoPE models
-            key_states, value_states = past_key_value.update(key_states, value_states, self.layer_idx, cache_kwargs)
-        
+            key_states, value_states = past_key_value.update(
+                key_states, value_states, self.layer_idx, cache_kwargs
+            )
+
         if use_cache:
             # Since qkv_proj is fused, query_states etc will hold a reference to the original qkv_states tensor
             # which can cause excessive memory usage by the cache. `contiguous` is a convenient way to workaround this.
@@ -90,11 +110,13 @@ class FusedLlamaAttentionForQuantizedModel(FusedBaseAttentionModule):
                 key_states,
                 value_states,
                 attn_mask=attention_mask,
-                is_causal=attention_mask is None and q_len > 1
+                is_causal=attention_mask is None and q_len > 1,
             )
             attn_weights = None
         else:
-            attn_weights = torch.matmul(query_states, key_states.transpose(2, 3)) / math.sqrt(self.head_dim)
+            attn_weights = torch.matmul(
+                query_states, key_states.transpose(2, 3)
+            ) / math.sqrt(self.head_dim)
 
             if attn_weights.size() != (bsz, self.num_heads, q_len, kv_seq_len):
                 raise ValueError(
@@ -108,10 +130,14 @@ class FusedLlamaAttentionForQuantizedModel(FusedBaseAttentionModule):
                         f"Attention mask should be of size {(bsz, 1, q_len, kv_seq_len)}, but is {attention_mask.size()}"
                     )
                 attn_weights = attn_weights + attention_mask
-                attn_weights = torch.max(attn_weights, torch.tensor(torch.finfo(attn_weights.dtype).min))
+                attn_weights = torch.max(
+                    attn_weights, torch.tensor(torch.finfo(attn_weights.dtype).min)
+                )
 
             # upcast attention to fp32
-            attn_weights = nn.functional.softmax(attn_weights, dim=-1, dtype=torch.float32).to(query_states.dtype)
+            attn_weights = nn.functional.softmax(
+                attn_weights, dim=-1, dtype=torch.float32
+            ).to(query_states.dtype)
             attn_output = torch.matmul(attn_weights, value_states)
 
         if attn_output.size() != (bsz, self.num_heads, q_len, self.head_dim):
@@ -142,12 +168,21 @@ class FusedLlamaAttentionForQuantizedModel(FusedBaseAttentionModule):
         bits: int = 4,
         disable_exllama=True,
         disable_exllamav2=False,
-        **kwargs
+        use_tritonv2=False,
+        **kwargs,
     ):
         """
         Replace all LlamaAttention modules with QuantLlamaAttention modules, fusing the q, k, v projections.
         """
-        QuantLinear = dynamically_import_QuantLinear(use_triton=use_triton, desc_act=desc_act, group_size=group_size, bits=bits, disable_exllama=disable_exllama, disable_exllamav2=disable_exllamav2)
+        QuantLinear = dynamically_import_QuantLinear(
+            use_triton=use_triton,
+            desc_act=desc_act,
+            group_size=group_size,
+            bits=bits,
+            disable_exllama=disable_exllama,
+            disable_exllamav2=disable_exllamav2,
+            use_tritonv2=use_tritonv2,
+        )
 
         for name, m in model.named_modules():
             if not isinstance(m, LlamaAttention):
@@ -157,7 +192,9 @@ class FusedLlamaAttentionForQuantizedModel(FusedBaseAttentionModule):
             k_proj = m.k_proj
             v_proj = m.v_proj
 
-            qweights = torch.cat([q_proj.qweight, k_proj.qweight, v_proj.qweight], dim=1)
+            qweights = torch.cat(
+                [q_proj.qweight, k_proj.qweight, v_proj.qweight], dim=1
+            )
             qzeros = torch.cat([q_proj.qzeros, k_proj.qzeros, v_proj.qzeros], dim=1)
             scales = torch.cat([q_proj.scales, k_proj.scales, v_proj.scales], dim=1)
 
@@ -166,13 +203,19 @@ class FusedLlamaAttentionForQuantizedModel(FusedBaseAttentionModule):
                     # TODO: support it. The issue lies maybe in the line:
                     # int groups = qzeros.size(0);
                     # in exllama_ext.cpp
-                    raise ValueError("Exllama kernel does not support query/key/value fusion with act-order. Please either use inject_fused_attention=False or disable_exllama=True.")
+                    raise ValueError(
+                        "Exllama kernel does not support query/key/value fusion with act-order. Please either use inject_fused_attention=False or disable_exllama=True."
+                    )
                 else:
                     g_idx = None
             else:
                 g_idx = torch.cat([q_proj.g_idx, k_proj.g_idx, v_proj.g_idx], dim=0)
-            
-            bias = torch.cat([q_proj.bias, k_proj.bias, v_proj.bias], dim=0) if q_proj.bias is not None else None
+
+            bias = (
+                torch.cat([q_proj.bias, k_proj.bias, v_proj.bias], dim=0)
+                if q_proj.bias is not None
+                else None
+            )
 
             qlinear_args = (
                 q_proj.bits,
@@ -192,19 +235,26 @@ class FusedLlamaAttentionForQuantizedModel(FusedBaseAttentionModule):
             qkv_layer.scales = scales
             qkv_layer.g_idx = g_idx
             qkv_layer.bias = bias
-            
+
             # Introduced in Transformers 4.36
             layer_idx = None
             if hasattr(m, "layer_idx"):
                 layer_idx = m.layer_idx
-            attn = cls(m.hidden_size, m.num_heads, qkv_layer, m.o_proj, m.rotary_emb, layer_idx=layer_idx)
+            attn = cls(
+                m.hidden_size,
+                m.num_heads,
+                qkv_layer,
+                m.o_proj,
+                m.rotary_emb,
+                layer_idx=layer_idx,
+            )
 
-            if '.' in name:
-                parent_name = name.rsplit('.', 1)[0]
-                child_name = name[len(parent_name) + 1:]
+            if "." in name:
+                parent_name = name.rsplit(".", 1)[0]
+                child_name = name[len(parent_name) + 1 :]
                 parent = model.get_submodule(parent_name)
             else:
-                parent_name = ''
+                parent_name = ""
                 parent = model
                 child_name = name
 

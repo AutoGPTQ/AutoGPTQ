@@ -5,8 +5,8 @@ import torch.nn as nn
 from torch.nn import functional as F
 from transformers.models.gptj.modeling_gptj import GPTJAttention
 
-from ._fused_base import FusedBaseAttentionModule
 from ..utils.import_utils import compare_pytorch_version, dynamically_import_QuantLinear
+from ._fused_base import FusedBaseAttentionModule
 
 
 def fixed_pos_embedding(x, seq_dim=1, seq_len=None):
@@ -15,7 +15,9 @@ def fixed_pos_embedding(x, seq_dim=1, seq_len=None):
         seq_len = x.shape[seq_dim]
     inv_freq = 1.0 / (10000 ** (torch.arange(0, dim, 2) / dim))
     sinusoid_inp = (
-        torch.einsum("i , j -> i j", torch.arange(seq_len, dtype=torch.float), inv_freq).to(x.device).float()
+        torch.einsum("i , j -> i j", torch.arange(seq_len, dtype=torch.float), inv_freq)
+        .to(x.device)
+        .float()
     )
     return torch.sin(sinusoid_inp), torch.cos(sinusoid_inp)
 
@@ -39,7 +41,10 @@ def duplicate_interleave(m):
 
 
 def apply_rotary_pos_emb(x, sincos, offset=0):
-    sin, cos = (duplicate_interleave(t)[None, offset : x.shape[1] + offset, None, :] for t in sincos)
+    sin, cos = (
+        duplicate_interleave(t)[None, offset : x.shape[1] + offset, None, :]
+        for t in sincos
+    )
     # einsum notation for lambda t: repeat(t[offset:x.shape[1]+offset,:], "n d -> () n () (d j)", j=2)
     return (x * cos) + (rotate_every_two(x) * sin)
 
@@ -51,9 +56,9 @@ class FusedGPTJAttentionForQuantizedModel(FusedBaseAttentionModule):
         max_positions = config.max_position_embeddings
         self.register_buffer(
             "bias",
-            torch.tril(torch.ones((max_positions, max_positions), dtype=torch.bool)).view(
-                1, 1, max_positions, max_positions
-            ),
+            torch.tril(
+                torch.ones((max_positions, max_positions), dtype=torch.bool)
+            ).view(1, 1, max_positions, max_positions),
         )
         self.register_buffer("masked_bias", torch.tensor(-1e9))
 
@@ -69,7 +74,9 @@ class FusedGPTJAttentionForQuantizedModel(FusedBaseAttentionModule):
                 f"embed_dim must be divisible by num_attention_heads (got `embed_dim`: {self.embed_dim} and"
                 f" `num_attention_heads`: {self.num_attention_heads})."
             )
-        self.scale_attn = torch.sqrt(torch.tensor(self.head_dim, dtype=torch.float32)).to(torch.get_default_dtype())
+        self.scale_attn = torch.sqrt(
+            torch.tensor(self.head_dim, dtype=torch.float32)
+        ).to(torch.get_default_dtype())
 
         self.qkv_proj = nn.Linear(self.embed_dim, self.embed_dim * 3, bias=False)
         self.out_proj = nn.Linear(self.embed_dim, self.embed_dim, bias=False)
@@ -96,7 +103,9 @@ class FusedGPTJAttentionForQuantizedModel(FusedBaseAttentionModule):
         elif len(tensor.shape) == 4:
             tensor = tensor.permute(0, 2, 1, 3).contiguous()
         else:
-            raise ValueError(f"Input tensor rank should be one of [4, 5], but is: {len(tensor.shape)}")
+            raise ValueError(
+                f"Input tensor rank should be one of [4, 5], but is: {len(tensor.shape)}"
+            )
         new_shape = tensor.size()[:-2] + (num_attention_heads * attn_head_size,)
         return tensor.view(new_shape)
 
@@ -110,7 +119,9 @@ class FusedGPTJAttentionForQuantizedModel(FusedBaseAttentionModule):
     ):
         # compute causal mask from causal mask buffer
         query_length, key_length = query.size(-2), key.size(-2)
-        causal_mask = self.bias[:, :, key_length - query_length: key_length, :key_length]
+        causal_mask = self.bias[
+            :, :, key_length - query_length : key_length, :key_length
+        ]
 
         # Keep the attention weights computation in fp32 to avoid overflow issues
         query = query.to(torch.float32)
@@ -121,7 +132,9 @@ class FusedGPTJAttentionForQuantizedModel(FusedBaseAttentionModule):
         mask_value = torch.finfo(attn_weights.dtype).min
         # Need to be a tensor, otherwise we get error: `RuntimeError: expected scalar type float but found double`.
         # Need to be on the same device, otherwise `RuntimeError: ..., x and y to be on the same device`
-        mask_value = torch.tensor(mask_value, dtype=attn_weights.dtype).to(attn_weights.device)
+        mask_value = torch.tensor(mask_value, dtype=attn_weights.dtype).to(
+            attn_weights.device
+        )
         attn_weights = torch.where(causal_mask, attn_weights, mask_value)
 
         attn_weights = attn_weights / self.scale_attn
@@ -166,10 +179,10 @@ class FusedGPTJAttentionForQuantizedModel(FusedBaseAttentionModule):
 
         if self.rotary_dim is not None:
             k_rot = key[:, :, :, : self.rotary_dim]
-            k_pass = key[:, :, :, self.rotary_dim:]
+            k_pass = key[:, :, :, self.rotary_dim :]
 
             q_rot = query[:, :, :, : self.rotary_dim]
-            q_pass = query[:, :, :, self.rotary_dim:]
+            q_pass = query[:, :, :, self.rotary_dim :]
 
             sincos = fixed_pos_embedding(k_rot, 1, seq_len=seq_len)
             k_rot = apply_rotary_pos_emb(k_rot, sincos, offset=offset)
@@ -209,13 +222,17 @@ class FusedGPTJAttentionForQuantizedModel(FusedBaseAttentionModule):
                 value,
                 attn_mask=None if is_causal else attention_mask,
                 dropout_p=self.attn_dropout_p,
-                is_causal=is_causal
+                is_causal=is_causal,
             )
             attn_weights = None
         else:
-            attn_output, attn_weights = self._attn(query, key, value, attention_mask, head_mask)
+            attn_output, attn_weights = self._attn(
+                query, key, value, attention_mask, head_mask
+            )
 
-        attn_output = self._merge_heads(attn_output, self.num_attention_heads, self.head_dim)
+        attn_output = self._merge_heads(
+            attn_output, self.num_attention_heads, self.head_dim
+        )
         attn_output = self.out_proj(attn_output)
         attn_output = self.resid_dropout(attn_output)
 
@@ -237,10 +254,19 @@ class FusedGPTJAttentionForQuantizedModel(FusedBaseAttentionModule):
         bits: int = 4,
         disable_exllama=True,
         disable_exllamav2=False,
-        **kwargs
+        use_tritonv2=False,
+        **kwargs,
     ):
         config = model.config
-        QuantLinear = dynamically_import_QuantLinear(use_triton=use_triton, desc_act=desc_act, group_size=group_size, bits=bits, disable_exllama=disable_exllama, disable_exllamav2=disable_exllamav2)
+        QuantLinear = dynamically_import_QuantLinear(
+            use_triton=use_triton,
+            desc_act=desc_act,
+            group_size=group_size,
+            bits=bits,
+            disable_exllama=disable_exllama,
+            disable_exllamav2=disable_exllamav2,
+            use_tritonv2=use_tritonv2,
+        )
 
         for name, m in model.named_modules():
             if not isinstance(m, GPTJAttention):
@@ -252,20 +278,28 @@ class FusedGPTJAttentionForQuantizedModel(FusedBaseAttentionModule):
             k_proj = m.k_proj
             v_proj = m.v_proj
 
-            qweights = torch.cat([q_proj.qweight, k_proj.qweight, v_proj.qweight], dim=1)
+            qweights = torch.cat(
+                [q_proj.qweight, k_proj.qweight, v_proj.qweight], dim=1
+            )
             qzeros = torch.cat([q_proj.qzeros, k_proj.qzeros, v_proj.qzeros], dim=1)
             scales = torch.cat([q_proj.scales, k_proj.scales, v_proj.scales], dim=1)
 
             if QuantLinear.QUANT_TYPE == "exllama":
                 if desc_act:
                     # See fused_llama_attn.py comment
-                    raise ValueError("Exllama kernel does not support query/key/value fusion with act-order. Please either use inject_fused_attention=False or disable_exllama=True.")
+                    raise ValueError(
+                        "Exllama kernel does not support query/key/value fusion with act-order. Please either use inject_fused_attention=False or disable_exllama=True."
+                    )
                 else:
                     g_idx = None
             else:
                 g_idx = torch.cat([q_proj.g_idx, k_proj.g_idx, v_proj.g_idx], dim=0)
 
-            bias = torch.cat([q_proj.bias, k_proj.bias, v_proj.bias], dim=0) if q_proj.bias is not None else None
+            bias = (
+                torch.cat([q_proj.bias, k_proj.bias, v_proj.bias], dim=0)
+                if q_proj.bias is not None
+                else None
+            )
 
             qlinear_args = (
                 q_proj.bits,
@@ -278,7 +312,7 @@ class FusedGPTJAttentionForQuantizedModel(FusedBaseAttentionModule):
             if (not desc_act or group_size == -1) and not use_triton:
                 qlinear_kwargs["use_cuda_fp16"] = use_cuda_fp16
             qlinear_kwargs["weight_dtype"] = q_proj.scales.dtype
-            
+
             qkv_proj = QuantLinear(*qlinear_args, **qlinear_kwargs)
             qkv_proj.qweight = qweights
             qkv_proj.qzeros = qzeros
@@ -286,12 +320,12 @@ class FusedGPTJAttentionForQuantizedModel(FusedBaseAttentionModule):
             qkv_proj.g_idx = g_idx
             qkv_proj.bias = bias
 
-            if '.' in name:
-                parent_name = name.rsplit('.', 1)[0]
-                child_name = name[len(parent_name) + 1:]
+            if "." in name:
+                parent_name = name.rsplit(".", 1)[0]
+                child_name = name[len(parent_name) + 1 :]
                 parent = model.get_submodule(parent_name)
             else:
-                parent_name = ''
+                parent_name = ""
                 parent = model
                 child_name = name
 
