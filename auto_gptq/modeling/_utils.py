@@ -116,6 +116,7 @@ def make_quant(
                 (not (desc_act) or group_size == -1)
                 and not use_triton
                 and not use_qigen
+                and not use_tritonv2
             ):
                 new_layer = QuantLinear(
                     bits,
@@ -153,6 +154,7 @@ def make_quant(
             disable_exllama=disable_exllama,
             disable_exllamav2=disable_exllamav2,
             use_qigen=use_qigen,
+            use_tritonv2=use_tritonv2,
         )
 
 

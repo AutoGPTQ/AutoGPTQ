@@ -842,6 +842,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         trainable: bool = False,
         disable_exllama: Optional[bool] = None,
         disable_exllamav2: bool = False,
+        use_tritonv2: bool = False,
         **kwargs,
     ):
         """load quantized model from local disk"""
@@ -863,7 +864,6 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         revision = kwargs.pop("revision", None)
         subfolder = kwargs.pop("subfolder", "")
         commit_hash = kwargs.pop("_commit_hash", None)
-        use_tritonv2 = kwargs.pop("use_tritonv2", False)
 
         if use_triton and use_tritonv2:
             logging.warn(
@@ -1123,10 +1123,11 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             if low_cpu_mem_usage:
                 make_sure_no_tensor_in_meta_device(
                     model,
-                    use_triton or use_tritonv2,
+                    use_triton,
                     quantize_config.desc_act,
                     quantize_config.group_size,
                     bits=quantize_config.bits,
+                    use_tritonv2=use_tritonv2,
                 )
 
             # TODO: move this logic in an awq_utils.py file.
@@ -1496,10 +1497,11 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         # == step7: make model compatible with peft
         cls.make_sure_compatible_with_peft(
             model,
-            use_triton or use_tritonv2,
+            use_triton,
             quantize_config.desc_act,
             quantize_config.group_size,
             bits=quantize_config.bits,
+            use_tritonv2=use_tritonv2,
         )
 
         return cls(
@@ -1545,10 +1547,13 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         desc_act: bool,
         group_size: int,
         bits: int,
+        use_tritonv2: bool = False,
     ):
         GeneralQuantLinear.inject_to_model(
             model,
-            dynamically_import_QuantLinear(use_triton, desc_act, group_size, bits=bits),
+            dynamically_import_QuantLinear(
+                use_triton, desc_act, group_size, bits=bits, use_tritonv2=use_tritonv2
+            ),
         )
 
     def __getattr__(self, item):

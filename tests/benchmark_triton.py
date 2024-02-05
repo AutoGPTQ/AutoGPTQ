@@ -1,4 +1,4 @@
-import itertools
+import argparse
 import os
 
 import torch
@@ -12,7 +12,7 @@ from auto_gptq import AutoGPTQForCausalLM
 MODEL_ID = "TheBloke/Llama-7B-GPTQ"
 DATASET_ID = "timdettmers/openassistant-guanaco"
 LEARNING_RATE = 3e-5
-MAX_SEQ_LEN = 10
+MAX_SEQ_LEN = 2048
 BATCH_SIZE = 5
 NUM_TRAIN_STEPS = 10
 
@@ -48,7 +48,7 @@ def benchmark_forward(
         num_threads=torch.get_num_threads(),
     )
     if repeats == "auto":
-        m = t.blocked_autorange()
+        m = t.adaptive_autorange()
     else:
         m = t.timeit(repeats)
     if verbose:
@@ -117,9 +117,13 @@ def get_hf_model(model_id=MODEL_ID, **model_kwargs):
 
 def get_model_and_tokenizer(
     model_id=MODEL_ID,
+    trainable=False,
+    use_triton=False,
+    use_tritonv2=False,
+    disable_exllama=True,
+    disable_exllamav2=True,
     inject_fused_attention=False,
     inject_fused_mlp=False,
-    **model_kwargs,
 ):
     tokenizer = AutoTokenizer.from_pretrained(
         MODEL_ID,
@@ -130,12 +134,13 @@ def get_model_and_tokenizer(
 
     model = AutoGPTQForCausalLM.from_quantized(
         model_id,
-        trainable=True,
+        trainable=trainable,
+        use_triton=use_triton,
+        use_tritonv2=use_tritonv2,
+        disable_exllamav2=disable_exllamav2,
+        disable_exllama=disable_exllama,
         inject_fused_attention=inject_fused_attention,
         inject_fused_mlp=inject_fused_mlp,
-        disable_exllamav2=True,
-        disable_exllama=True,
-        **model_kwargs,
     )
 
     model.warmup_triton()
@@ -204,53 +209,120 @@ def get_data_loader(dataset_id, tokenizer, max_length=MAX_SEQ_LEN, batch_size=5)
     return data_loader
 
 
-def setup(model_id, dataset_id, max_seq_length, batch_size):
+def setup(model_id, use_triton=False, use_tritonv2=True):
     ref_model, tokenizer = get_model_and_tokenizer(
         model_id=model_id,
-        use_triton=True,
         inject_fused_attention=False,
         inject_fused_mlp=False,
     )
+    assert not (use_triton and use_tritonv2), "Cannot use both triton and tritonv2"
     test_model, _ = get_model_and_tokenizer(
         model_id=model_id,
-        use_tritonv2=True,
+        use_triton=use_triton,
+        use_tritonv2=use_tritonv2,
         inject_fused_attention=False,
         inject_fused_mlp=False,
     )
 
-    data_loader = get_data_loader(
-        dataset_id, tokenizer, max_length=max_seq_length, batch_size=batch_size
-    )
+    # data_loader = get_data_loader(
+    #     dataset_id, tokenizer, max_length=max_seq_length, batch_size=batch_size
+    # )
 
-    return ref_model, test_model, data_loader
+    return ref_model, test_model  # , data_loader
 
 
 # out = model(**batch)
-def test_triton_qlinear():
-    ref_model, _ = get_model_and_tokenizer(
-        model_id=MODEL_ID,
-        use_triton=True,
-        inject_fused_attention=False,
-        inject_fused_mlp=False,
+def run_benchmark(model_id, use_tritonv2, max_seq_len, batch_size):
+    model, tokenizer = get_model_and_tokenizer(
+        model_id=model_id, use_tritonv2=use_tritonv2, use_triton=not use_tritonv2
     )
-    test_model, _ = get_model_and_tokenizer(
-        model_id=MODEL_ID,
-        use_tritonv2=True,
-        inject_fused_attention=False,
-        inject_fused_mlp=False,
+    data_loader = get_data_loader(
+        dataset_id=DATASET_ID,
+        tokenizer=tokenizer,
+        max_length=max_seq_len,
+        batch_size=batch_size,
     )
+    batch = next(iter(data_loader))
+    benchmark_forward(
+        model, **batch, desc="Tritonv2" if use_tritonv2 else "Triton", verbose=True
+    )
+
+
+def run_test(model_id, use_tritonv2=True, batch_size=1, max_seq_len=10, seed=3407):
+    ref_model, test_model = setup(
+        model_id=model_id,
+        use_triton=not use_tritonv2,
+        use_tritonv2=use_tritonv2,
+    )
+    torch.manual_seed(seed)
     hidden_size = ref_model.model.model.embed_tokens.weight.shape[1]
-    test_data = torch.randn((1, 2048, hidden_size), dtype=torch.float16).cuda()
+    test_data = torch.randn(
+        (batch_size, max_seq_len, hidden_size), dtype=torch.float16
+    ).cuda()
+    from auto_gptq.nn_modules.qlinear import qlinear_cuda, qlinear_cuda_old
 
-    qlinear_ref = ref_model.model.model.layers[0].self_attn.q_proj
-    qlinear_test = test_model.model.model.layers[0].self_attn.q_proj
+    for i, (ref_layer, test_layer) in enumerate(
+        zip(ref_model.model.model.layers, test_model.model.model.layers)
+    ):
+        ref_attn, test_attn = ref_layer.self_attn, test_layer.self_attn
 
-    # test_batch = next(iter(data_loader))
-    test_out = qlinear_test(test_data)
-    ref_out = qlinear_ref(test_data)
-    print(f"Mean diff: {torch.mean(torch.abs(test_out - ref_out))}")
-    benchmark_forward(qlinear_ref, test_data, desc="Triton", verbose=True)
-    benchmark_forward(qlinear_test, test_data, desc="Triton-v2", verbose=True)
+        for k in ["q_proj", "k_proj", "v_proj", "o_proj"]:
+            ref_out = getattr(ref_attn, k)(test_data)
+            test_out = getattr(test_attn, k)(test_data)
+            print(f"Layer {i} self_attn {k}: diff={get_diff(test_out, ref_out)}")
+        print()
+        ref_mlp, test_mlp = ref_layer.mlp, test_layer.mlp
+        down_proj_input = torch.randn(
+            batch_size, max_seq_len, ref_mlp.intermediate_size, dtype=torch.float16
+        ).cuda()
+        for k in ["gate_proj", "up_proj", "down_proj"]:
+            if k == "down_proj":
+                ref_out = getattr(ref_mlp, k)(down_proj_input)
+                test_out = getattr(test_mlp, k)(down_proj_input)
+            else:
+                ref_out = getattr(ref_mlp, k)(test_data)
+                test_out = getattr(test_mlp, k)(test_data)
+                print(
+                    f"Layer {i} mlp {k}: diff={get_diff(test_out, ref_out)}"
+                )  # , get_diff(test_out.logits, ref_out.logits)
+        print()
+    # torch.testing.assert_allclose(test_out.logits, ref_out.logits, rtol=3e-5, atol=2e-2)
 
 
-test_triton_qlinear()
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter
+    )
+    parser.add_argument("--model_id", type=str, default=MODEL_ID, help="Model ID")
+    parser.add_argument(
+        "--max_seq_len", type=int, default=MAX_SEQ_LEN, help="Max sequence length"
+    )
+    parser.add_argument("--batch_size", type=int, default=BATCH_SIZE, help="Batch size")
+    parser.add_argument("--use_tritonv2", action="store_true", help="Use Tritonv2")
+    parser.add_argument(
+        "--test", action="store_true", help="Test triton vs triton-v2 outputs"
+    )
+    parser.add_argument(
+        "--test_kernel",
+        type=str,
+        default="tritonv2",
+        choices=["triton", "tritonv2"],
+        help="Whether to compare triton or tritonv2 against cuda-old ref",
+    )
+    args = parser.parse_args()
+    if args.test:
+        use_tritonv2 = True if args.test_kernel == "tritonv2" else False
+        use_triton = not use_tritonv2
+        print(
+            "Testing qlinear outputs between ref (cuda_old) vs {}".format(
+                "Tritonv2" if use_tritonv2 else "Triton"
+            )
+        )
+
+        run_test(
+            args.model_id,
+            use_tritonv2=use_tritonv2,
+        )
+    else:
+        print("Running benchmark...")
+        run_benchmark(args.use_tritonv2, args.max_seq_len, args.batch_size)
