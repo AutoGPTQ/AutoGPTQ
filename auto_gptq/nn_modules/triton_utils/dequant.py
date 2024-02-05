@@ -84,8 +84,11 @@ def dequant_kernel_248(
     tl.store(out_ptr + (x_index), weights, mask=xmask)
 
 
-def dequant248(qweight, scales, qzeros, g_idx, bits, maxq=None, X_BLOCK=1024):
-    # elements_per_feature = 32 // bits
+def dequant248(qweight, scales, qzeros, g_idx, bits, maxq=None):
+    """
+    Launcher for triton dequant kernel.  Only valid for bits = 2, 4, 8
+    """
+
     num_groups = scales.shape[0]
     outfeatures = scales.shape[1]
     infeatures = g_idx.shape[0]
@@ -106,7 +109,6 @@ def dequant248(qweight, scales, qzeros, g_idx, bits, maxq=None, X_BLOCK=1024):
         bits=bits,
         outfeatures=outfeatures,
         num_groups=num_groups,
-        # X_BLOCK=X_BLOCK,
     )
     return out
 
