@@ -19,6 +19,7 @@ from auto_gptq.nn_modules.qlinear import (
     qlinear_tritonv2,
 )
 
+FIXTURES_PATH = Path(__file__).parent.absolute() / "fixtures"
 COLORS = itertools.cycle(plt.rcParams["axes.prop_cycle"].by_key()["color"])
 STYLES = itertools.cycle(["solid", "dashed", "dashdot", "dotted"])
 
@@ -31,14 +32,14 @@ class GPTQState:
     qzeros: torch.Tensor
     scales: torch.Tensor
     g_idx: torch.Tensor
-    wf: torch.Tensor
+    # wf: torch.Tensor
     bits: int
     maxq: int
     group_size: int
 
 
-def down_load_test_modules(save_dir="./fixtures"):
-
+def download_test_modules(save_dir):
+    print("Downloading pre-quantized llama and mistral models...")
     from transformers import AutoModelForCausalLM
 
     dtype = torch.float16
@@ -58,10 +59,10 @@ def down_load_test_modules(save_dir="./fixtures"):
         model_name = model.model.__class__.__name__
         torch.save(
             model.model.layers[0].self_attn,
-            f"./{save_dir}/gptq_{model_name}_self_attn0_layer0.pt",
+            f"{save_dir}/gptq_{model_name}_self_attn0_layer0.pt",
         )
         torch.save(
-            model.model.layers[0].mlp, f"./{save_dir}/gptq_{model_name}_mlp_layer0.pt"
+            model.model.layers[0].mlp, f"{save_dir}/gptq_{model_name}_mlp_layer0.pt"
         )
 
 
@@ -94,9 +95,6 @@ def make_perf_report(
     return triton.testing.perf_report(bench)
 
 
-FIXTURES_PATH = Path(__file__).parent.absolute() / "fixtures"
-
-
 def get_qstate(fixtures_path, model="llama", module="self_attn", layer="q_proj"):
     module_paths = os.listdir(fixtures_path)
     try:
@@ -116,7 +114,6 @@ def get_qstate(fixtures_path, model="llama", module="self_attn", layer="q_proj")
         qzeros=layer.qzeros.cuda(),
         scales=layer.scales.cuda(),
         g_idx=layer.g_idx.cuda(),
-        wf=layer.wf.cuda(),
         bits=layer.bits,
         maxq=layer.maxq,
         group_size=layer.group_size,
@@ -166,7 +163,6 @@ def get_qlayers(
         linear.qzeros = qstate.qzeros
         linear.scales = qstate.scales
         linear.g_idx = qstate.g_idx
-        linear.wf = qstate.wf
         linear.maxq = qstate.maxq
         if isinstance(linear, qlinear_exllama.QuantLinear) or isinstance(
             linear, qlinear_exllamav2.QuantLinear
@@ -248,7 +244,10 @@ if __name__ == "__main__":
         "--layer", type=str, default="q_proj", help="Layer name in module to benchmark"
     )
     args = parser.parse_args()
-    qstate: GPTQState = get_qstate(
-        args.fixtures_path, args.model, args.module, args.layer
-    )
+    fixtures_path = args.fixtures_path
+    if not os.path.exists(fixtures_path):
+        os.makedirs(fixtures_path)
+        download_test_modules(fixtures_path)
+
+    qstate: GPTQState = get_qstate(fixtures_path, args.model, args.module, args.layer)
     run_bench(qstate)
