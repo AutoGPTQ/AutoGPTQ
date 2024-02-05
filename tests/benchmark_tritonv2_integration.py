@@ -24,6 +24,7 @@ def get_diff(a, ref):
     return f"Maxdiff: {(a - ref).abs().max()}, Mean relative diff: {((a - ref).abs() / (ref.abs() + eps)).mean()}"
 
 
+#Adapted from https://github.com/Dao-AILab/flash-attention/blob/main/flash_attn/utils/benchmark.py
 def benchmark_forward(
     fn,
     *inputs,
@@ -312,66 +313,66 @@ def run_test(model_id, use_tritonv2=True, batch_size=1, max_seq_len=10, seed=340
             else:
                 ref_out = getattr(ref_mlp, k)(test_data)
                 test_out = getattr(test_mlp, k)(test_data)
-                print(
-                    f"Layer {i} mlp {k}: diff={get_diff(test_out, ref_out)}"
-                )  # , get_diff(test_out.logits, ref_out.logits)
+            print(
+                f"Layer {i} mlp {k}: diff={get_diff(test_out, ref_out)}"
+            )  # , get_diff(test_out.logits, ref_out.logits)
         print()
     # torch.testing.assert_allclose(test_out.logits, ref_out.logits, rtol=3e-5, atol=2e-2)
 
 
-get_hf_model()
+# get_hf_model()
 
-# if __name__ == "__main__":
-#     parser = argparse.ArgumentParser(
-#         formatter_class=argparse.ArgumentDefaultsHelpFormatter
-#     )
-#     parser.add_argument("--model_id", type=str, default=MODEL_ID, help="Model ID")
-#     parser.add_argument(
-#         "--max_seq_len",
-#         type=int,
-#         default=MAX_SEQ_LEN,
-#         help="Max sequence length for benchmarking",
-#     )
-#     parser.add_argument(
-#         "--batch_size", type=int, default=BATCH_SIZE, help="Batch size for benchmarking"
-#     )
-#     parser.add_argument("--use_tritonv2", action="store_true", help="Use Tritonv2")
-#     parser.add_argument(
-#         "--benchmark_kernel",
-#         type=str,
-#         default="tritonv2",
-#         choices=["triton", "tritonv2", "exllama", "exllamav2", "default"],
-#         help="Run benchmark",
-#     )
-#     parser.add_argument(
-#         "--test", action="store_true", help="Test triton vs triton-v2 outputs"
-#     )
-#     parser.add_argument(
-#         "--test_kernel",
-#         type=str,
-#         default="tritonv2",
-#         choices=["triton", "tritonv2"],
-#         help="Whether to compare triton or tritonv2 against cuda-old ref",
-#     )
-#     args = parser.parse_args()
-#     if args.test:
-#         use_tritonv2 = True if args.test_kernel == "tritonv2" else False
-#         use_triton = not use_tritonv2
-#         print(
-#             "Testing qlinear outputs between ref (cuda_old) vs {}".format(
-#                 "Tritonv2" if use_tritonv2 else "Triton"
-#             )
-#         )
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter
+    )
+    parser.add_argument("--model_id", type=str, default=MODEL_ID, help="Model ID")
+    parser.add_argument(
+        "--max_seq_len",
+        type=int,
+        default=MAX_SEQ_LEN,
+        help="Max sequence length for benchmarking",
+    )
+    parser.add_argument(
+        "--batch_size", type=int, default=BATCH_SIZE, help="Batch size for benchmarking"
+    )
+    parser.add_argument("--use_tritonv2", action="store_true", help="Use Tritonv2")
+    parser.add_argument(
+        "--benchmark_kernel",
+        type=str,
+        default="tritonv2",
+        choices=["triton", "tritonv2", "exllama", "exllamav2", "default"],
+        help="Run benchmark",
+    )
+    parser.add_argument(
+        "--test", action="store_true", help="Test triton vs triton-v2 outputs"
+    )
+    parser.add_argument(
+        "--test_kernel",
+        type=str,
+        default="tritonv2",
+        choices=["triton", "tritonv2"],
+        help="Whether to compare triton or tritonv2 against cuda-old ref",
+    )
+    args = parser.parse_args()
+    if args.test:
+        use_tritonv2 = True if args.test_kernel == "tritonv2" else False
+        use_triton = not use_tritonv2
+        print(
+            "Testing qlinear outputs between ref (cuda_old) vs {}".format(
+                "Tritonv2" if use_tritonv2 else "Triton"
+            )
+        )
 
-#         run_test(
-#             args.model_id,
-#             use_tritonv2=use_tritonv2,
-#         )
-#     else:
-#         print("Running benchmark...")
-#         run_benchmark(
-#             args.model_id,
-#             kernel=args.benchmark_kernel,
-#             max_seq_len=args.max_seq_len,
-#             batch_size=args.batch_size,
-#         )
+        run_test(
+            args.model_id,
+            use_tritonv2=use_tritonv2,
+        )
+    else:
+        print("Running benchmark...")
+        run_benchmark(
+            args.model_id,
+            kernel=args.benchmark_kernel,
+            max_seq_len=args.max_seq_len,
+            batch_size=args.batch_size,
+        )

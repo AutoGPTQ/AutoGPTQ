@@ -243,6 +243,9 @@ if __name__ == "__main__":
     parser.add_argument(
         "--layer", type=str, default="q_proj", help="Layer name in module to benchmark"
     )
+    parser.add_argument(
+        "--check", action="store_true", help="Check outputs against qlinear_cuda_old"
+    )
     args = parser.parse_args()
     fixtures_path = args.fixtures_path
     if not os.path.exists(fixtures_path):
@@ -250,4 +253,4 @@ if __name__ == "__main__":
         download_test_modules(fixtures_path)
 
     qstate: GPTQState = get_qstate(fixtures_path, args.model, args.module, args.layer)
-    run_bench(qstate)
+    run_bench(qstate, check=args.check)
