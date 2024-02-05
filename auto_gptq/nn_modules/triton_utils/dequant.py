@@ -1,15 +1,22 @@
-import triton
+import itertools
 
+import torch
+import triton
 import triton.language as tl
 from torch.cuda.amp import custom_bwd, custom_fwd
-import torch
-import itertools
+
+
 def make_dequant_configs(block_sizes, num_warps):
     configs = []
     for bs, ws in itertools.product(block_sizes, num_warps):
         configs.append(triton.Config({"X_BLOCK": bs}, num_warps=ws))
-        
+    return configs
+
+
 DEFAULT_DEQUANT_CONFIGS = make_dequant_configs([128, 256, 512, 1024], [4, 8])
+
+
+@triton.autotune(DEFAULT_DEQUANT_CONFIGS, key=["numels"])
 @triton.jit
 def dequant_kernel_248(
     g_idx_ptr,
@@ -28,37 +35,34 @@ def dequant_kernel_248(
     xoffset = tl.program_id(0) * X_BLOCK
     x_index = xoffset + tl.arange(0, X_BLOCK)
     xmask = x_index < numels
-    row_idx = x_index // outfeatures  
-    col_idx = x_index % outfeatures  
+    row_idx = x_index // outfeatures
+    col_idx = x_index % outfeatures
 
     elements_per_feature: tl.constexpr = 32 // bits
 
     # Load parameters
-    g_idx = tl.load(
-        g_idx_ptr + (row_idx), None, eviction_policy="evict_last"
-    )  
+    g_idx = tl.load(g_idx_ptr + (row_idx), None, eviction_policy="evict_last")
     qweights = tl.load(
         qweight_ptr + (col_idx + (outfeatures * (row_idx // elements_per_feature))),
         None,
-    )  
+    )
 
     wf_weights = (row_idx % elements_per_feature) * bits
 
     wf_zeros = (col_idx % elements_per_feature) * bits
-    tl.static_print("wf_zeros shape: ", wf_zeros.shape)
 
-    tmp1 = g_idx + num_groups  
+    tmp1 = g_idx + num_groups
     tmp2 = g_idx < 0
     tl.device_assert(g_idx >= 0, "index out of bounds: 0 <= tmp0 < 0")
     groups = tl.where(tmp2, tmp1, g_idx)  # tmp3 are g_idx
 
     scales = tl.load(scales_ptr + (col_idx + (outfeatures * groups)), None).to(
         tl.float32
-    )  
+    )
 
     # Unpack weights
     weights = qweights >> wf_weights  # bit shift qweight
-    
+
     weights = weights & maxq
 
     # Unpack zeros
@@ -66,18 +70,18 @@ def dequant_kernel_248(
     qzeros = tl.load(
         qzeros_ptr + ((qzero_ncols * groups) + (col_idx // elements_per_feature)),
         None,
-        eviction_policy="evict_last",  
+        eviction_policy="evict_last",
     )
-    zeros = qzeros >> wf_zeros  
-    zeros = zeros & maxq  
+    zeros = qzeros >> wf_zeros
+    zeros = zeros & maxq
 
     # Dequantize
-    zeros = zeros + 1  
-    weights = weights - zeros  
+    zeros = zeros + 1
+    weights = weights - zeros
     weights = weights.to(tl.float32)
-    weights = scales * weights 
+    weights = scales * weights
 
-    tl.store(out_ptr + (x_index), weights, mask=xmask)  
+    tl.store(out_ptr + (x_index), weights, mask=xmask)
 
 
 def dequant248(qweight, scales, qzeros, g_idx, bits, maxq=None, X_BLOCK=1024):
@@ -102,10 +106,9 @@ def dequant248(qweight, scales, qzeros, g_idx, bits, maxq=None, X_BLOCK=1024):
         bits=bits,
         outfeatures=outfeatures,
         num_groups=num_groups,
-        X_BLOCK=X_BLOCK,
+        # X_BLOCK=X_BLOCK,
     )
     return out
-
 
 
 def quant_matmul_248(
