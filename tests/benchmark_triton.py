@@ -116,17 +116,17 @@ def get_hf_model(model_id=MODEL_ID, **model_kwargs):
 
 
 def get_model_and_tokenizer(
-    model_id=MODEL_ID,
-    trainable=False,
+    model_id,
     use_triton=False,
     use_tritonv2=False,
     disable_exllama=True,
     disable_exllamav2=True,
+    trainable=False,
     inject_fused_attention=False,
     inject_fused_mlp=False,
 ):
     tokenizer = AutoTokenizer.from_pretrained(
-        MODEL_ID,
+        model_id,
         use_fast=True,
     )
     if not tokenizer.pad_token_id:
@@ -142,8 +142,9 @@ def get_model_and_tokenizer(
         inject_fused_attention=inject_fused_attention,
         inject_fused_mlp=inject_fused_mlp,
     )
+    if use_triton or use_tritonv2:
+        model.warmup_triton()
 
-    model.warmup_triton()
     return model, tokenizer
 
 
@@ -232,9 +233,36 @@ def setup(model_id, use_triton=False, use_tritonv2=True):
 
 
 # out = model(**batch)
-def run_benchmark(model_id, use_tritonv2, max_seq_len, batch_size):
+def run_benchmark(
+    model_id,
+    kernel,
+    max_seq_len,
+    batch_size,
+    use_triton=False,
+    use_tritonv2=False,
+    disable_exllama=True,
+    disable_exllamav2=True,
+):
+    if kernel == "triton":
+        print("Benchmarking triton kernel...")
+        use_triton = True
+    elif kernel == "tritonv2":
+        print("Benchmarking tritonv2 kernel...")
+        use_tritonv2 = True
+    elif kernel == "exllama":
+        print("Benchmarking exllama kernel...")
+        disable_exllama = False
+    elif kernel == "exllamav2":
+        print("Benchmarking exllamav2 kernel...")
+        disable_exllamav2 = False
+    else:
+        print("Benchmarking default kernel...")
     model, tokenizer = get_model_and_tokenizer(
-        model_id=model_id, use_tritonv2=use_tritonv2, use_triton=not use_tritonv2
+        model_id=model_id,
+        use_triton=use_triton,
+        use_tritonv2=use_tritonv2,
+        disable_exllama=disable_exllama,
+        disable_exllamav2=disable_exllamav2,
     )
     data_loader = get_data_loader(
         dataset_id=DATASET_ID,
@@ -259,7 +287,6 @@ def run_test(model_id, use_tritonv2=True, batch_size=1, max_seq_len=10, seed=340
     test_data = torch.randn(
         (batch_size, max_seq_len, hidden_size), dtype=torch.float16
     ).cuda()
-    from auto_gptq.nn_modules.qlinear import qlinear_cuda, qlinear_cuda_old
 
     for i, (ref_layer, test_layer) in enumerate(
         zip(ref_model.model.model.layers, test_model.model.model.layers)
@@ -295,10 +322,22 @@ if __name__ == "__main__":
     )
     parser.add_argument("--model_id", type=str, default=MODEL_ID, help="Model ID")
     parser.add_argument(
-        "--max_seq_len", type=int, default=MAX_SEQ_LEN, help="Max sequence length"
+        "--max_seq_len",
+        type=int,
+        default=MAX_SEQ_LEN,
+        help="Max sequence length for benchmarking",
     )
-    parser.add_argument("--batch_size", type=int, default=BATCH_SIZE, help="Batch size")
+    parser.add_argument(
+        "--batch_size", type=int, default=BATCH_SIZE, help="Batch size for benchmarking"
+    )
     parser.add_argument("--use_tritonv2", action="store_true", help="Use Tritonv2")
+    parser.add_argument(
+        "--benchmark_kernel",
+        type=str,
+        default="tritonv2",
+        choices=["triton", "tritonv2", "exllama", "exllamav2", "default"],
+        help="Run benchmark",
+    )
     parser.add_argument(
         "--test", action="store_true", help="Test triton vs triton-v2 outputs"
     )
@@ -325,4 +364,9 @@ if __name__ == "__main__":
         )
     else:
         print("Running benchmark...")
-        run_benchmark(args.use_tritonv2, args.max_seq_len, args.batch_size)
+        run_benchmark(
+            args.model_id,
+            kernel=args.benchmark_kernel,
+            max_seq_len=args.max_seq_len,
+            batch_size=args.batch_size,
+        )
