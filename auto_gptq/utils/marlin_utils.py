@@ -140,7 +140,9 @@ def convert_to_marlin(model, model_quantlinear, quantization_config, repack: boo
             dequantized_weight = dequantized_weight.to(torch.float16)
 
             if not torch.all(dequantized_qzeros == 8):
-                raise ValueError(f"Marlin kernel is compatible only with checkpoints using symetric quantization. Found non-symmetric quantization for the weight {name}.")
+                raise ValueError(
+                    f"Marlin kernel is compatible only with checkpoints using symetric quantization. "
+                     "Found non-symmetric quantization for the weight {name}.")
 
             linear_module = torch.nn.Linear(
                 in_features=dequantized_weight.shape[1],
@@ -153,9 +155,6 @@ def convert_to_marlin(model, model_quantlinear, quantization_config, repack: boo
 
             if bias is not None:
                 linear_module.bias.data.copy_(bias)
-
-            in_features = linear_module.in_features
-            out_features = linear_module.out_features
         else:
             linear_module = torch.nn.Linear(
                 in_features=module.infeatures, 

@@ -152,6 +152,7 @@ class BaseQuantizeConfig(PushToHubMixin):
             "model_name_or_path": self.model_name_or_path,
             "model_file_base_name": self.model_file_base_name,
             "is_marlin_format": self.is_marlin_format,
+            "quant_method": "gptq"
         }
 
 
@@ -566,7 +567,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             raise EnvironmentError("can only save quantized model, please execute .quantize first.")
 
         self.model.to(CPU)
-
+        
         model_base_name = self.quantize_config.model_file_base_name or f"gptq_model-{self.quantize_config.bits}bit-{self.quantize_config.group_size}g"
         if use_safetensors:
             model_save_name = model_base_name + ".safetensors"
@@ -599,7 +600,6 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             # otherwise it raises an OSError
             safetensors_metadata['format'] = "pt"
 
-            
             # Store the quantization configuration as safetensors metadata
             from auto_gptq import __version__
             safetensors_metadata['auto_gptq_version'] = str(__version__)
@@ -614,6 +614,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             model_save_name = model_base_name + ".bin"
             torch.save(self.model.state_dict(), join(save_dir, model_save_name))
 
+        self.model.config.quantization_config = self.quantize_config.to_dict()
         self.model.config.save_pretrained(save_dir)
         self.quantize_config.save_pretrained(save_dir)
         self.quantize_config.model_name_or_path = save_dir
