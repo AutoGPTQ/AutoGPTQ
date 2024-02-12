@@ -28,11 +28,13 @@ from ._utils import *
 from ._utils import unpack_awq, pack_from_tensors
 from ..nn_modules.qlinear import GeneralQuantLinear
 from ..nn_modules._fused_base import FusedBaseAttentionModule, FusedBaseMLPModule
-from ..nn_modules.qlinear.qlinear_marlin import _validate_marlin_compatibility
 from ..quantization import GPTQ
+from ..utils.marlin_utils import (
+    prepare_model_for_marlin_load, _validate_marlin_compatibility, _validate_marlin_device_support
+)
 from ..utils.data_utils import collate_data
 from ..utils.import_utils import (
-    dynamically_import_QuantLinear, TRITON_AVAILABLE, AUTOGPTQ_CUDA_AVAILABLE, EXLLAMA_KERNELS_AVAILABLE, QIGEN_AVAILABLE, EXLLAMAV2_KERNELS_AVAILABLE
+    dynamically_import_QuantLinear, TRITON_AVAILABLE, AUTOGPTQ_CUDA_AVAILABLE, EXLLAMA_KERNELS_AVAILABLE, QIGEN_AVAILABLE, EXLLAMAV2_KERNELS_AVAILABLE, MARLIN_AVAILABLE
 )
 from tqdm import tqdm
 import huggingface_hub
@@ -58,6 +60,7 @@ class BaseQuantizeConfig(PushToHubMixin):
     static_groups: bool = field(default=False)
     sym: bool = field(default=True)
     true_sequential: bool = field(default=True)
+    is_marlin_format: bool = field(default=False)
     model_name_or_path: Optional[str] = field(default=None)
     model_file_base_name: Optional[str] = field(default=None)
     awq_gemm_checkpoint: Optional[bool] = field(default=False)
@@ -89,7 +92,8 @@ class BaseQuantizeConfig(PushToHubMixin):
         subfolder = kwargs.pop("subfolder", None)
         commit_hash = kwargs.pop("_commit_hash", None)
 
-        for quantize_config_filename in ["quantize_config.json", "quant_config.json"]:
+        transformers_config = False
+        for quantize_config_filename in ["quantize_config.json", "quant_config.json", "config.json"]:
             if os.path.isdir(save_dir):  # Local
                 resolved_config_file = join(save_dir, quantize_config_filename)
             else: # Remote
@@ -109,14 +113,20 @@ class BaseQuantizeConfig(PushToHubMixin):
                     _commit_hash=commit_hash,
                 )
             if resolved_config_file is not None:
+                if quantize_config_filename == "config.json":
+                    transformers_config = True
                 break
-
+                    
         if resolved_config_file is None:
-            raise ValueError("No quantize_config.json or quant_config.json file was found in the model repository.")
+            raise ValueError("No quantize_config.json, quant_config.json or config.json file was found in the model repository.")            
         
         field_names = [field.name for field in fields(cls)]
         with open(resolved_config_file, "r", encoding="utf-8") as f:
             args_from_json = json.load(f)
+            
+            if transformers_config:
+                args_from_json = args_from_json["quantization_config"]
+            
             filtered_args = {"awq_gemm_checkpoint": False}
             for key, val in args_from_json.items():
                 if key == "version" and val == "GEMM":
@@ -148,6 +158,8 @@ class BaseQuantizeConfig(PushToHubMixin):
             "true_sequential": self.true_sequential,
             "model_name_or_path": self.model_name_or_path,
             "model_file_base_name": self.model_file_base_name,
+            "is_marlin_format": self.is_marlin_format,
+            "quant_method": "gptq"
         }
 
 
@@ -602,12 +614,14 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             safetensors_metadata['gptq_group_size'] = str(self.quantize_config.group_size)
             safetensors_metadata['gptq_desc_act'] = str(self.quantize_config.desc_act)
             safetensors_metadata['gptq_damp_percent'] = str(self.quantize_config.damp_percent)
+            safetensors_metadata['gptq_is_marlin_format'] = str(self.quantize_config.is_marlin_format)
 
             safe_save(state_dict, join(save_dir, model_save_name), safetensors_metadata)
         else:
             model_save_name = model_base_name + ".bin"
             torch.save(self.model.state_dict(), join(save_dir, model_save_name))
 
+        self.model.config.quantization_config = self.quantize_config.to_dict()
         self.model.config.save_pretrained(save_dir)
         self.quantize_config.save_pretrained(save_dir)
         self.quantize_config.model_name_or_path = save_dir
@@ -827,7 +841,18 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
 
         if quantize_config is None:
             quantize_config = BaseQuantizeConfig.from_pretrained(model_name_or_path, **cached_file_kwargs, **kwargs)
-        
+
+        if not use_marlin and MARLIN_AVAILABLE:
+            unsupported_reason = _validate_marlin_compatibility(quantize_config)
+            if unsupported_reason is None and _validate_marlin_device_support():
+                logger.info("You passed a model that is compatible with the Marlin int4*fp16 GPTQ kernel but use_marlin is False. We recommend using `use_marlin=True` to use the optimized Marlin kernels for inference. Example: `model = AutoGPTQForCausalLM.from_quantized(..., use_marlin=True)`.")
+
+        if hasattr(quantize_config, "is_marlin_format") and quantize_config.is_marlin_format and not use_marlin:
+            raise ValueError(
+                "You passed a GPTQ model saved in int4*fp16 GPTQ Marlin kernel format but are loading with use_marlin=False. "
+                "Please use `use_marlin=True` to load this model. Example: `model = AutoGPTQForCausalLM.from_quantized(..., use_marlin=True)`."
+            )
+
         if model_basename is None:
             if quantize_config.model_file_base_name:
                 possible_model_basenames = [quantize_config.model_file_base_name]
@@ -873,7 +898,6 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                         break
         
         quantize_config.model_file_base_name = true_model_basename
-        
         if resolved_archive_file is None:
             raise FileNotFoundError(f"Could not find a model in {model_name_or_path} with a name in {', '.join(searched_files)}. Please specify the argument model_basename to use a custom file name.")
                 
@@ -1059,13 +1083,14 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
 
             # TODO: Move this logic in a marlin_utils.py file.
             if use_marlin:
+                # Validate the model can run in Marlin.
                 if torch_dtype != torch.float16:
                     raise ValueError("Marlin kernel requires torch_dtype=torch.float16.")
-
                 unsupported_reason = _validate_marlin_compatibility(quantize_config)
                 if unsupported_reason is not None:
                     raise ValueError(f"The model {model_name_or_path} can not be converted to use the Marlin kernel for the following reason: {unsupported_reason}, which is not supported by Marlin kernel.")
 
+                # Load the quant linear type we need.
                 quant_linear_class = dynamically_import_QuantLinear(
                     use_triton=use_triton,
                     desc_act=quantize_config.desc_act,
@@ -1074,58 +1099,25 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                     disable_exllama=disable_exllama,
                     disable_exllamav2=disable_exllamav2
                 )
+                
+                # Prepare model for marlin load.
+                #   If stub is marlin serialzed         --> load from directly
+                #   If stub has cached marlin version   --> load from the cached versin
+                #   Otherwise                           --> convert to marlin, cache, load from cache
+                model, model_save_name = prepare_model_for_marlin_load(
+                    model_name_or_path=model_name_or_path, 
+                    model=model,
+                    quantize_config=quantize_config,
+                    quant_linear_class=quant_linear_class,
+                    torch_dtype=torch_dtype,
+                    current_model_save_name=model_save_name,
+                    device_map=device_map
+                )
 
-                if is_local:
-                    is_cached = os.path.isfile(os.path.join(model_name_or_path, "autogptq_model.safetensors"))
-                else:
-                    namespace, subfolder = model_name_or_path.split("/")
-                    assets_path = huggingface_hub.cached_assets_path(library_name="autogptq", namespace=namespace, subfolder=subfolder)
-                    weight_path = os.path.join(assets_path, "autogptq_model.safetensors")
-
-                    is_cached = os.path.isfile(weight_path)
-
-                if is_cached:
-                    if is_local:
-                        model_save_name = os.path.join(model_name_or_path, "autogptq_model.safetensors")
-                    else:
-                        namespace, subfolder = model_name_or_path.split("/")
-                        assets_path = huggingface_hub.cached_assets_path(library_name="autogptq", namespace=namespace, subfolder=subfolder)
-                        model_save_name = os.path.join(assets_path, "autogptq_model.safetensors")
-
-                    logger.info(f"Loading a GPTQ model, detected a cached repacked weight for Marlin kernel at {model_save_name}.")
-
-                    # We will use the cached checkpoint to load parameters and buffers in the model, so we only need to replace QuantLinear layers here.
-                    model = convert_to_marlin(model, quant_linear_class, quantize_config, repack=False)
-                else:
-                    # Loading the GPTQ checkpoint to do the conversion.
-                    # TODO: Avoid loading the model with wrong QuantLinear, and directly use
-                    # Marlin ones. The repacking can be done directly on the safetensors, just
-                    # as for AWQ checkpoints.
-                    accelerate.utils.modeling.load_checkpoint_in_model(
-                        model,
-                        dtype=torch_dtype,  # This is very hacky but works due to https://github.com/huggingface/accelerate/blob/bd72a5f1a80d5146554458823f8aeda0a9db5297/src/accelerate/utils/modeling.py#L292
-                        checkpoint=model_save_name,
-                        device_map=device_map,
-                        offload_state_dict=True,
-                        offload_buffers=True
-                    )
-
-                    model = convert_to_marlin(model, quant_linear_class, quantize_config, repack=True)
-
-                    # Cache the converted model.
-                    if is_local:
-                        model_save_name = os.path.join(model_name_or_path, "autogptq_model.safetensors")
-                        safe_save(model.state_dict(), model_save_name)
-                    else:
-                        namespace, subfolder = model_name_or_path.split("/")
-                        assets_path = huggingface_hub.cached_assets_path(library_name="autogptq", namespace=namespace, subfolder=subfolder)
-                        model_save_name = os.path.join(assets_path, "autogptq_model.safetensors")
-
-                        safe_save(model.state_dict(), model_save_name)
-
+                # Disable incompatible optimizations.
                 if inject_fused_attention or inject_fused_mlp:
                     # TODO: Validate whether that can be used.
-                    logger.info("Disabling fused attention and mlp injection because Marlin kernel is used")
+                    logger.info("Disabling fused attention and mlp injection because Marlin kernel is used.")
                     inject_fused_attention = False
                     inject_fused_mlp = False
 
