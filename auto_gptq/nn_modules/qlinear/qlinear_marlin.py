@@ -29,18 +29,19 @@ except ImportError:
     _marlin_available = False
 
 
-def mul(A, B, C, s, workspace, thread_k=-1, thread_n=-1, sms=-1):
+def mul(A, B, C, s, workspace, thread_k=-1, thread_n=-1, sms=-1, max_par=16):
     """Marlin FP16xINT4 multiply; can be used within `torch.compile`.
     @A: `torch.half` input matrix of shape `(m, k)` in standard row-major layout
     @B: `torch.int` weight matrix of original shape `(k, n)` in Marlin format; see `Layer.pack()`
     @C: `torch.half` out matrix of shape `(m, n)` in standard row-major layout
     @s: `torch.half` scales of shape `(m / group_size, n)`
-    @workspace: `torch.int` tensor with at least as many entries as there a GPU SMs (256 is usually safe)
+    @workspace: `torch.int` tensor with at least `n / 128 * max_par` entries that are all zero
     @thread_k: `k` size of a thread_tile in `B` (can usually be left as auto -1)
     @thread_n: `n` size of a thread_tile in `B` (can usually be left as auto -1)
     @sms: number of SMs to use for the kernel (can usually be left as auto -1)
+    @max_par: maximum number of batch 64 problems to solve in parallel for large input sizes
     """
-    autogptq_marlin_cuda.mul(A, B, C, s, workspace, thread_k, thread_n, sms)
+    autogptq_marlin_cuda.mul(A, B, C, s, workspace, thread_k, thread_n, sms, max_par)
 
 
 # Precompute permutations for Marlin weight and scale shuffling 
@@ -107,8 +108,8 @@ class QuantLinear(nn.Module):
         self.group_size = group_size if group_size != -1 else infeatures
         self.register_buffer('B', torch.empty((self.infeatures // 16, self.outfeatures * 16 // 8), dtype=torch.int))
         self.register_buffer('s', torch.empty((self.infeatures // group_size, self.outfeatures), dtype=torch.half))
-        # 128 is currently the minimum `tile_n`, hence it gives the maximum workspace size
-        self.register_buffer('workspace', torch.zeros(self.outfeatures // 128, dtype=torch.int), persistent=False)
+        # 128 is currently the minimum `tile_n`, hence it gives the maximum workspace size; 16 is the default `max_par`
+        self.register_buffer('workspace', torch.zeros(self.outfeatures // 128 * 16, dtype=torch.int), persistent=False)
         if bias:
             self.register_buffer('bias', torch.zeros((outfeatures), dtype=torch.half))
         else:
