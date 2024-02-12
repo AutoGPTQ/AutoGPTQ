@@ -21,72 +21,53 @@ def prepare_model_for_marlin_load(
     current_model_save_name,
     device_map
 ):  
-     # If GPTQ model is serialized in the Marlin format, load directly (no repacking).
-    if is_marlin_serialized(quantize_config):
+     # The model (e.g. model.safetensors) is already serialized in the Marlin format, load it directly.
+    if hasattr(quantize_config, "is_marlin_format") and quantize_config.is_marlin_format:
         model_save_name = current_model_save_name
         logger.info(f"Loading a GPTQ model, detected Marlin serialized format at {model_save_name}.")
         model = convert_to_marlin(model, quant_linear_class, quantize_config, repack=False)
-
-    # If GPTQ model has Marlin version cached locally, load from the cached version (no repacking).
-    elif is_marlin_cached(model_name_or_path):
-        model_save_name = _get_cached_marlin_save_name(model_name_or_path)
-        logger.info(f"Loading a GPTQ model, detected a cached repacked weight for Marlin kernel at {model_save_name}.")
-        model = convert_to_marlin(model, quant_linear_class, quantize_config, repack=False)
-    
-    # Otherwise, convert the model to Marlin format first and cache locally.
     else:
-        # Loading the GPTQ checkpoint to do the conversion.
-        # TODO: Avoid loading the model with wrong QuantLinear, and directly use
-        # Marlin ones. The repacking can be done directly on the safetensors, just
-        # as for AWQ checkpoints.
-        model_save_name = current_model_save_name
-        accelerate.utils.modeling.load_checkpoint_in_model(
-            model,
-            dtype=torch_dtype,  # This is very hacky but works due to https://github.com/huggingface/accelerate/blob/bd72a5f1a80d5146554458823f8aeda0a9db5297/src/accelerate/utils/modeling.py#L292
-            checkpoint=model_save_name,
-            device_map=device_map,
-            offload_state_dict=True,
-            offload_buffers=True
-        )
-        # Convert model to marlin, repacking weights into Marlin format.
-        model = convert_to_marlin(model, quant_linear_class, quantize_config, repack=True)
+        model_save_name = _get_cached_marlin_save_name(model_name_or_path)
+
+        # If GPTQ model has Marlin version cached locally, load from the cached version (no repacking needed).
+        if os.path.isfile(model_save_name):
+            logger.info(f"Loading a GPTQ model, detected a cached repacked weight for Marlin kernel at {model_save_name}.")
+            model = convert_to_marlin(model, quant_linear_class, quantize_config, repack=False)
         
-        # Cache the converted model.
-        model_save_name = cache_marlin(model, model_name_or_path)
+        # Otherwise, convert the model to Marlin format first and cache locally.
+        else:
+            # Loading the GPTQ checkpoint to do the conversion.
+            # TODO: Avoid loading the model with wrong QuantLinear, and directly use
+            # Marlin ones. The repacking can be done directly on the safetensors, just
+            # as for AWQ checkpoints.
+            accelerate.utils.modeling.load_checkpoint_in_model(
+                model,
+                dtype=torch_dtype,  # This is very hacky but works due to https://github.com/huggingface/accelerate/blob/bd72a5f1a80d5146554458823f8aeda0a9db5297/src/accelerate/utils/modeling.py#L292
+                checkpoint=current_model_save_name,
+                device_map=device_map,
+                offload_state_dict=True,
+                offload_buffers=True
+            )
+            # Convert model to marlin, repacking weights into Marlin format.
+            model = convert_to_marlin(model, quant_linear_class, quantize_config, repack=True)
+            
+            # Cache the converted model.
+            safe_save(model.state_dict(), model_save_name)
     
     return model, model_save_name
 
-# Gets The Cached Weight Path.
-#   -- if remote:   $HF_HOME/assets/autogptq/{model_path}/autogptq_model.safetensors
-#   -- if local:    {path}/autogptq_model.safetensors
 def _get_cached_marlin_save_name(model_name_or_path):
+    """
+    Gets The Cached Weight Path.
+    If remote:   $HF_HOME/assets/autogptq/{model_name_or_path}/autogptq_model.safetensors
+    If local:    {model_name_or_path}/autogptq_model.safetensors
+    """
     if os.path.isdir(model_name_or_path):
         return os.path.join(model_name_or_path, "autogptq_model.safetensors")
     else:
         namespace, subfolder = model_name_or_path.split("/")
-        assets_path = huggingface_hub.cached_assets_path(library_name="autogptq", namespace=namespace, subfolder=subfolder)
+        assets_path = huggingface_hub.cached_assets_path(library_name="auto_gptq", namespace=namespace, subfolder=subfolder)
         return os.path.join(assets_path, "autogptq_model.safetensors")
-
-# Checks if a model stub is a marlin serialized model.
-def is_marlin_serialized(quantize_config):
-    if not hasattr(quantize_config, "is_marlin_format"):
-        return False
-    return quantize_config.is_marlin_format
-
-# Checks if a model stub has a cached marlin version:
-#   -- if remote:   $HF_HOME/assets/autogptq/{model_stub}.
-#   -- if local:    {path}/autogptq_model.safetensors
-def is_marlin_cached(model_name_or_path):
-    model_save_name = _get_cached_marlin_save_name(model_name_or_path)
-    return os.path.isfile(model_save_name)
-
-# Caches Marlin model by saving autogptq_model.safetensors to
-#   -- if remote:   $HF_HOME/assets/autogptq/{model_stub}.
-#   -- if local:    {path}/autogptq_model.safetensors 
-def cache_marlin(model, model_name_or_path):
-    model_save_name = _get_cached_marlin_save_name(model_name_or_path)
-    safe_save(model.state_dict(), model_save_name)
-    return model_save_name
 
 # Validate marlin suppor
 def _validate_marlin_device_support():
@@ -161,7 +142,7 @@ def convert_to_marlin(model, model_quantlinear, quantization_config, repack: boo
                 out_features=module.outfeatures, 
                 bias=bias is not None, 
                 dtype=torch.float16, 
-                device="cuda"
+                device="meta"
             )
 
         # Create new linear method and copy to model.

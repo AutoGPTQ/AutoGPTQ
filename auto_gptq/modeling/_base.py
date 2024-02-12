@@ -92,7 +92,8 @@ class BaseQuantizeConfig(PushToHubMixin):
         subfolder = kwargs.pop("subfolder", None)
         commit_hash = kwargs.pop("_commit_hash", None)
 
-        for quantize_config_filename in ["quantize_config.json", "quant_config.json"]:
+        transformers_config = False
+        for quantize_config_filename in ["quantize_config.json", "quant_config.json", "config.json"]:
             if os.path.isdir(save_dir):  # Local
                 resolved_config_file = join(save_dir, quantize_config_filename)
             else: # Remote
@@ -112,14 +113,20 @@ class BaseQuantizeConfig(PushToHubMixin):
                     _commit_hash=commit_hash,
                 )
             if resolved_config_file is not None:
+                if quantize_config_filename == "config.json":
+                    transformers_config = True
                 break
-
+                    
         if resolved_config_file is None:
-            raise ValueError("No quantize_config.json or quant_config.json file was found in the model repository.")
+            raise ValueError("No quantize_config.json, quant_config.json or config.json file was found in the model repository.")            
         
         field_names = [field.name for field in fields(cls)]
         with open(resolved_config_file, "r", encoding="utf-8") as f:
             args_from_json = json.load(f)
+            
+            if transformers_config:
+                args_from_json = args_from_json["quantization_config"]
+            
             filtered_args = {"awq_gemm_checkpoint": False}
             for key, val in args_from_json.items():
                 if key == "version" and val == "GEMM":
@@ -567,7 +574,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             raise EnvironmentError("can only save quantized model, please execute .quantize first.")
 
         self.model.to(CPU)
-        
+
         model_base_name = self.quantize_config.model_file_base_name or f"gptq_model-{self.quantize_config.bits}bit-{self.quantize_config.group_size}g"
         if use_safetensors:
             model_save_name = model_base_name + ".safetensors"
@@ -838,14 +845,13 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         if not use_marlin and MARLIN_AVAILABLE:
             unsupported_reason = _validate_marlin_compatibility(quantize_config)
             if unsupported_reason is None and _validate_marlin_device_support():
-                logger.info("You passed a model that is compatible with Marlin GPTQ kernels but use_marlin is False. Pass use_marlin=True to use the optimized Marlin kernels for inference.")
+                logger.info("You passed a model that is compatible with the Marlin int4*fp16 GPTQ kernel but use_marlin is False. We recommend using `use_marlin=True` to use the optimized Marlin kernels for inference. Example: `model = AutoGPTQForCausalLM.from_quantized(..., use_marlin=True)`.")
 
-        if hasattr(quantize_config, "is_marlin_format") and quantize_config.is_marlin_format:
-            if not use_marlin:
-                raise ValueError(
-                    "You passed a GPTQ model saved in Marlin format but set use_marlin=False. "
-                    "You use_marlin=True to utilize this model."
-                )
+        if hasattr(quantize_config, "is_marlin_format") and quantize_config.is_marlin_format and not use_marlin:
+            raise ValueError(
+                "You passed a GPTQ model saved in int4*fp16 GPTQ Marlin kernel format but are loading with use_marlin=False. "
+                "Please use `use_marlin=True` to load this model. Example: `model = AutoGPTQForCausalLM.from_quantized(..., use_marlin=True)`."
+            )
 
         if model_basename is None:
             if quantize_config.model_file_base_name:
@@ -1111,7 +1117,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                 # Disable incompatible optimizations.
                 if inject_fused_attention or inject_fused_mlp:
                     # TODO: Validate whether that can be used.
-                    logger.info("Disabling fused attention and mlp injection because Marlin kernel is used")
+                    logger.info("Disabling fused attention and mlp injection because Marlin kernel is used.")
                     inject_fused_attention = False
                     inject_fused_mlp = False
 
