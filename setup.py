@@ -161,7 +161,7 @@ if BUILD_CUDA_EXT:
 
             extensions.append(
                 cpp_extension.CUDAExtension(
-                    'marlin_cuda',
+                    'autogptq_marlin_cuda',
                     [
                         'autogptq_extension/marlin/marlin_cuda.cpp',
                         'autogptq_extension/marlin/marlin_cuda_kernel.cu'
