@@ -44,7 +44,7 @@ except Exception as e:
     QIGEN_EXCEPTION = e
 
 try:
-    import marlin_cuda
+    import autogptq_marlin_cuda
 
     MARLIN_AVAILABLE = True
 except Exception as e:

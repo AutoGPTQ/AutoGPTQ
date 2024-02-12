@@ -22,7 +22,7 @@ import transformers
 logger = getLogger(__name__)
 
 try:
-    import marlin_cuda
+    import autogptq_marlin_cuda
 
     _marlin_available = True
 except ImportError:
@@ -40,7 +40,7 @@ def mul(A, B, C, s, workspace, thread_k=-1, thread_n=-1, sms=-1):
     @thread_n: `n` size of a thread_tile in `B` (can usually be left as auto -1)
     @sms: number of SMs to use for the kernel (can usually be left as auto -1)
     """
-    marlin_cuda.mul(A, B, C, s, workspace, thread_k, thread_n, sms)
+    autogptq_marlin_cuda.mul(A, B, C, s, workspace, thread_k, thread_n, sms)
 
 
 # Precompute permutations for Marlin weight and scale shuffling 

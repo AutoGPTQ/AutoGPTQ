@@ -5,10 +5,12 @@ import torch
 from safetensors.torch import save_file as safe_save
 from ..nn_modules.qlinear.qlinear_marlin import QuantLinear as MarlinQuantLinear
 from ..nn_modules.qlinear.qlinear_marlin import dequantize_weight
-
+from accelerate.utils import find_tied_parameters
 import gc, os, copy
 from logging import getLogger
 from tqdm import tqdm
+
+from .modeling_utils import recurse_setattr, recurse_getattr
 
 logger = getLogger(__name__)
 
@@ -51,6 +53,16 @@ def prepare_model_for_marlin_load(
             # Convert model to marlin, repacking weights into Marlin format.
             model = convert_to_marlin(model, quant_linear_class, quantize_config, repack=True)
             
+            # Safetensors is unable to save tied weights, so we untie them here. Reference: https://github.com/huggingface/safetensors/issues/202
+            tied_params = find_tied_parameters(model)
+
+            for weight_group in tied_params:
+                for param_name in weight_group:
+                    if isinstance(recurse_getattr(model, param_name), torch.nn.Parameter):
+                        recurse_setattr(model, param_name, torch.nn.Parameter(recurse_getattr(model, param_name).clone()))
+                    else:
+                        recurse_setattr(model, param_name, recurse_getattr(model, param_name).clone())
+
             # Cache the converted model.
             safe_save(model.state_dict(), model_save_name)
     

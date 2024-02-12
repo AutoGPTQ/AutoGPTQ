@@ -123,7 +123,7 @@ class BaseQuantizeConfig(PushToHubMixin):
         field_names = [field.name for field in fields(cls)]
         with open(resolved_config_file, "r", encoding="utf-8") as f:
             args_from_json = json.load(f)
-            
+
             if transformers_config:
                 args_from_json = args_from_json["quantization_config"]
             
@@ -1029,7 +1029,6 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                     gptq_layers = set()
                     non_gptq_params = set()
                     with safe_open(model_save_name, framework="pt") as f:
-                        state_dict_keys = list(f.keys())
                         for state_dict_key in f.keys():
                             if "qweight" not in state_dict_key and "qzeros" not in state_dict_key and "scales" not in state_dict_key:
                                 non_gptq_params.add(state_dict_key)
