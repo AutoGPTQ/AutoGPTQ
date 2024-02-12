@@ -27,6 +27,8 @@ SUPPORTED_MODELS = [
 ]
 if compare_transformers_version("v4.28.0", op="ge"):
     SUPPORTED_MODELS.append("llama")
+if compare_transformers_version("v4.30.0", op="ge"):
+    SUPPORTED_MODELS.append("longllama")
 if compare_transformers_version("v4.33.0", op="ge"):
     SUPPORTED_MODELS.append("falcon")
 if compare_transformers_version("v4.34.0", op="ge"):

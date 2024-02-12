@@ -581,10 +581,10 @@ class TestQ4Marlin(unittest.TestCase):
         device = torch.device("cuda:0")
 
         model_id = "TheBloke/Llama-2-7B-Chat-GPTQ"
-        model_q = AutoGPTQForCausalLM.from_quantized(model_id, device="cuda:0", use_triton=False, inject_fused_attention=False, inject_fused_mlp=False, disable_exllama=True, disable_exllamav2=True, use_marlin=True)
+        model_q = AutoGPTQForCausalLM.from_quantized(model_id, device="cuda:0", use_marlin=True)
 
         has_marlin = False
-        for name, module in model_q.named_modules():
+        for _, module in model_q.named_modules():
             if isinstance(module, MarlinQuantLinear):
                 has_marlin = True
                 break

@@ -20,3 +20,4 @@ from .decilm import *
 from .stablelmepoch import *
 from .mixtral import *
 from .qwen2 import *
+from .longllama import *
