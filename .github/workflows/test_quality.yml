@@ -78,6 +78,9 @@ jobs:
         run: |
           conda install cuda-toolkit -c "nvidia/label/cuda-12.1.0"
 
+          echo "CONDA_PREFIX:"
+          echo $CONDA_PREFIX
+
           export CUDA_HOME=$CONDA_PREFIX
           export CUDA_PATH=$CONDA_PREFIX
 
@@ -96,6 +99,12 @@ jobs:
 
       - name: Install AutoGPTQ
         run: |
+          echo "CUDA_HOME:"
+          echo $CUDA_HOME
+
+          echo "CUDA_PATH:"
+          echo $CUDA_PATH
+
           DISABLE_QIGEN=1 pip install -vvv .[quality]
       
       - name: Check style with ruff
