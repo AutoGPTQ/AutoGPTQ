@@ -107,4 +107,4 @@ jobs:
       
       - name: Check style with ruff
         run: |
-          ruff .
+          ruff auto_gptq examples tests setup.py
