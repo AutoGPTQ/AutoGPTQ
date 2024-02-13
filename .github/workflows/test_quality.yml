@@ -51,15 +51,15 @@ jobs:
 
       - name: Install dependencies
         run: |
-            conda install cuda-toolkit -c "nvidia/label/cuda-12.1.0"
+          conda install cuda-toolkit -c "nvidia/label/cuda-12.1.0"
 
-            # Refer to https://pytorch.org/get-started/locally/
-            if ("${{ runner.os }}" -eq "Linux")
-            {
-              python -m pip install torch
-            }else{
-              python -m pip install torch --index-url https://download.pytorch.org/whl/cu121
-            }
+          # Refer to https://pytorch.org/get-started/locally/
+          if ("${{ runner.os }}" -eq "Linux")
+          {
+            python -m pip install torch
+          }else{
+            python -m pip install torch --index-url https://download.pytorch.org/whl/cu121
+          }
           
           python -m pip install --upgrade build setuptools wheel numpy
 
