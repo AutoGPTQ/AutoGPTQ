@@ -11,39 +11,45 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import math
 from logging import getLogger
 
 import numpy as np
 import torch
 import torch.nn as nn
-import transformers
+
 
 logger = getLogger(__name__)
 
 try:
-    import marlin_cuda
+    import autogptq_marlin_cuda
+except ImportError as e:
+    marlin_import_exception = e
 
-    _marlin_available = True
-except ImportError:
-    _marlin_available = False
+    def error_raiser_marlin(*args, **kwargs):
+        raise ValueError(
+            f"Trying to use the marlin backend, but could not import the C++/CUDA dependencies with the following error: {marlin_import_exception}"
+        )
+
+    autogptq_marlin_cuda = error_raiser_marlin
 
 
-def mul(A, B, C, s, workspace, thread_k=-1, thread_n=-1, sms=-1):
+def mul(A, B, C, s, workspace, thread_k=-1, thread_n=-1, sms=-1, max_par=16):
     """Marlin FP16xINT4 multiply; can be used within `torch.compile`.
     @A: `torch.half` input matrix of shape `(m, k)` in standard row-major layout
     @B: `torch.int` weight matrix of original shape `(k, n)` in Marlin format; see `Layer.pack()`
     @C: `torch.half` out matrix of shape `(m, n)` in standard row-major layout
     @s: `torch.half` scales of shape `(m / group_size, n)`
-    @workspace: `torch.int` tensor with at least as many entries as there a GPU SMs (256 is usually safe)
+    @workspace: `torch.int` tensor with at least `n / 128 * max_par` entries that are all zero
     @thread_k: `k` size of a thread_tile in `B` (can usually be left as auto -1)
     @thread_n: `n` size of a thread_tile in `B` (can usually be left as auto -1)
     @sms: number of SMs to use for the kernel (can usually be left as auto -1)
+    @max_par: maximum number of batch 64 problems to solve in parallel for large input sizes
     """
-    marlin_cuda.mul(A, B, C, s, workspace, thread_k, thread_n, sms)
+    autogptq_marlin_cuda.mul(A, B, C, s, workspace, thread_k, thread_n, sms, max_par)
 
 
-# Precompute permutations for Marlin weight and scale shuffling 
+# Precompute permutations for Marlin weight and scale shuffling
+
 
 def _get_perms():
     perm = []
@@ -55,7 +61,7 @@ def _get_perms():
                 2 * (i % 4),
                 2 * (i % 4) + 1,
                 2 * (i % 4 + 4),
-                2 * (i % 4 + 4) + 1
+                2 * (i % 4 + 4) + 1,
             ]:
                 perm1.append(16 * row + col + 8 * block)
         for j in range(4):
@@ -80,40 +86,41 @@ _perm, _scale_perm, _scale_perm_single = _get_perms()
 class QuantLinear(nn.Module):
     QUANT_TYPE = "marlin"
 
-    def __init__(
-            self,
-            bits,
-            group_size,
-            infeatures,
-            outfeatures,
-            bias,
-            trainable=False,
-            **kwargs
-    ):
+    def __init__(self, bits, group_size, infeatures, outfeatures, bias, trainable=False, **kwargs):
         super().__init__()
         if infeatures % 128 != 0 or outfeatures != 256 == 0:
-            raise ValueError('`infeatures` must be divisible by 128 and `outfeatures` by 256.')
+            raise ValueError("`infeatures` must be divisible by 128 and `outfeatures` by 256.")
         if bits not in [4]:
             raise NotImplementedError("Only 4 bits are supported.")
         if group_size not in [-1, 128] and group_size != infeatures:
-            raise ValueError('Only group_size -1 and 128 are supported.')
+            raise ValueError("Only group_size -1 and 128 are supported.")
         if infeatures % group_size != 0:
-            raise ValueError('`infeatures` must be divisible by `group_size`.')
+            raise ValueError("`infeatures` must be divisible by `group_size`.")
         if trainable:
-            raise NotImplementedError('Marlin does not support train.')
+            raise NotImplementedError("Marlin does not support train.")
 
         self.infeatures = infeatures
         self.outfeatures = outfeatures
         self.group_size = group_size if group_size != -1 else infeatures
-        self.register_buffer('B', torch.empty((self.infeatures // 16, self.outfeatures * 16 // 8), dtype=torch.int))
-        self.register_buffer('s', torch.empty((self.infeatures // group_size, self.outfeatures), dtype=torch.half))
-        # 128 is currently the minimum `tile_n`, hence it gives the maximum workspace size
-        self.register_buffer('workspace', torch.zeros(self.outfeatures // 128, dtype=torch.int), persistent=False)
+        self.register_buffer(
+            "B",
+            torch.empty((self.infeatures // 16, self.outfeatures * 16 // 8), dtype=torch.int),
+        )
+        self.register_buffer(
+            "s",
+            torch.empty((self.infeatures // group_size, self.outfeatures), dtype=torch.half),
+        )
+        # 128 is currently the minimum `tile_n`, hence it gives the maximum workspace size; 16 is the default `max_par`
+        self.register_buffer(
+            "workspace",
+            torch.zeros(self.outfeatures // 128 * 16, dtype=torch.int),
+            persistent=False,
+        )
         if bias:
-            self.register_buffer('bias', torch.zeros((outfeatures), dtype=torch.half))
+            self.register_buffer("bias", torch.zeros((outfeatures), dtype=torch.half))
         else:
             self.bias = None
-            
+
     def post_init(self):
         pass
 
@@ -123,9 +130,9 @@ class QuantLinear(nn.Module):
         @scales: corresponding quantization scales of shape `(infeatures, groups)`
         """
         if linear.weight.dtype != torch.half:
-            raise ValueError('Only `torch.half` weights are supported.')
+            raise ValueError("Only `torch.half` weights are supported.")
         tile = 16
-        maxq = 2 ** 4 - 1
+        maxq = 2**4 - 1
         s = scales.t()
         w = linear.weight.data.t()
         if self.group_size != self.infeatures:
@@ -162,22 +169,16 @@ class QuantLinear(nn.Module):
     def forward(self, A):
         A = A.half()
         C = torch.empty(A.shape[:-1] + (self.s.shape[1],), dtype=A.dtype, device=A.device)
-        mul(A.view((-1, A.shape[-1])), self.B, C.view((-1, C.shape[-1])), self.s, self.workspace)
-        C = C + self.bias if self.bias is not None else C 
+        mul(
+            A.view((-1, A.shape[-1])),
+            self.B,
+            C.view((-1, C.shape[-1])),
+            self.s,
+            self.workspace,
+        )
+        C = C + self.bias if self.bias is not None else C
         return C
 
-
-# Adapted from https://github.com/rib-2/marlin/tree/conversion
-def _validate_marlin_compatibility(quantization_config):
-    if quantization_config.bits != 4:
-        return f"The quantized model uses a bitwidth different than 4 (found {quantization_config.bits})"
-    if quantization_config.group_size != 128 and quantization_config.group_size != -1:
-        return f"The quantized model uses a group size that is not 128 or -1 (found quantization_config.group_size)"
-    if not quantization_config.sym:
-        return f"The quantized model uses asymmetric quantization"
-    if quantization_config.desc_act:
-        return f"The quantized model uses act-order (also called desc-act) scheme"
-    return None
 
 # Copied from https://github.com/IST-DASLab/marlin/pull/1
 @torch.no_grad()
@@ -187,14 +188,14 @@ def unpack_4bit_to_32bit_signed(qweight, qzeros):
         (qweight.shape[0] * 8, qweight.shape[1]),
         dtype=torch.int8,
         device=qweight.device,
-        requires_grad=False
+        requires_grad=False,
     )
 
     unpacked_zeros = torch.zeros(
         (qzeros.shape[0], qzeros.shape[1] * 8),
         dtype=torch.int8,
         device=qzeros.device,
-        requires_grad=False
+        requires_grad=False,
     )
 
     for row in range(unpacked_weights.shape[0]):
@@ -206,6 +207,7 @@ def unpack_4bit_to_32bit_signed(qweight, qzeros):
         unpacked_zeros[:, col] = (qzeros[:, col // 8] >> (4 * i)) & 0xF
 
     return unpacked_weights, unpacked_zeros + 1
+
 
 # Copied from https://github.com/IST-DASLab/marlin/pull/1
 @torch.no_grad()
@@ -219,4 +221,5 @@ def dequantize_weight(layer):
 
     return unpacked_qweight.T, unpacked_qzeros
 
-__all__ = ["QuantLinear", "_validate_marlin_compatibility", "dequantize_weight"]
+
+__all__ = ["QuantLinear", "dequantize_weight"]

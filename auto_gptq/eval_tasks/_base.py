@@ -2,7 +2,7 @@ from abc import abstractmethod
 from typing import Any, Dict, List, Optional, Union
 
 import torch
-from transformers import PreTrainedTokenizer, PreTrainedModel
+from transformers import PreTrainedModel, PreTrainedTokenizer
 
 from ..modeling import BaseGPTQForCausalLM
 from ..utils.data_utils import get_dataloader
@@ -17,7 +17,7 @@ class BaseTask:
         prompt_col_name: str,
         label_col_name: str,
         device: Optional[str] = None,
-        **kwargs
+        **kwargs,
     ):
         self.model = model
         self.tokenizer = tokenizer
@@ -30,7 +30,7 @@ class BaseTask:
             prompt_col_name=prompt_col_name,
             label_col_name=label_col_name,
             tokenizer=tokenizer,
-            **kwargs
+            **kwargs,
         )
 
         self.device = device

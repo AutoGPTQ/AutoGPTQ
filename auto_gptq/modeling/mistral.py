@@ -1,4 +1,4 @@
-from ._base import *
+from ._base import BaseGPTQForCausalLM
 
 
 class MistralGPTQForCausalLM(BaseGPTQForCausalLM):

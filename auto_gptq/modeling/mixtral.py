@@ -1,4 +1,4 @@
-from ._base import *
+from ._base import BaseGPTQForCausalLM
 
 
 class MixtralGPTQForCausalLM(BaseGPTQForCausalLM):
@@ -25,7 +25,7 @@ class MixtralGPTQForCausalLM(BaseGPTQForCausalLM):
             "block_sparse_moe.experts.5.w3",
             "block_sparse_moe.experts.6.w3",
             "block_sparse_moe.experts.7.w3",
-         ],
+        ],
         [
             "block_sparse_moe.experts.0.w2",
             "block_sparse_moe.experts.1.w2",
@@ -35,7 +35,7 @@ class MixtralGPTQForCausalLM(BaseGPTQForCausalLM):
             "block_sparse_moe.experts.5.w2",
             "block_sparse_moe.experts.6.w2",
             "block_sparse_moe.experts.7.w2",
-        ]
+        ],
     ]
 
 

@@ -1,16 +1,21 @@
-import torch
 import unittest
+
+import autogptq_cuda_64
+import autogptq_cuda_256
+import torch
 from transformers import AutoTokenizer
+
 from auto_gptq import AutoGPTQForCausalLM
 from auto_gptq.nn_modules.qlinear.qlinear_cuda_old import QuantLinear as CudaOldQLinear
 
-import autogptq_cuda_256
-import autogptq_cuda_64
 
 try:
     from awq import AutoAWQForCausalLM
 except ModuleNotFoundError as e:
-    raise ModuleNotFoundError(f"AutoAWQ package (https://github.com/casper-hansen/AutoAWQ) is required to run this test. {e}")
+    raise ModuleNotFoundError(
+        f"AutoAWQ package (https://github.com/casper-hansen/AutoAWQ) is required to run this test. {e}"
+    )
+
 
 class TestAwqCompatibility(unittest.TestCase):
     # TODO: test cuda-old fp16.
@@ -21,7 +26,16 @@ class TestAwqCompatibility(unittest.TestCase):
         device = torch.device("cuda:0")
         quant_path = "TheBloke/Llama-2-7B-Chat-AWQ"
 
-        model_autogptq = AutoGPTQForCausalLM.from_quantized(quant_path, device=device, use_triton=False, inject_fused_attention=False, inject_fused_mlp=False, disable_exllama=True, disable_exllamav2=True, torch_dtype=torch.float32)
+        model_autogptq = AutoGPTQForCausalLM.from_quantized(
+            quant_path,
+            device=device,
+            use_triton=False,
+            inject_fused_attention=False,
+            inject_fused_mlp=False,
+            disable_exllama=True,
+            disable_exllamav2=True,
+            torch_dtype=torch.float32,
+        )
         tokenizer = AutoTokenizer.from_pretrained(quant_path)
 
         prompt = "I am in Paris and I am going to see the"
@@ -57,7 +71,16 @@ class TestAwqCompatibility(unittest.TestCase):
         prompt = "I am in Paris and I am going to see the"
 
         for torch_dtype in [torch.float16, torch.float32]:
-            model_autogptq = AutoGPTQForCausalLM.from_quantized(quant_path, device=device, use_triton=False, inject_fused_attention=False, inject_fused_mlp=False, disable_exllama=True, disable_exllamav2=True, torch_dtype=torch_dtype)
+            model_autogptq = AutoGPTQForCausalLM.from_quantized(
+                quant_path,
+                device=device,
+                use_triton=False,
+                inject_fused_attention=False,
+                inject_fused_mlp=False,
+                disable_exllama=True,
+                disable_exllamav2=True,
+                torch_dtype=torch_dtype,
+            )
 
             for name, module in model_autogptq.named_modules():
                 if isinstance(module, CudaOldQLinear):
@@ -67,7 +90,6 @@ class TestAwqCompatibility(unittest.TestCase):
                         self.assertFalse(module.use_cuda_fp16)
                     else:
                         self.assertTrue(module.use_cuda_fp16)
-
 
             inp = tokenizer(prompt, return_tensors="pt").to(device)
 
@@ -95,7 +117,16 @@ class TestAwqCompatibility(unittest.TestCase):
         prompt = "I am in Paris and I am going to see the"
 
         for torch_dtype in [torch.float16, torch.float32]:
-            model_autogptq = AutoGPTQForCausalLM.from_quantized(quant_path, device=device, use_triton=False, inject_fused_attention=False, inject_fused_mlp=False, disable_exllama=True, disable_exllamav2=True, torch_dtype=torch_dtype)
+            model_autogptq = AutoGPTQForCausalLM.from_quantized(
+                quant_path,
+                device=device,
+                use_triton=False,
+                inject_fused_attention=False,
+                inject_fused_mlp=False,
+                disable_exllama=True,
+                disable_exllamav2=True,
+                torch_dtype=torch_dtype,
+            )
 
             # Force autogptq_cuda_64.
             for name, module in model_autogptq.named_modules():
@@ -130,7 +161,16 @@ class TestAwqCompatibility(unittest.TestCase):
         device = torch.device("cuda:0")
         quant_path = "TheBloke/Llama-2-7B-Chat-AWQ"
 
-        model_autogptq = AutoGPTQForCausalLM.from_quantized(quant_path, device=device, use_triton=False, inject_fused_attention=False, inject_fused_mlp=False, disable_exllama=False, disable_exllamav2=True, torch_dtype=torch.float16)
+        model_autogptq = AutoGPTQForCausalLM.from_quantized(
+            quant_path,
+            device=device,
+            use_triton=False,
+            inject_fused_attention=False,
+            inject_fused_mlp=False,
+            disable_exllama=False,
+            disable_exllamav2=True,
+            torch_dtype=torch.float16,
+        )
         tokenizer = AutoTokenizer.from_pretrained(quant_path)
 
         prompt = "I am in Paris and I am going to see the"
@@ -162,7 +202,14 @@ class TestAwqCompatibility(unittest.TestCase):
         device = torch.device("cuda:0")
         quant_path = "TheBloke/Llama-2-7B-Chat-AWQ"
 
-        model_autogptq = AutoGPTQForCausalLM.from_quantized(quant_path, device=device, use_triton=False, inject_fused_attention=False, inject_fused_mlp=False, torch_dtype=torch.float16)
+        model_autogptq = AutoGPTQForCausalLM.from_quantized(
+            quant_path,
+            device=device,
+            use_triton=False,
+            inject_fused_attention=False,
+            inject_fused_mlp=False,
+            torch_dtype=torch.float16,
+        )
         tokenizer = AutoTokenizer.from_pretrained(quant_path)
 
         prompt = "I am in Paris and I am going to see the"
