@@ -28,9 +28,7 @@ jobs:
       matrix:
         python-version: [3.9]
         os: [ubuntu-22.04]
-
     runs-on: ${{ matrix.os }}
-    steps:
   
     steps:
       - uses: actions/checkout@v3
