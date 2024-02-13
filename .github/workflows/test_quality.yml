@@ -45,10 +45,6 @@ jobs:
         source venv/bin/activate
         pip install --upgrade pip
         DISABLE_QIGEN=1 pip install -vvv .[quality]
-    - name: Check style with black
-      run: |
-        source venv/bin/activate
-        black --check .
     - name: Check style with ruff
       run: |
         source venv/bin/activate
