@@ -45,6 +45,16 @@ jobs:
         source venv/bin/activate
         pip install --upgrade pip
         pip install torch
+        echo "torch version:"
+        python -c "import torch; print(torch.__version__);"
+        echo "pip version:"
+        pip --version
+        which pip
+        echo "python version:"
+        python --version
+        which python
+        echo "setuptools version:"
+        pip list | grep setuptools
         DISABLE_QIGEN=1 pip install -vvv .[quality]
     - name: Check style with ruff
       run: |
