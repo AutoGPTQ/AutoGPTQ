@@ -78,6 +78,12 @@ jobs:
         run: |
           conda install cuda-toolkit -c "nvidia/label/cuda-12.1.0"
 
+          find / -iname *cuda*
+
+          echo "printenv:"
+          printenv
+          echo "-----"
+
           echo "CONDA_PREFIX:"
           echo $CONDA_PREFIX
 
