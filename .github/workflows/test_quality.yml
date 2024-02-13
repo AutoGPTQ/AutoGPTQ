@@ -1,0 +1,110 @@
+name: check_code_quality
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - "auto_gptq/**.py"
+      - "tests/**.py"
+      - "examples/**.py"
+      - "setup.py"
+
+  pull_request:
+    branches: [ main ]
+    paths:
+      - "auto_gptq/**.py"
+      - "tests/**.py"
+      - "examples/**.py"
+      - "setup.py"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: [3.9]
+        os: [ubuntu-22.04]
+    runs-on: ${{ matrix.os }}
+  
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Free disk space
+        run: |
+          df -h
+          echo "Removing large packages"
+          sudo apt-get remove -y '^dotnet-.*'
+          sudo apt-get remove -y 'php.*'
+          sudo apt-get remove -y azure-cli google-chrome-stable firefox powershell mono-devel
+          df -h
+          sudo apt-get autoremove -y >/dev/null 2>&1
+          sudo apt-get clean
+          sudo apt-get autoremove -y >/dev/null 2>&1
+          sudo apt-get autoclean -y >/dev/null 2>&1
+          df -h
+          echo "https://github.com/actions/virtual-environments/issues/709"
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+          df -h
+          echo "remove big /usr/local"
+          sudo rm -rf "/usr/local/share/boost"
+          sudo rm -rf /usr/local/lib/android >/dev/null 2>&1
+          df -h
+          sudo rm -rf /usr/share/dotnet/sdk > /dev/null 2>&1
+          sudo rm -rf /usr/share/dotnet/shared > /dev/null 2>&1
+          sudo rm -rf /usr/share/swift > /dev/null 2>&1
+          df -h
+
+      - uses: actions/setup-python@v3
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Setup Miniconda
+        uses: conda-incubator/setup-miniconda@v2.2.0
+        with:
+          activate-environment: "build"
+          python-version: ${{ matrix.python-version }}
+          mamba-version: "*"
+          use-mamba: false
+          channels: conda-forge,defaults
+          channel-priority: true
+          add-pip-as-python-dependency: true
+          auto-activate-base: false
+
+      - name: Install dependencies
+        run: |
+          conda install cuda-toolkit -c "nvidia/label/cuda-12.1.0"
+
+          # Refer to https://pytorch.org/get-started/locally/
+          if [[ "${{ runner.os }}" == "Linux" ]]; then
+            python -m pip install torch
+          else
+            python -m pip install torch --index-url https://download.pytorch.org/whl/cu121
+          fi
+          
+          python -m pip install --upgrade build setuptools wheel numpy
+
+      - name: Check install
+        run: |
+          python -c "import torch; print('torch version:', torch.__version__)"
+
+      - name: Install AutoGPTQ
+        run: |
+          # For some reason $CONDA_PREFIX is empty.
+          export CUDA_HOME=/usr/share/miniconda
+          export CUDA_PATH=/usr/share/miniconda
+
+          echo "CUDA_HOME:"
+          echo $CUDA_HOME
+
+          echo "CUDA_PATH:"
+          echo $CUDA_PATH
+
+          TORCH_CUDA_ARCH_LIST="7.5 8.0 8.6+PTX" DISABLE_QIGEN=1 pip install -vvv .[quality]
+      
+      - name: Check style with ruff
+        run: |
+          ruff auto_gptq examples tests setup.py

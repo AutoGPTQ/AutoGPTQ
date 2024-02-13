@@ -1,42 +1,34 @@
-from packaging.version import parse as parse_version
 from logging import getLogger
-import torch
-
 from typing import Optional
 
+import torch
+from packaging.version import parse as parse_version
+
+
 try:
-    import triton
+    import triton  # noqa: F401
 
     TRITON_AVAILABLE = True
 except ImportError:
     TRITON_AVAILABLE = False
 
 try:
-    import autogptq_cuda_256
-    import autogptq_cuda_64
-
     AUTOGPTQ_CUDA_AVAILABLE = True
-except:
+except Exception:
     AUTOGPTQ_CUDA_AVAILABLE = False
 
 
 try:
-    import exllama_kernels
-
     EXLLAMA_KERNELS_AVAILABLE = True
-except:
+except Exception:
     EXLLAMA_KERNELS_AVAILABLE = False
-    
-try:
-    import exllamav2_kernels
 
+try:
     EXLLAMAV2_KERNELS_AVAILABLE = True
-except:
+except Exception:
     EXLLAMAV2_KERNELS_AVAILABLE = False
-    
-try:
-    import cQIGen as qinfer
 
+try:
     QIGEN_AVAILABLE = True
     QIGEN_EXCEPTION = None
 except Exception as e:
@@ -44,25 +36,36 @@ except Exception as e:
     QIGEN_EXCEPTION = e
 
 try:
-    import autogptq_marlin_cuda
-
     MARLIN_AVAILABLE = True
-except Exception as e:
+except Exception:
     MARLIN_AVAILABLE = False
 
 
 logger = getLogger(__name__)
 
 
-def dynamically_import_QuantLinear(use_triton: bool, desc_act: bool, group_size: int, bits: int, disable_exllama: Optional[bool] = None, disable_exllamav2:bool = False, use_qigen: bool = False, disable_marlin: bool = True):
+def dynamically_import_QuantLinear(
+    use_triton: bool,
+    desc_act: bool,
+    group_size: int,
+    bits: int,
+    disable_exllama: Optional[bool] = None,
+    disable_exllamav2: bool = False,
+    use_qigen: bool = False,
+    disable_marlin: bool = True,
+):
     if use_qigen:
         if not QIGEN_AVAILABLE:
-            raise ValueError(f"QIGen appears to be not available with the error: {QIGEN_EXCEPTION}. Please check your installation or use `use_qigen=False`.")
+            raise ValueError(
+                f"QIGen appears to be not available with the error: {QIGEN_EXCEPTION}. Please check your installation or use `use_qigen=False`."
+            )
         from ..nn_modules.qlinear.qlinear_qigen import QuantLinear
     else:
         if use_triton:
             if torch.version.hip:
-                logger.warning("Running GPTQ triton version on AMD GPUs is untested and may result in errors or wrong predictions. Please use use_triton=False.")
+                logger.warning(
+                    "Running GPTQ triton version on AMD GPUs is untested and may result in errors or wrong predictions. Please use use_triton=False."
+                )
 
             from ..nn_modules.qlinear.qlinear_triton import QuantLinear
         else:
@@ -82,14 +85,11 @@ def dynamically_import_QuantLinear(use_triton: bool, desc_act: bool, group_size:
                 from ..nn_modules.qlinear.qlinear_cuda_old import QuantLinear
             else:
                 from ..nn_modules.qlinear.qlinear_cuda import QuantLinear
-                
+
     return QuantLinear
 
 
-def compare_transformers_version(
-    version: str = "v4.28.0",
-    op: str = "eq"
-):
+def compare_transformers_version(version: str = "v4.28.0", op: str = "eq"):
     assert op in ["eq", "lt", "le", "gt", "ge"]
 
     from transformers import __version__
@@ -97,10 +97,7 @@ def compare_transformers_version(
     return getattr(parse_version(__version__), f"__{op}__")(parse_version(version))
 
 
-def compare_pytorch_version(
-    version: str = "v2.0.0",
-    op: str = "eq"
-):
+def compare_pytorch_version(version: str = "v2.0.0", op: str = "eq"):
     assert op in ["eq", "lt", "le", "gt", "ge"]
 
     from torch import __version__

@@ -1,10 +1,11 @@
 import os
+import platform
+import subprocess
 import sys
 from pathlib import Path
-from setuptools import setup, Extension, find_packages
-import subprocess
-import math
-import platform
+
+from setuptools import find_packages, setup
+
 
 os.environ["CC"] = "g++"
 os.environ["CXX"] = "g++"
@@ -90,15 +91,16 @@ requirements = [
 
 extras_require = {
     "triton": ["triton==2.0.0"],
-    "test": ["pytest", "parameterized"]
+    "test": ["pytest", "parameterized"],
+    "quality": ["ruff==0.1.5"],
 }
 
 include_dirs = ["autogptq_cuda"]
 
-additional_setup_kwargs = dict()
+additional_setup_kwargs = {}
 if BUILD_CUDA_EXT:
     from torch.utils import cpp_extension
-       
+
     if platform.system() != "Windows" and platform.machine() != "aarch64" and not DISABLE_QIGEN:
         print("Generating qigen kernels...")
         cores_info = subprocess.run("cat /proc/cpuinfo | grep cores | head -1", shell=True, check=True, text=True, stdout=subprocess.PIPE).stdout.split(" ")
@@ -108,8 +110,8 @@ if BUILD_CUDA_EXT:
             p = os.cpu_count()
         try:
             subprocess.check_output(["python", "./autogptq_extension/qigen/generate.py", "--module", "--search", "--p", str(p)])
-        except subprocess.CalledProcessError as e:
-            raise Exception(f"Generating QiGen kernels failed with the error shown above.")
+        except subprocess.CalledProcessError:
+            raise Exception("Generating QiGen kernels failed with the error shown above.")
 
     if not ROCM_VERSION:
         from distutils.sysconfig import get_python_lib
@@ -135,7 +137,7 @@ if BUILD_CUDA_EXT:
             ]
         )
     ]
-    
+
     if platform.system() != "Windows":
         if platform.machine() != "aarch64" and not DISABLE_QIGEN:
             extensions.append(

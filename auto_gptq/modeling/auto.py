@@ -1,29 +1,30 @@
 from inspect import signature
 from typing import Dict, Optional, Union
 
-from ._base import BaseQuantizeConfig, BaseGPTQForCausalLM
+from ._base import BaseGPTQForCausalLM, BaseQuantizeConfig
 from ._utils import check_and_get_model_type
+from .baichuan import BaiChuanGPTQForCausalLM
 from .bloom import BloomGPTQForCausalLM
 from .codegen import CodeGenGPTQForCausalLM
+from .decilm import DeciLMGPTQForCausalLM
+from .gpt2 import GPT2GPTQForCausalLM
+from .gpt_bigcode import GPTBigCodeGPTQForCausalLM
 from .gpt_neox import GPTNeoXGPTQForCausalLM
 from .gptj import GPTJGPTQForCausalLM
-from .gpt2 import GPT2GPTQForCausalLM
+from .internlm import InternLMGPTQForCausalLM
 from .llama import LlamaGPTQForCausalLM
+from .longllama import LongLlamaGPTQForCausalLM
+from .mistral import MistralGPTQForCausalLM
+from .mixtral import MixtralGPTQForCausalLM
 from .moss import MOSSGPTQForCausalLM
 from .opt import OPTGPTQForCausalLM
-from .rw import RWGPTQForCausalLM
-from .gpt_bigcode import GPTBigCodeGPTQForCausalLM
-from .baichuan import BaiChuanGPTQForCausalLM
-from .internlm import InternLMGPTQForCausalLM
 from .qwen import QwenGPTQForCausalLM
-from .mistral import MistralGPTQForCausalLM
-from .yi import YiGPTQForCausalLM
-from .xverse import XverseGPTQForCausalLM
-from .decilm import DeciLMGPTQForCausalLM
-from .stablelmepoch import StableLMEpochGPTQForCausalLM
-from .mixtral import MixtralGPTQForCausalLM
 from .qwen2 import Qwen2GPTQForCausalLM
-from .longllama import LongLlamaGPTQForCausalLM
+from .rw import RWGPTQForCausalLM
+from .stablelmepoch import StableLMEpochGPTQForCausalLM
+from .xverse import XverseGPTQForCausalLM
+from .yi import YiGPTQForCausalLM
+
 
 GPTQ_CAUSAL_LM_MODEL_MAP = {
     "bloom": BloomGPTQForCausalLM,
@@ -67,17 +68,15 @@ class AutoGPTQForCausalLM:
         quantize_config: BaseQuantizeConfig,
         max_memory: Optional[dict] = None,
         trust_remote_code: bool = False,
-        **model_init_kwargs
+        **model_init_kwargs,
     ) -> BaseGPTQForCausalLM:
-        model_type = check_and_get_model_type(
-            pretrained_model_name_or_path, trust_remote_code
-        )
+        model_type = check_and_get_model_type(pretrained_model_name_or_path, trust_remote_code)
         return GPTQ_CAUSAL_LM_MODEL_MAP[model_type].from_pretrained(
             pretrained_model_name_or_path=pretrained_model_name_or_path,
             quantize_config=quantize_config,
             max_memory=max_memory,
             trust_remote_code=trust_remote_code,
-            **model_init_kwargs
+            **model_init_kwargs,
         )
 
     @classmethod
@@ -100,7 +99,7 @@ class AutoGPTQForCausalLM:
         trainable: bool = False,
         disable_exllama: Optional[bool] = None,
         disable_exllamav2: bool = False,
-        **kwargs
+        **kwargs,
     ) -> BaseGPTQForCausalLM:
         # If disable_exllamav2 is True, we want to fall back on the exllama kernel and not the cuda/cuda_old ones.
         if disable_exllama is None:
@@ -108,7 +107,7 @@ class AutoGPTQForCausalLM:
                 disable_exllama = False
             else:
                 disable_exllama = True
-        
+
         model_type = check_and_get_model_type(model_name_or_path, trust_remote_code)
         quant_func = GPTQ_CAUSAL_LM_MODEL_MAP[model_type].from_quantized
         # A static list of kwargs needed for huggingface_hub
@@ -122,7 +121,7 @@ class AutoGPTQForCausalLM:
             "revision",
             "subfolder",
             "_raise_exceptions_for_missing_entries",
-            "_commit_hash"
+            "_commit_hash",
         ]
         # TODO: do we need this filtering of kwargs? @PanQiWei is there a reason we can't just pass all kwargs?
         keywords = {
@@ -148,7 +147,7 @@ class AutoGPTQForCausalLM:
             trainable=trainable,
             disable_exllama=disable_exllama,
             disable_exllamav2=disable_exllamav2,
-            **keywords
+            **keywords,
         )
 
 
