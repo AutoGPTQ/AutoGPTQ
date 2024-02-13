@@ -78,6 +78,9 @@ jobs:
         run: |
           conda install cuda-toolkit -c "nvidia/label/cuda-12.1.0"
 
+          export CUDA_HOME=$CONDA_PREFIX
+          export CUDA_PATH=$CONDA_PREFIX
+
           # Refer to https://pytorch.org/get-started/locally/
           if [[ "${{ runner.os }}" == "Linux" ]]; then
             python -m pip install torch

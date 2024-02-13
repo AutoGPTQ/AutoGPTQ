@@ -20,3 +20,4 @@ from .rw import RWGPTQForCausalLM
 from .stablelmepoch import StableLMEpochGPTQForCausalLM
 from .xverse import XverseGPTQForCausalLM
 from .yi import YiGPTQForCausalLM
+from ._base import BaseQuantizeConfig
