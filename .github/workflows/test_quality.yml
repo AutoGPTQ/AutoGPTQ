@@ -78,17 +78,9 @@ jobs:
         run: |
           conda install cuda-toolkit -c "nvidia/label/cuda-12.1.0"
 
-          find / -iname *cuda*
-
-          echo "printenv:"
-          printenv
-          echo "-----"
-
-          echo "CONDA_PREFIX:"
-          echo $CONDA_PREFIX
-
-          export CUDA_HOME=$CONDA_PREFIX
-          export CUDA_PATH=$CONDA_PREFIX
+          # For some reason $CONDA_PREFIX is empty.
+          export CUDA_HOME=/usr/share/miniconda
+          export CUDA_PATH=/usr/share/miniconda
 
           # Refer to https://pytorch.org/get-started/locally/
           if [[ "${{ runner.os }}" == "Linux" ]]; then
