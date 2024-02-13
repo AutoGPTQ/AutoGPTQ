@@ -103,7 +103,7 @@ jobs:
           echo "CUDA_PATH:"
           echo $CUDA_PATH
 
-          DISABLE_QIGEN=1 pip install -vvv .[quality]
+          TORCH_CUDA_ARCH_LIST="7.5 8.0 8.6+PTX" DISABLE_QIGEN=1 pip install -vvv .[quality]
       
       - name: Check style with ruff
         run: |
