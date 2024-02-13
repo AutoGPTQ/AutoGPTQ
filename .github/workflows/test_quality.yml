@@ -49,29 +49,29 @@ jobs:
           add-pip-as-python-dependency: true
           auto-activate-base: false
 
-    - name: Install dependencies
-      run: |
-          conda install cuda-toolkit -c "nvidia/label/cuda-12.1.0"
+      - name: Install dependencies
+        run: |
+            conda install cuda-toolkit -c "nvidia/label/cuda-12.1.0"
 
-          # Refer to https://pytorch.org/get-started/locally/
-          if ("${{ runner.os }}" -eq "Linux")
-          {
-            python -m pip install torch
-          }else{
-            python -m pip install torch --index-url https://download.pytorch.org/whl/cu121
-          }
-        
-        python -m pip install --upgrade build setuptools wheel numpy
+            # Refer to https://pytorch.org/get-started/locally/
+            if ("${{ runner.os }}" -eq "Linux")
+            {
+              python -m pip install torch
+            }else{
+              python -m pip install torch --index-url https://download.pytorch.org/whl/cu121
+            }
+          
+          python -m pip install --upgrade build setuptools wheel numpy
 
-    - name: Check install
-      run: |
-        python -c "import torch; print('torch version:', torch.__version__)"
+      - name: Check install
+        run: |
+          python -c "import torch; print('torch version:', torch.__version__)"
 
-    - name: Install AutoGPTQ
-      run: |
-        DISABLE_QIGEN=1 pip install -vvv .[quality]
-    
-    - name: Check style with ruff
-      run: |
-        source venv/bin/activate
-        ruff .
+      - name: Install AutoGPTQ
+        run: |
+          DISABLE_QIGEN=1 pip install -vvv .[quality]
+      
+      - name: Check style with ruff
+        run: |
+          source venv/bin/activate
+          ruff .
