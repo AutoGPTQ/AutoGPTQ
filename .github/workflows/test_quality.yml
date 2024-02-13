@@ -54,12 +54,11 @@ jobs:
           conda install cuda-toolkit -c "nvidia/label/cuda-12.1.0"
 
           # Refer to https://pytorch.org/get-started/locally/
-          if ("${{ runner.os }}" -eq "Linux")
-          {
+          if [[ "${{ runner.os }}" == "Linux" ]]; then
             python -m pip install torch
-          }else{
+          else
             python -m pip install torch --index-url https://download.pytorch.org/whl/cu121
-          }
+          fi
           
           python -m pip install --upgrade build setuptools wheel numpy
 
