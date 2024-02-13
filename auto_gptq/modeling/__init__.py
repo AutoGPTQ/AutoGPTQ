@@ -1,3 +1,4 @@
+from ._base import BaseQuantizeConfig
 from .auto import GPTQ_CAUSAL_LM_MODEL_MAP, AutoGPTQForCausalLM
 from .baichuan import BaiChuanGPTQForCausalLM
 from .bloom import BloomGPTQForCausalLM
@@ -20,4 +21,3 @@ from .rw import RWGPTQForCausalLM
 from .stablelmepoch import StableLMEpochGPTQForCausalLM
 from .xverse import XverseGPTQForCausalLM
 from .yi import YiGPTQForCausalLM
-from ._base import BaseQuantizeConfig
