@@ -1,9 +1,10 @@
-import unittest
 import tempfile
+import unittest
 
 from transformers import AutoTokenizer
 
 from auto_gptq import AutoGPTQForCausalLM, BaseQuantizeConfig
+
 
 class TestQuantization(unittest.TestCase):
     def test_quantize(self):
@@ -21,9 +22,11 @@ class TestQuantization(unittest.TestCase):
             desc_act=False,
         )
 
-        model = AutoGPTQForCausalLM.from_pretrained(pretrained_model_dir,
-                                                    quantize_config=quantize_config,
-                                                    use_flash_attention_2=False)
+        model = AutoGPTQForCausalLM.from_pretrained(
+            pretrained_model_dir,
+            quantize_config=quantize_config,
+            use_flash_attention_2=False,
+        )
 
         model.quantize(examples)
 

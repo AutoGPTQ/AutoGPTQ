@@ -18,7 +18,14 @@ def levenshtein_distance(seq1: Sequence, seq2: Sequence):
             if seq1[i - 1] == seq2[j - 1]:
                 dp_matrix[i, j] = dp_matrix[i - 1, j - 1]
             else:
-                dp_matrix[i, j] = min(dp_matrix[i - 1, j - 1], dp_matrix[i - 1, j], dp_matrix[i, j - 1]) + 1
+                dp_matrix[i, j] = (
+                    min(
+                        dp_matrix[i - 1, j - 1],
+                        dp_matrix[i - 1, j],
+                        dp_matrix[i, j - 1],
+                    )
+                    + 1
+                )
 
     return dp_matrix[num_rows - 1, num_cols - 1]
 

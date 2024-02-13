@@ -1,5 +1,6 @@
 import functools
 
+
 def recurse_getattr(obj, attr: str):
     """
     Recursive `getattr`.

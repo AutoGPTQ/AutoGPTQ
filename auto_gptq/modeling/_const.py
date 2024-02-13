@@ -1,5 +1,3 @@
-from packaging.version import parse as parse_version
-
 from torch import device
 
 from ..utils.import_utils import compare_transformers_version

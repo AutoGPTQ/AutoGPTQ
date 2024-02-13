@@ -1,8 +1,6 @@
-import os
-
 from transformers import AutoTokenizer, TextGenerationPipeline
-from auto_gptq import AutoGPTQForCausalLM, BaseQuantizeConfig
 
+from auto_gptq import AutoGPTQForCausalLM, BaseQuantizeConfig
 
 pretrained_model_dir = "facebook/opt-125m"
 quantized_model_dir = "opt-125m-4bit-128g"
@@ -66,7 +64,9 @@ if __name__ == "__main__":
     import logging
 
     logging.basicConfig(
-        format="%(asctime)s %(levelname)s [%(name)s] %(message)s", level=logging.INFO, datefmt="%Y-%m-%d %H:%M:%S"
+        format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
+        level=logging.INFO,
+        datefmt="%Y-%m-%d %H:%M:%S",
     )
 
     main()

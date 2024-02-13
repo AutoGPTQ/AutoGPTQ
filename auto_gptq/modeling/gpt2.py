@@ -1,4 +1,4 @@
-from ._base import *
+from ._base import BaseGPTQForCausalLM
 
 
 class GPT2GPTQForCausalLM(BaseGPTQForCausalLM):
@@ -9,7 +9,7 @@ class GPT2GPTQForCausalLM(BaseGPTQForCausalLM):
         ["attn.c_attn"],
         ["attn.c_proj"],
         ["mlp.c_fc"],
-        ["mlp.c_proj"]
+        ["mlp.c_proj"],
     ]
 
 
