@@ -31,31 +31,48 @@ jobs:
 
     runs-on: ${{ matrix.os }}
     steps:
-    - uses: actions/checkout@v2
-    - name: Setup Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v2
-      with:
-        python-version: ${{ matrix.python-version }}
-    - name: Create and start a virtual environment
-      run: |
-        python -m venv venv
-        source venv/bin/activate
+  
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: actions/setup-python@v3
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Setup Miniconda
+        uses: conda-incubator/setup-miniconda@v2.2.0
+        with:
+          activate-environment: "build"
+          python-version: ${{ matrix.python-version }}
+          mamba-version: "*"
+          use-mamba: false
+          channels: conda-forge,defaults
+          channel-priority: true
+          add-pip-as-python-dependency: true
+          auto-activate-base: false
+
     - name: Install dependencies
       run: |
-        source venv/bin/activate
-        pip install --upgrade pip setuptools wheel
-        pip install torch
-        echo "torch version:"
-        python -c "import torch; print(torch.__version__);"
-        echo "pip version:"
-        pip --version
-        which pip
-        echo "python version:"
-        python --version
-        which python
-        echo "setuptools version:"
-        pip list | grep setuptools
+          conda install cuda-toolkit -c "nvidia/label/cuda-12.1.0"
+
+          # Refer to https://pytorch.org/get-started/locally/
+          if ("${{ runner.os }}" -eq "Linux")
+          {
+            python -m pip install torch
+          }else{
+            python -m pip install torch --index-url https://download.pytorch.org/whl/cu121
+          }
+        
+        python -m pip install --upgrade build setuptools wheel numpy
+
+    - name: Check install
+      run: |
+        python -c "import torch; print('torch version:', torch.__version__)"
+
+    - name: Install AutoGPTQ
+      run: |
         DISABLE_QIGEN=1 pip install -vvv .[quality]
+    
     - name: Check style with ruff
       run: |
         source venv/bin/activate
