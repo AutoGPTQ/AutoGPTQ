@@ -3,6 +3,7 @@ from logging import getLogger
 from ..utils.import_utils import compare_transformers_version
 from ._base import BaseGPTQForCausalLM
 
+
 if compare_transformers_version("v4.28.0", op="ge"):
     from ..nn_modules.fused_llama_attn import FusedLlamaAttentionForQuantizedModel
     from ..nn_modules.fused_llama_mlp import FusedLlamaMLPForQuantizedModel

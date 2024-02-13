@@ -14,6 +14,7 @@ from transformers.generation.logits_process import LogitsProcessor
 
 from auto_gptq import AutoGPTQForCausalLM, BaseQuantizeConfig
 
+
 logger = logging.getLogger(__name__)
 
 random.seed(0)

@@ -13,6 +13,7 @@ from transformers import AutoTokenizer, get_linear_schedule_with_warmup
 from auto_gptq import AutoGPTQForCausalLM, get_gptq_peft_model
 from auto_gptq.utils.data_utils import collate_data, make_data_block
 
+
 parser = ArgumentParser()
 parser.add_argument("--model_name_or_path", type=str)
 parser.add_argument("--adapter_len", type=int, default=10)

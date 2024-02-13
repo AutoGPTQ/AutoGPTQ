@@ -16,6 +16,7 @@ from auto_gptq.utils.peft_utils import (
     get_gptq_peft_model,
 )
 
+
 MODEL_NAME = "TheBloke/Wizard-Vicuna-7B-Uncensored-GPTQ"
 
 

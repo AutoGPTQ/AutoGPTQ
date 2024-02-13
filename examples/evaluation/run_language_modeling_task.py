@@ -7,6 +7,7 @@ from transformers import AutoTokenizer
 from auto_gptq import AutoGPTQForCausalLM, BaseQuantizeConfig
 from auto_gptq.eval_tasks import LanguageModelingTask
 
+
 DATASET = "tatsu-lab/alpaca"
 WITH_INPUT_TEMPLATE = "Instruction:\n{instruction}\n\nInput:\n{input}\n\nOutput:\n"
 WITHOUT_INPUT_TEMPLATE = "Instruction:\n{instruction}\n\nOutput:\n"

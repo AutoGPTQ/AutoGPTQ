@@ -4,6 +4,7 @@ from typing import Optional
 import torch
 from packaging.version import parse as parse_version
 
+
 try:
     import triton  # noqa: F401
 

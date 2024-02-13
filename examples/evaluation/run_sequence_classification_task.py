@@ -8,6 +8,7 @@ from transformers import AutoTokenizer
 from auto_gptq import AutoGPTQForCausalLM, BaseQuantizeConfig
 from auto_gptq.eval_tasks import SequenceClassificationTask
 
+
 DATASET = "cardiffnlp/tweet_sentiment_multilingual"
 TEMPLATE = "Question:What's the sentiment of the given text? Choices are {labels}.\nText: {text}\nAnswer:"
 ID2LABEL = {0: "negative", 1: "neutral", 2: "positive"}

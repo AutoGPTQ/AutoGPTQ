@@ -6,6 +6,7 @@ from transformers import AutoTokenizer
 
 from auto_gptq.utils import Perplexity
 
+
 if __name__ == "__main__":
     """
     Example usage.

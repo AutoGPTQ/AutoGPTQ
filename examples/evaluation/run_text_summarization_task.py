@@ -8,6 +8,7 @@ from transformers import AutoTokenizer, GenerationConfig
 from auto_gptq import AutoGPTQForCausalLM, BaseQuantizeConfig
 from auto_gptq.eval_tasks import TextSummarizationTask
 
+
 os.system("pip install py7zr")
 
 

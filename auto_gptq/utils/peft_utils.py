@@ -18,6 +18,7 @@ from ..nn_modules.qlinear.qlinear_exllama import QuantLinear as QuantLinearExlla
 from ..nn_modules.qlinear.qlinear_qigen import QuantLinear as QuantLinearQigen
 from ..nn_modules.qlinear.qlinear_triton import QuantLinear as QuantLinearTriton
 
+
 LinearLayer = Union[
     torch.nn.Linear,
     GeneralQuantLinear,

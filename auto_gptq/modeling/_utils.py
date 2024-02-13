@@ -11,6 +11,7 @@ from transformers import AutoConfig
 from ..utils.import_utils import dynamically_import_QuantLinear
 from ._const import CPU, CUDA_0, EXLLAMA_DEFAULT_MAX_INPUT_LENGTH, SUPPORTED_MODELS
 
+
 logger = getLogger(__name__)
 
 

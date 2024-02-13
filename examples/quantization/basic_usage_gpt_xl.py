@@ -7,6 +7,7 @@ from transformers import TextGenerationPipeline
 
 from auto_gptq import AutoGPTQForCausalLM, BaseQuantizeConfig
 
+
 pretrained_model_dir = "gpt2-xl"
 quantized_model_dir = "gpt2-large-4bit-128g"
 

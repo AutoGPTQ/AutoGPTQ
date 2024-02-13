@@ -6,6 +6,7 @@ import torch
 from gekko import GEKKO
 from torch import nn
 
+
 logger = getLogger(__name__)
 
 try:

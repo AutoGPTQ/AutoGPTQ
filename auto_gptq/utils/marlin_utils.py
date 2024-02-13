@@ -14,6 +14,7 @@ from ..nn_modules.qlinear.qlinear_marlin import QuantLinear as MarlinQuantLinear
 from ..nn_modules.qlinear.qlinear_marlin import dequantize_weight
 from .modeling_utils import recurse_getattr, recurse_setattr
 
+
 logger = getLogger(__name__)
 
 

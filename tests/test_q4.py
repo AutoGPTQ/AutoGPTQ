@@ -7,6 +7,7 @@ from auto_gptq.nn_modules.qlinear.qlinear_exllama import QuantLinear
 from auto_gptq.nn_modules.qlinear.qlinear_marlin import QuantLinear as MarlinQuantLinear
 from auto_gptq.utils.import_utils import dynamically_import_QuantLinear
 
+
 try:
     from exllama_kernels import prepare_buffers, set_tuning_params
 except ImportError as e:

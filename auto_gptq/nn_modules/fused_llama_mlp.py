@@ -7,6 +7,7 @@ from transformers.models.llama.modeling_llama import LlamaMLP
 from ..utils.import_utils import TRITON_AVAILABLE
 from ._fused_base import FusedBaseMLPModule
 
+
 logger = getLogger(__name__)
 
 if TRITON_AVAILABLE:

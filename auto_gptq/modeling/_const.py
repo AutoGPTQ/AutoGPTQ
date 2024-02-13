@@ -2,6 +2,7 @@ from torch import device
 
 from ..utils.import_utils import compare_transformers_version
 
+
 CPU = device("cpu")
 CUDA_0 = device("cuda:0")
 

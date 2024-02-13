@@ -1,5 +1,6 @@
 import torch
 
+
 try:
     from awq.modules.linear import WQLinear_GEMM, WQLinear_GEMV
 except ModuleNotFoundError as e:
@@ -12,6 +13,7 @@ import numpy as np
 from auto_gptq.modeling._utils import autogptq_post_init
 from auto_gptq.nn_modules.qlinear.qlinear_exllamav2 import QuantLinear
 from auto_gptq.utils.import_utils import dynamically_import_QuantLinear
+
 
 group_size = 128
 bits = 4

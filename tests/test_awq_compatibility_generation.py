@@ -8,6 +8,7 @@ from transformers import AutoTokenizer
 from auto_gptq import AutoGPTQForCausalLM
 from auto_gptq.nn_modules.qlinear.qlinear_cuda_old import QuantLinear as CudaOldQLinear
 
+
 try:
     from awq import AutoAWQForCausalLM
 except ModuleNotFoundError as e:
