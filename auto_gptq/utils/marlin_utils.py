@@ -1,4 +1,3 @@
-import copy
 import gc
 import os
 from logging import getLogger
@@ -11,9 +10,13 @@ from safetensors.torch import save_file as safe_save
 from tqdm import tqdm
 
 from ..nn_modules.qlinear.qlinear_marlin import QuantLinear as MarlinQuantLinear
-from ..nn_modules.qlinear.qlinear_marlin import dequantize_weight
+from ..nn_modules.qlinear.qlinear_marlin import _get_perms, unpack_qzeros
+from .import_utils import MARLIN_AVAILABLE, MARLIN_EXCEPTION
 from .modeling_utils import recurse_getattr, recurse_setattr
 
+
+if MARLIN_AVAILABLE:
+    import autogptq_marlin_cuda
 
 logger = getLogger(__name__)
 
@@ -107,6 +110,8 @@ def _validate_marlin_device_support():
 
 # Adapted from https://github.com/rib-2/marlin/tree/conversion
 def _validate_marlin_compatibility(quantization_config):
+    if not MARLIN_AVAILABLE:
+        return f"AutoGPTQ is not compiled with the Marlin kernel, with the following error: {MARLIN_EXCEPTION}"
     if quantization_config.bits != 4:
         return f"The quantized model uses a bitwidth different than 4 (found {quantization_config.bits})"
     if quantization_config.group_size != 128 and quantization_config.group_size != -1:
@@ -119,7 +124,7 @@ def _validate_marlin_compatibility(quantization_config):
 
 
 @torch.no_grad()
-def convert_to_marlin(model, model_quantlinear, quantization_config, repack: bool):
+def convert_to_marlin(model, model_quantlinear, quantization_config, repack: bool, strict: bool = False):
     """
     Converts GPTQ-packed weights to the Marlin format. This assumes that the model already meets Marlin kernel constraints.
 
@@ -130,6 +135,7 @@ def convert_to_marlin(model, model_quantlinear, quantization_config, repack: boo
     if repack:
         message = "Repacking weights to be compatible with Marlin kernel..."
     else:
+        # TODO: load directly Marlin QuantLinear.
         message = "Overriding QuantLinear layers to use Marlin's QuantLinear..."
 
     for name, module in tqdm(model.named_modules(), desc=message, total=len(list(model.named_modules()))):
@@ -144,49 +150,50 @@ def convert_to_marlin(model, model_quantlinear, quantization_config, repack: boo
         parent_name = ".".join(name.split(".")[:-1])
         layer_name = name[len(parent_name) + 1 :]
 
+        with torch.device("meta"):
+            new_module = MarlinQuantLinear(
+                bits=4,
+                group_size=module.group_size,
+                infeatures=module.infeatures,
+                outfeatures=module.outfeatures,
+                bias=bias is not None,
+                trainable=False,
+            )
+
+        # workspace is never in the state_dict, thus we need to allocate it manually.
+        new_module.workspace = torch.zeros(module.outfeatures // 128 * 16, dtype=torch.int, device=module.device)
+
         # Dequantize the weight.
         if repack:
-            dequantized_weight, dequantized_qzeros = dequantize_weight(module)
-            dequantized_weight = dequantized_weight.to(torch.float16)
+            marlin_repacked_weight = autogptq_marlin_cuda.gptq_repack(module.qweight)
 
-            if not torch.all(dequantized_qzeros == 8):
-                raise ValueError(
-                    "Marlin kernel is compatible only with checkpoints using symetric quantization. "
-                    "Found non-symmetric quantization for the weight {name}."
-                )
+            if strict:
+                dequantized_qzeros = unpack_qzeros(module.qzeros)
 
-            linear_module = torch.nn.Linear(
-                in_features=dequantized_weight.shape[1],
-                out_features=dequantized_weight.shape[0],
-                bias=bias is not None,
-                dtype=torch.float16,
-                device="cuda",
-            )
-            linear_module.weight.data.copy_(dequantized_weight)
+                if not torch.all(dequantized_qzeros == 8):
+                    raise ValueError(
+                        "Marlin kernel is compatible only with checkpoints using symetric quantization. "
+                        "Found non-symmetric quantization for the weight {name}."
+                    )
+
+
+            _, _scale_perm, _scale_perm_single = _get_perms()
+
+            s = module.scales.data.clone()
+            if module.group_size != module.infeatures:
+                s = s.reshape((1, -1))
+                s = s.reshape((-1, len(_scale_perm)))[:, _scale_perm]
+            else:
+                s = s.reshape((-1, len(_scale_perm_single)))[:, _scale_perm_single]
+            s = s.reshape((-1, module.outfeatures)).contiguous()
+
+            new_module.B = marlin_repacked_weight
+            new_module.s = s
 
             if bias is not None:
-                linear_module.bias.data.copy_(bias)
-        else:
-            linear_module = torch.nn.Linear(
-                in_features=module.infeatures,
-                out_features=module.outfeatures,
-                bias=bias is not None,
-                dtype=torch.float16,
-                device="meta",
-            )
+                new_module.bias.data.copy_(bias)
 
-        # Create new linear method and copy to model.
-        new_module = MarlinQuantLinear(
-            bits=4,
-            group_size=module.group_size,
-            infeatures=linear_module.in_features,
-            outfeatures=linear_module.out_features,
-            bias=bias is not None,
-            trainable=False,
-        )
-
-        if repack:
-            new_module.pack(linear_module, scales=copy.deepcopy(module.scales.data.t()).to("cuda"))
+            new_module = new_module.to(module.device)
 
         # Save to parent.
         parent_module = model.get_submodule(parent_name)
@@ -195,8 +202,7 @@ def convert_to_marlin(model, model_quantlinear, quantization_config, repack: boo
         # Free cuda memory.
         del module
         if repack:
-            del dequantized_weight
-        torch.cuda.empty_cache()
+            del marlin_repacked_weight
         gc.collect()
 
     # Set quantization config to be Marlin.

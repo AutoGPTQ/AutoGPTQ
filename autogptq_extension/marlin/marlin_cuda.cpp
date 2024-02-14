@@ -14,29 +14,15 @@
  * limitations under the License.
  */
 
-
 #include <torch/all.h>
 #include <torch/python.h>
+#include <ATen/core/Tensor.h>
 #include <ATen/cuda/CUDAContext.h>
+#include <c10/cuda/CUDAGuard.h>
 #include <cuda_runtime.h>
 
-int marlin_cuda(
-  const void* A,
-  const void* B,
-        void* C,
-        void* s,
-  int prob_m,
-  int prob_n,
-  int prob_k,
-  void* workspace,
-  int groupsize = -1,
-  int dev = 0,
-  cudaStream_t stream = 0,
-  int thread_k = -1,
-  int thread_n = -1,
-  int sms = -1,
-  int max_par = 16
-);
+#include "marlin_cuda_kernel.cuh"
+#include "marlin_repack.cuh"
 
 const int ERR_PROB_SHAPE = 1;
 const int ERR_KERN_SHAPE = 2;
@@ -90,4 +76,5 @@ void mul(
 
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
   m.def("mul", &mul, "Marlin FP16xINT4 matmul.");
+  m.def("gptq_repack", &gptq_repack, "Repack GPTQ checkpoints for Marlin.");
 }

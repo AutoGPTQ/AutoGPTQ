@@ -208,6 +208,20 @@ def unpack_4bit_to_32bit_signed(qweight, qzeros):
 
     return unpacked_weights, unpacked_zeros + 1
 
+def unpack_qzeros(qzeros):
+    unpacked_zeros = torch.zeros(
+        (qzeros.shape[0], qzeros.shape[1] * 8),
+        dtype=torch.int8,
+        device=qzeros.device,
+        requires_grad=False,
+    )
+
+    for col in range(unpacked_zeros.shape[1]):
+        i = col % 8
+        unpacked_zeros[:, col] = (qzeros[:, col // 8] >> (4 * i)) & 0xF
+
+    return unpacked_zeros + 1
+
 
 # Copied from https://github.com/IST-DASLab/marlin/pull/1
 @torch.no_grad()
@@ -220,6 +234,14 @@ def dequantize_weight(layer):
     unpacked_qweight = (unpacked_qweight - unpacked_qzeros) * scales
 
     return unpacked_qweight.T, unpacked_qzeros
+
+def dequantize_qzeros(layer):
+    qzeros = layer.qzeros
+    unpacked_qzeros = unpack_qzeros(qzeros)
+    group_size = layer.group_size
+    unpacked_qzeros = unpacked_qzeros.repeat_interleave(group_size, dim=0)
+
+    return unpacked_qzeros
 
 
 __all__ = ["QuantLinear", "dequantize_weight"]

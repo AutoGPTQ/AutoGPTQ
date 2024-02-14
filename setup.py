@@ -166,7 +166,8 @@ if BUILD_CUDA_EXT:
                     'autogptq_marlin_cuda',
                     [
                         'autogptq_extension/marlin/marlin_cuda.cpp',
-                        'autogptq_extension/marlin/marlin_cuda_kernel.cu'
+                        'autogptq_extension/marlin/marlin_cuda_kernel.cu',
+                        'autogptq_extension/marlin/marlin_repack.cu'
                     ]
                 )
             )
