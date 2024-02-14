@@ -19,12 +19,12 @@
 #define MARLIN_CUDA_KERNEL_CUH
 
 
+#include <cuda.h>
 #include <cuda_fp16.h>
 #include <assert.h>
 #include <iostream>
 
 #include "marlin_cuda_kernel.cuh"
-
 
 constexpr int ceildiv(int a, int b) {
   return (a + b - 1) / b;
