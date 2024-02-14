@@ -10,7 +10,7 @@ jobs:
       matrix:
         os: [ubuntu-20.04]
         python: ["3.8", "3.9", "3.10", "3.11"]
-        rocm: ["5.6.1", "5.7.1"]  # we build only for rocm5.6 & 5.7 to match PyTorch 2.1.0 and PyTorch 2.2 nightly
+        rocm: ["5.7.3"]  # we build only for ROCm 5.7 to match PyTorch 2.2.0 and PyTorch 2.2 nightly
 
     name: Build wheels for ${{ matrix.os }} and Python ${{ matrix.python }} and RoCm ${{ matrix.rocm }}
     runs-on: ${{ matrix.os }}
@@ -73,8 +73,8 @@ jobs:
             export ROCM_DL_FILE=amdgpu-install_5.4.50402-1_all.deb
           elif [[ "${{ matrix.rocm }}" == "5.6.1" ]]; then
             export ROCM_DL_FILE=amdgpu-install_5.6.50601-1_all.deb
-          elif [[ "${{ matrix.rocm }}" == "5.7.1" ]]; then
-            export ROCM_DL_FILE=amdgpu-install_5.7.50701-1_all.deb
+          elif [[ "${{ matrix.rocm }}" == "5.7.3" ]]; then
+            export ROCM_DL_FILE=amdgpu-install_5.7.50703-1_all.deb
           else
             echo Unknown rocm version
             exit 1
@@ -91,12 +91,9 @@ jobs:
 
           python -m pip install --upgrade build setuptools wheel ninja numpy gekko pandas
 
-          if [[ "${{ matrix.rocm }}" == "5.7.1" ]]; then
-            echo "Using PyTorch nightly"
-            python -m pip install --pre torch --index-url https://download.pytorch.org/whl/nightly/rocm5.7
-          elif [[ "${{ matrix.rocm }}" == "5.6.1" ]]; then
+          if [[ "${{ matrix.rocm }}" == "5.7.3" ]]; then
             echo "Using PyTorch stable"
-            python -m pip install torch --index-url https://download.pytorch.org/whl/rocm5.6
+            python -m pip install torch --index-url https://download.pytorch.org/whl/rocm5.7
           else
             echo Unknown rocm version for python install
             exit 1
