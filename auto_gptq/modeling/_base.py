@@ -986,7 +986,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                         with open(str(cached_index)) as f:
                             index_json = json.load(f)
                             # find the shards from index.json
-                            shards = list(set([shard for shard in index_json["weight_map"].values()]))
+                            shards = list(set(index_json["weight_map"].values()))
                             for shard in shards:
                                 resolved_archive_file = cached_file(
                                     model_name_or_path,

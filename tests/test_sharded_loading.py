@@ -1,7 +1,6 @@
 import unittest
 
 import torch
-
 from transformers import AutoTokenizer
 
 from auto_gptq import AutoGPTQForCausalLM
