@@ -110,7 +110,7 @@ The following combinations are tested:
 
 #### Marlin kernel
 
-An optimized int4 * fp16 kernel was recently proposed at https://github.com/IST-DASLab/marlin. This is integrated in AutoGPTQ when loading a model with `use_marlin=True`. This kernel is available only on devices with compute capability 8.0 or 8.6 (Ampere GPUs). Please compile AutoGPTQ from source with: `TORCH_CUDA_ARCH_LIST="8.0 8.6+PTX" COMPILE_MARLIN=1 DISABLE_QIGEN=1 pip install -vvv -e .`.
+An optimized int4 * fp16 kernel was recently proposed at https://github.com/IST-DASLab/marlin. This is integrated in AutoGPTQ when loading a model with `use_marlin=True`. This kernel is available only on devices with compute capability 8.0 or 8.6 (Ampere GPUs).
 
 ## Quick Tour
 

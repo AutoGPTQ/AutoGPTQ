@@ -19,11 +19,12 @@
 #define MARLIN_CUDA_KERNEL_CUH
 
 
+#include <cuda.h>
 #include <cuda_fp16.h>
+#include <assert.h>
 #include <iostream>
 
 #include "marlin_cuda_kernel.cuh"
-
 
 constexpr int ceildiv(int a, int b) {
   return (a + b - 1) / b;
@@ -52,6 +53,7 @@ using FragS = Vec<half2, 1>; // quantization scales
 // Predicated asynchronous global->shared copy; used for inputs A where we apply predication to handle batchsizes that
 // are not multiples of 16.
 __device__ inline void cp_async4_pred(void* smem_ptr, const void* glob_ptr, bool pred = true) {
+#if defined(__CUDA_ARCH__) && __CUDA_ARCH__ >= 800
   const int BYTES = 16;
   uint32_t smem = static_cast<uint32_t>(__cvta_generic_to_shared(smem_ptr));
   asm volatile(
@@ -61,12 +63,16 @@ __device__ inline void cp_async4_pred(void* smem_ptr, const void* glob_ptr, bool
     "   @p cp.async.cg.shared.global [%1], [%2], %3;\n"
     "}\n" :: "r"((int) pred), "r"(smem), "l"(glob_ptr), "n"(BYTES)
   );
+#else
+  assert(0);
+#endif
 }
 
 // Asynchronous global->shared copy with a chache hint indicating that the values may be evicted immediately; used for
 // quantized weights B, which are only accessed precisely once and should thus not pollute the L2 cache which we need
 // for inputs A and outputs C.
 __device__ inline void cp_async4_stream(void* smem_ptr, const void* glob_ptr) {
+#if defined(__CUDA_ARCH__) && __CUDA_ARCH__ >= 800
   const int BYTES = 16;
   uint32_t smem = static_cast<uint32_t>(__cvta_generic_to_shared(smem_ptr));
   asm volatile(
@@ -76,21 +82,33 @@ __device__ inline void cp_async4_stream(void* smem_ptr, const void* glob_ptr) {
     "   cp.async.cg.shared.global.L2::cache_hint [%0], [%1], %2, p;\n"
     "}\n" :: "r"(smem), "l"(glob_ptr), "n"(BYTES)
   );
+#else
+  assert(0);
+#endif
 }
 
 // Async copy fence.
 __device__ inline void cp_async_fence() {
+#if defined(__CUDA_ARCH__) && __CUDA_ARCH__ >= 800
   asm volatile("cp.async.commit_group;\n" ::);
+#else
+  assert(0);
+#endif
 }
 
 // Wait until at most `n` async copy stages are still pending.
 template <int n>
 __device__ inline void cp_async_wait() {
+#if defined(__CUDA_ARCH__) && __CUDA_ARCH__ >= 800
   asm volatile("cp.async.wait_group %0;\n" :: "n"(n));
+#else
+  assert(0);
+#endif
 }
 
 // m16n8k16 tensor core mma instruction with fp16 inputs and fp32 output/accumulation.
 __device__ inline void mma(const FragA& a_frag, const FragB& frag_b, FragC& frag_c) {
+#if defined(__CUDA_ARCH__) && __CUDA_ARCH__ >= 800
   const uint32_t* a = reinterpret_cast<const uint32_t*>(&a_frag);
   const uint32_t* b = reinterpret_cast<const uint32_t*>(&frag_b);
   float* c = reinterpret_cast<float*>(&frag_c);
@@ -101,6 +119,9 @@ __device__ inline void mma(const FragA& a_frag, const FragB& frag_b, FragC& frag
     :  "r"(a[0]),  "r"(a[1]),  "r"(a[2]),  "r"(a[3]),  "r"(b[0]),  "r"(b[1]),
        "f"(c[0]),  "f"(c[1]),  "f"(c[2]),  "f"(c[3])
   );
+#else
+  assert(0);
+#endif
 }
 
 // Instruction for loading a full 16x16 matrix fragment of operand A from shared memory, directly in tensor core layout.
