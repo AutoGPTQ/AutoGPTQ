@@ -4,7 +4,7 @@ on: workflow_dispatch
 
 jobs:
   build_wheels:
-    if: ${{ github.repository_owner == 'PanQiWei' }}
+    if: ${{ github.repository_owner == 'AutoGPTQ' }}
     name: Build wheels for ${{ matrix.os }} and Python ${{ matrix.python }} and CUDA ${{ matrix.cuda }}
     runs-on: ${{ matrix.os }}
     strategy:
