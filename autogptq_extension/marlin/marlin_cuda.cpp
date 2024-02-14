@@ -14,10 +14,11 @@
  * limitations under the License.
  */
 
-
 #include <torch/all.h>
 #include <torch/python.h>
+#include <ATen/core/Tensor.h>
 #include <ATen/cuda/CUDAContext.h>
+#include <c10/cuda/CUDAGuard.h>
 #include <cuda_runtime.h>
 
 #include "marlin_cuda_kernel.cuh"
@@ -25,33 +26,6 @@
 
 const int ERR_PROB_SHAPE = 1;
 const int ERR_KERN_SHAPE = 2;
-
-torch::Tensor gptq_repack(
-    torch::Tensor W
-){
-  int m = W.sizes()[0];
-  int n = W.sizes()[1];
-
-  assert(W.is_contiguous());
-  assert(W.dtype() == at::kInt);
-  assert(m % 2 == 0);
-  assert(n % 64 == 0);
-  auto result = at::empty(
-      {m / 2, n * 2}, at::TensorOptions().dtype(at::kInt).device(W.device()));
-
-  const at::cuda::OptionalCUDAGuard device_guard(device_of(W));
-  const dim3 threads(32);
-  // marlin packs 16 x 64 block and gptq packs 8 x 1
-  const dim3 blocks(m / 2, n / 64);
-  cudaStream_t stream = at::cuda::getCurrentCUDAStream().stream();
-  gptq_repack_kernel<<<blocks, threads, 0, stream>>>(
-    (uint32_t*)W.data_ptr(),
-    (uint32_t*)result.data_ptr(),
-    m,
-    n
-  );
-  return result;
-}
 
 void mul(
   const torch::Tensor& A,
@@ -102,5 +76,5 @@ void mul(
 
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
   m.def("mul", &mul, "Marlin FP16xINT4 matmul.");
-  m.def("gptq_repack", &gptq_repack, "Repack gptq for Marlin.")
+  m.def("gptq_repack", &gptq_repack, "Repack GPTQ checkpoints for Marlin.");
 }
