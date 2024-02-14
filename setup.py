@@ -38,8 +38,8 @@ common_setup_kwargs = {
 
 PYPI_RELEASE = os.environ.get('PYPI_RELEASE', None)
 BUILD_CUDA_EXT = int(os.environ.get('BUILD_CUDA_EXT', '1')) == 1
-DISABLE_QIGEN = int(os.environ.get('DISABLE_QIGEN', '0')) == 1
-COMPILE_MARLIN = int(os.environ.get('COMPILE_MARLIN', '0')) == 1
+DISABLE_QIGEN = int(os.environ.get('DISABLE_QIGEN', '1')) == 1
+COMPILE_MARLIN = int(os.environ.get('COMPILE_MARLIN', '1')) == 1
 
 if BUILD_CUDA_EXT:
     try:
@@ -152,15 +152,6 @@ if BUILD_CUDA_EXT:
 
         # Marlin is not ROCm-compatible, CUDA only
         if not ROCM_VERSION and COMPILE_MARLIN:
-            torch_cuda_archs = os.environ.get("TORCH_CUDA_ARCH_LIST", None)
-
-            if not torch_cuda_archs:
-                raise ValueError('The environment variable `TORCH_CUDA_ARCH_LIST` needs to be specified to compile AutoGPTQ with Marlin kernel. Example: `TORCH_CUDA_ARCH_LIST="8.0 8.6+PTX"`.')
-
-            archs_list = torch_cuda_archs.split(" ")
-            if any(arch.startswith("6") or arch.startswith("7") for arch in archs_list):
-                raise ValueError('Marlin kernel can not be compiled CUDA compute capability <8.0. Please specifiy a correct `TORCH_CUDA_ARCH_LIST` environment variable. Example: `TORCH_CUDA_ARCH_LIST="8.0 8.6+PTX"`')
-
             extensions.append(
                 cpp_extension.CUDAExtension(
                     'autogptq_marlin_cuda',
