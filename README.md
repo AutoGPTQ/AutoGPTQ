@@ -67,7 +67,6 @@ git clone https://github.com/PanQiWei/AutoGPTQ.git && cd AutoGPTQ
 
 A few packages are required in order to build from source: `pip install numpy gekko pandas`.
 
-```
 Then, install locally from source:
 ```bash
 pip install -vvv -e .
