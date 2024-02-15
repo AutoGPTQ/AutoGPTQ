@@ -61,14 +61,15 @@ For older AutoGPTQ, please refer to [the previous releases installation table](d
 ### Install from source
 
 Clone the source code:
-```shell
+```bash
 git clone https://github.com/PanQiWei/AutoGPTQ.git && cd AutoGPTQ
+```
 
 A few packages are required in order to build from source: `pip install numpy gekko pandas`.
 
 ```
 Then, install locally from source:
-```shell
+```bash
 pip install -vvv -e .
 ```
 You can set `BUILD_CUDA_EXT=0` to disable pytorch extension building, but this is **strongly discouraged** as AutoGPTQ then falls back on a slow python implementation.
@@ -77,7 +78,7 @@ You can set `BUILD_CUDA_EXT=0` to disable pytorch extension building, but this i
 
 To install from source for AMD GPUs supporting ROCm, please specify the `ROCM_VERSION` environment variable. Example:
 
-```
+```bash
 ROCM_VERSION=5.6 pip install -vvv -e .
 ```
 
