@@ -1,5 +1,5 @@
 # Build with: `docker build -f Dockerfile -t autogptq .`
-# Run with: 
+# Run with: `docker run --gpus all --rm -it autogptq:latest /bin/bash`
 
 FROM nvcr.io/nvidia/cuda:12.1.0-runtime-ubuntu22.04
 
