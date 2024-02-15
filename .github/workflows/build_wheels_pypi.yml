@@ -37,15 +37,7 @@ jobs:
           sudo apt-get purge -y '^openjdk.*'
           sudo apt-get purge -y microsoft-edge-stable google-cloud-cli azure-cli google-chrome-stable firefox powershell mono-devel
           df -h
-          sudo apt-get autoremove -y
-          sudo apt-get clean
-          df -h
-          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
-          df -h
-          sudo rm -rf "/usr/local/share/boost"
-          sudo rm -rf /usr/local/lib/android
-          df -h
-
+    
       - uses: actions/setup-python@v3
         with:
           python-version: ${{ matrix.pyver }}
