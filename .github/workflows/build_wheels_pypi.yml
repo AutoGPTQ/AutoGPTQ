@@ -22,6 +22,7 @@ jobs:
 
       - name: Free disk space
         if: matrix.os == 'ubuntu-20.04'
+        shell: bash
         run: |
           # Go from 19G to 54G free disk space in 3min
           df -h
