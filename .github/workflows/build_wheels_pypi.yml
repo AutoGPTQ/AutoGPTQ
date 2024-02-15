@@ -19,24 +19,6 @@ jobs:
 
     steps:
       - uses: actions/checkout@v3
-
-      - name: Free disk space
-        if: matrix.os == 'ubuntu-20.04'
-        run: |
-          # Go from 19G to 54G free disk space in 3min
-          df -h
-          sudo apt-get update
-          sudo apt-get purge -y '^apache.*'
-          sudo apt-get purge -y '^imagemagick.*'
-          sudo apt-get purge -y '^dotnet.*'
-          sudo apt-get purge -y '^aspnetcore.*'
-          sudo apt-get purge -y 'php.*'
-          sudo apt-get purge -y '^temurin.*'
-          sudo apt-get purge -y '^mysql.*'
-          sudo apt-get purge -y '^java.*'
-          sudo apt-get purge -y '^openjdk.*'
-          sudo apt-get purge -y microsoft-edge-stable google-cloud-cli azure-cli google-chrome-stable firefox powershell mono-devel
-          df -h
     
       - uses: actions/setup-python@v3
         with:
