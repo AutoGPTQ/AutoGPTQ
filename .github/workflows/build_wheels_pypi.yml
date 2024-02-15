@@ -40,24 +40,14 @@ jobs:
           sudo apt-get autoremove -y
           sudo apt-get clean
           df -h
-          sudo rm "$AGENT_TOOLSDIRECTORY" -r -fo
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
           df -h
-          sudo rm "/usr/local/share/boost" -r -fo
-          sudo rm /usr/local/lib/android -r -fo
+          sudo rm -rf "/usr/local/share/boost"
+          sudo rm -rf /usr/local/lib/android
           df -h
-          sudo rm /usr/share/dotnet/sdk -r -fo
-          sudo rm /usr/share/dotnet/shared -r -fo
-          sudo rm /usr/share/swift -r -fo
-          df -h
-          sudo rm /var/lib/mysql -r -fo
-          sudo rm /home/runner/.dotnet -r -fo
-          sudo rm /home/runneradmin/.dotnet -r -fo
-          sudo rm /etc/skel/.dotnet -r -fo
-          sudo rm /usr/local/.ghcup -r -fo
-          sudo rm /usr/local/aws-cli -r -fo
-          sudo rm /usr/local/lib/node_modules -r -fo
-          sudo rm /usr/lib/heroku -r -fo
-          sudo rm /usr/local/share/chromium -r -fo
+          sudo rm -rf /usr/share/dotnet/sdk
+          sudo rm -rf /usr/share/dotnet/shared
+          sudo rm -rf /usr/share/swift
           df -h
 
       - uses: actions/setup-python@v3
