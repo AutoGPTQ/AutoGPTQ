@@ -825,7 +825,6 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         **kwargs,
     ):
         """load quantized model from local disk"""
-
         # If disable_exllamav2 is True, we want to fall back on the exllama kernel and not the cuda/cuda_old ones.
         if disable_exllama is None:
             if disable_exllamav2:
@@ -1369,13 +1368,17 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                 cls.fused_mlp_module_type.warmup(model, seqlen=model.seqlen)
 
         # == step7: make model compatible with peft
-        cls.make_sure_compatible_with_peft(
-            model,
-            use_triton,
-            quantize_config.desc_act,
-            quantize_config.group_size,
-            bits=quantize_config.bits,
-        )
+        # cls.make_sure_compatible_with_peft(
+        #     model,
+        #     use_triton,
+        #     quantize_config.desc_act,
+        #     quantize_config.group_size,
+        #     bits=quantize_config.bits,
+        #     disable_exllama=disable_exllama,
+        #     disable_exllamav2=disable_exllamav2,
+        #     use_marlin=use_marlin,
+        #     use_qigen=use_qigen,
+        # )
 
         return cls(
             model,
@@ -1418,10 +1421,14 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         desc_act: bool,
         group_size: int,
         bits: int,
+        disable_exllama: bool = True,
+        disable_exllamav2: bool = False,
+        use_marlin: bool = False,
+        use_qigen: bool = False,
     ):
         GeneralQuantLinear.inject_to_model(
             model,
-            dynamically_import_QuantLinear(use_triton, desc_act, group_size, bits=bits),
+            dynamically_import_QuantLinear(use_triton, desc_act, group_size, bits=bits, disable_exllama=disable_exllama, disable_exllamav2=disable_exllamav2, use_marlin=use_marlin, use_qigen=use_qigen),
         )
 
     def __getattr__(self, item):
