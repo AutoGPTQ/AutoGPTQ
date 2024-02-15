@@ -1097,7 +1097,6 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                     bits=quantize_config.bits,
                     disable_exllama=disable_exllama,
                     disable_exllamav2=disable_exllamav2,
-                    use_marlin=use_marlin,
                 )
 
             # TODO: move this logic in an awq_utils.py file.
