@@ -67,11 +67,13 @@ jobs:
           df -h
 
       - uses: actions/setup-python@v3
+        shell: pwsh
         with:
           python-version: ${{ matrix.pyver }}
 
       - name: Setup Miniconda
         uses: conda-incubator/setup-miniconda@v2.2.0
+        shell: pwsh
         with:
           activate-environment: "build"
           python-version: ${{ matrix.pyver }}
@@ -83,6 +85,7 @@ jobs:
           auto-activate-base: false
 
       - name: Install Dependencies
+        shell: pwsh
         run: |
           conda install cuda-toolkit -c "nvidia/label/cuda-${env:CUDA_VERSION}.0"
 
@@ -95,6 +98,7 @@ jobs:
           python -c "import torch; print('torch version:', torch.__version__)"
 
       - name: Build Wheel
+        shell: pwsh
         run: |
           $env:CUDA_PATH = $env:CONDA_PREFIX
           $env:CUDA_HOME = $env:CONDA_PREFIX
