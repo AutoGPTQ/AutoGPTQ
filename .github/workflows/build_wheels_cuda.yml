@@ -23,7 +23,6 @@ jobs:
 
       - name: Free disk space
         if: matrix.os == 'ubuntu-20.04'
-        shell: bash
         run: |
           # Go from 19G to 54G free disk space in 3min
           df -h
@@ -39,7 +38,7 @@ jobs:
           sudo apt-get purge -y '^openjdk.*'
           sudo apt-get purge -y microsoft-edge-stable google-cloud-cli azure-cli google-chrome-stable firefox powershell mono-devel
           df -h
-          sudo apt-get autoremove -y >/dev/null 2>&1
+          sudo apt-get autoremove -y
           sudo apt-get clean
           df -h
           echo "https://github.com/actions/virtual-environments/issues/709"
@@ -47,33 +46,31 @@ jobs:
           df -h
           echo "remove big /usr/local"
           sudo rm -rf "/usr/local/share/boost"
-          sudo rm -rf /usr/local/lib/android >/dev/null 2>&1
+          sudo rm -rf /usr/local/lib/android
           df -h
           echo "remove /usr/share leftovers"
-          sudo rm -rf /usr/share/dotnet/sdk > /dev/null 2>&1
-          sudo rm -rf /usr/share/dotnet/shared > /dev/null 2>&1
-          sudo rm -rf /usr/share/swift > /dev/null 2>&1
+          sudo rm -rf /usr/share/dotnet/sdk
+          sudo rm -rf /usr/share/dotnet/shared
+          sudo rm -rf /usr/share/swift
           df -h
           echo "remove other leftovers"
-          sudo rm -rf /var/lib/mysql > /dev/null 2>&1
-          sudo rm -rf /home/runner/.dotnet > /dev/null 2>&1
-          sudo rm -rf /home/runneradmin/.dotnet > /dev/null 2>&1
-          sudo rm -rf /etc/skel/.dotnet > /dev/null 2>&1
-          sudo rm -rf /usr/local/.ghcup > /dev/null 2>&1
-          sudo rm -rf /usr/local/aws-cli > /dev/null 2>&1
-          sudo rm -rf /usr/local/lib/node_modules > /dev/null 2>&1
-          sudo rm -rf /usr/lib/heroku > /dev/null 2>&1
-          sudo rm -rf /usr/local/share/chromium > /dev/null 2>&1
+          sudo rm -rf /var/lib/mysql
+          sudo rm -rf /home/runner/.dotnet
+          sudo rm -rf /home/runneradmin/.dotnet
+          sudo rm -rf /etc/skel/.dotnet
+          sudo rm -rf /usr/local/.ghcup
+          sudo rm -rf /usr/local/aws-cli
+          sudo rm -rf /usr/local/lib/node_modules
+          sudo rm -rf /usr/lib/heroku
+          sudo rm -rf /usr/local/share/chromium
           df -h
 
       - uses: actions/setup-python@v3
-        shell: pwsh
         with:
           python-version: ${{ matrix.pyver }}
 
       - name: Setup Miniconda
         uses: conda-incubator/setup-miniconda@v2.2.0
-        shell: pwsh
         with:
           activate-environment: "build"
           python-version: ${{ matrix.pyver }}
@@ -85,7 +82,6 @@ jobs:
           auto-activate-base: false
 
       - name: Install Dependencies
-        shell: pwsh
         run: |
           conda install cuda-toolkit -c "nvidia/label/cuda-${env:CUDA_VERSION}.0"
 
@@ -98,7 +94,6 @@ jobs:
           python -c "import torch; print('torch version:', torch.__version__)"
 
       - name: Build Wheel
-        shell: pwsh
         run: |
           $env:CUDA_PATH = $env:CONDA_PREFIX
           $env:CUDA_HOME = $env:CONDA_PREFIX
