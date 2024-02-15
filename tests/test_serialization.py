@@ -47,7 +47,8 @@ class TestSerialization(unittest.TestCase):
 
             second_load_time = end - start
 
-        self.assertTrue(second_load_time < 0.2 * first_load_time)
+        # Since we use a CUDA kernel to repack weights, the first load time is already small.
+        self.assertTrue(second_load_time < 0.8 * first_load_time)
 
     def test_marlin_hf_cache_serialization(self):
         start = time.time()
@@ -66,4 +67,5 @@ class TestSerialization(unittest.TestCase):
 
         second_load_time = end - start
 
-        self.assertTrue(second_load_time < 0.2 * first_load_time)
+        # Since we use a CUDA kernel to repack weights, the first load time is already small.
+        self.assertTrue(second_load_time < 0.8 * first_load_time)

@@ -1095,6 +1095,8 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                     quantize_config.desc_act,
                     quantize_config.group_size,
                     bits=quantize_config.bits,
+                    disable_exllama=disable_exllama,
+                    disable_exllamav2=disable_exllamav2,
                 )
 
             # TODO: move this logic in an awq_utils.py file.
@@ -1217,7 +1219,6 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
 
                         safe_save(new_state_dict, model_save_name)
 
-            # TODO: Move this logic in a marlin_utils.py file.
             if use_marlin:
                 if torch.version.hip:
                     raise ValueError("Can not use Marlin int4*fp16 kernel with AMD ROCm version of PyTorch as the kernel is not compatible. Please do not use `use_marlin=True` when using ROCm devices.")
@@ -1234,6 +1235,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                     )
 
                 # Load the quant linear type we need.
+                # TODO: load directy marlin with the right quantlinear class.
                 quant_linear_class = dynamically_import_QuantLinear(
                     use_triton=use_triton,
                     desc_act=quantize_config.desc_act,
@@ -1241,6 +1243,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                     bits=quantize_config.bits,
                     disable_exllama=disable_exllama,
                     disable_exllamav2=disable_exllamav2,
+                    disable_marlin=True,  # Get the "original" QuantLienar class
                 )
 
                 # Prepare model for marlin load.
@@ -1428,7 +1431,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
     ):
         GeneralQuantLinear.inject_to_model(
             model,
-            dynamically_import_QuantLinear(use_triton, desc_act, group_size, bits=bits, disable_exllama=disable_exllama, disable_exllamav2=disable_exllamav2, use_marlin=use_marlin, use_qigen=use_qigen),
+            dynamically_import_QuantLinear(use_triton, desc_act, group_size, bits=bits, disable_exllama=disable_exllama, disable_exllamav2=disable_exllamav2, disable_marlin=not use_marlin, use_qigen=use_qigen),
         )
 
     def __getattr__(self, item):
