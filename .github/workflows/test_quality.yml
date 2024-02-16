@@ -97,11 +97,7 @@ jobs:
           conda install cuda-toolkit -c "nvidia/label/cuda-12.1.0"
 
           # Refer to https://pytorch.org/get-started/locally/
-          if [[ "${{ runner.os }}" == "Linux" ]]; then
-            python -m pip install torch
-          else
-            python -m pip install torch --index-url https://download.pytorch.org/whl/cu121
-          fi
+          python -m pip install torch
           
           python -m pip install --upgrade build setuptools wheel numpy
 
@@ -121,7 +117,7 @@ jobs:
           echo "CUDA_PATH:"
           echo $CUDA_PATH
 
-          TORCH_CUDA_ARCH_LIST="7.5 8.0 8.6+PTX" DISABLE_QIGEN=1 pip install -vvv .[quality]
+          pip install -vvv .[quality]
       
       - name: Check style with ruff
         run: |

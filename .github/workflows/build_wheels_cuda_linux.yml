@@ -94,11 +94,12 @@ jobs:
 
       - name: Build Wheel
         run: |
-          export CUDA_PATH=$CONDA_PREFIX
-          export CUDA_HOME=$CONDA_PREFIX
+          # For some reason $CONDA_PREFIX is empty.
+          export CUDA_HOME=/usr/share/miniconda
+          export CUDA_PATH=/usr/share/miniconda
           export LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:${CONDA_PREFIX}/lib"
 
-          export TORCH_CUDA_ARCH_LIST = '6.0 6.1 7.0 7.5 8.0 8.6 8.9 9.0+PTX'
+          export TORCH_CUDA_ARCH_LIST="6.0 6.1 7.0 7.5 8.0 8.6 8.9 9.0+PTX"
 
           echo "CUDA_PATH:"
           echo $CUDA_PATH
