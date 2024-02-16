@@ -1,28 +1,26 @@
-name: Build AutoGPTQ Wheels with CUDA
+name: Build AutoGPTQ Wheels for PyPI with CUDA for Windows
 
 on: workflow_dispatch
 
 jobs:
   build_wheels:
     if: ${{ github.repository_owner == 'AutoGPTQ' }}
-    name: Build wheels for ${{ matrix.os }} and Python ${{ matrix.python }} and CUDA ${{ matrix.cuda }}
+    name: Build wheels for ${{ matrix.os }} and Python ${{ matrix.python }} and CUDA 12.1
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-20.04, windows-latest]
+        os: [windows-latest]
         pyver: ["3.8", "3.9", "3.10", "3.11"]
-        cuda: ["11.8"]  # wheel for 12.1 are built in build_wheels_pypi.yml
     defaults:
       run:
-        shell: bash
+        shell: pwsh
     env:
-        CUDA_VERSION: ${{ matrix.cuda }}
+        CUDA_VERSION: "12.1"
 
     steps:
       - uses: actions/checkout@v3
 
       - name: Free disk space
-        if: matrix.os == 'ubuntu-20.04'
         run: |
           # Go from 19G to 54G free disk space in 3min
           df -h
@@ -83,10 +81,11 @@ jobs:
 
       - name: Install Dependencies
         run: |
-          conda install cuda-toolkit -c "nvidia/label/cuda-${CUDA_VERSION}.0"
+          conda install cuda-toolkit -c "nvidia/label/cuda-${env:CUDA_VERSION}.0"
 
           # Refer to https://pytorch.org/get-started/locally/
-          python -m pip install torch --index-url https://download.pytorch.org/whl/cu118
+          python -m pip install torch --index-url https://download.pytorch.org/whl/cu121
+
           python -m pip install --upgrade build setuptools wheel ninja numpy gekko pandas
 
       - name: Check install
@@ -95,33 +94,22 @@ jobs:
 
       - name: Build Wheel
         run: |
-          export CUDA_PATH=$CONDA_PREFIX
-          export CUDA_HOME=$CONDA_PREFIX
-          
-          if [[ "${{ runner.os }}" == "Linux" ]]; then
-            export LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:${CONDA_PREFIX}/lib"
-          else
-            echo "nothing"
-          fi
+          $env:CUDA_PATH = $env:CONDA_PREFIX
+          $env:CUDA_HOME = $env:CONDA_PREFIX
 
-          export TORCH_CUDA_ARCH_LIST = '6.0 6.1 7.0 7.5 8.0 8.6 8.9 9.0+PTX'
+          $env:TORCH_CUDA_ARCH_LIST = '6.0 6.1 7.0 7.5 8.0 8.6 8.9 9.0+PTX'
+
+          $env:PYPI_RELEASE = "1"
 
           echo "CUDA_PATH:"
-          echo $CUDA_PATH
+          echo $env:CUDA_PATH
 
           echo "PYPI_RELEASE:"
-          echo $PYPI_RELEASE
+          echo $env:PYPI_RELEASE
 
           python setup.py sdist bdist_wheel
 
       - uses: actions/upload-artifact@v3
-        if: runner.os == 'Linux'
         with:
-          name: 'linux-cuda-wheels'
-          path: ./dist/*.whl
-
-      - uses: actions/upload-artifact@v3
-        if: runner.os == 'Windows'
-        with:
-          name: 'windows-cuda-wheels'
+          name: 'windows-cuda-wheels-pypi'
           path: ./dist/*.whl
