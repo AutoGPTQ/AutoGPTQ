@@ -1,4 +1,4 @@
-name: Build AutoGPTQ Wheels for PyPI with CUDA
+name: Build AutoGPTQ Wheels for PyPI with CUDA for Windows
 
 on: workflow_dispatch
 

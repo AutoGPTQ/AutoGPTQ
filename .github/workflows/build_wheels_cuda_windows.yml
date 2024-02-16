@@ -1,4 +1,4 @@
-name: Build AutoGPTQ Wheels with CUDA
+name: Build AutoGPTQ Wheels with CUDA for Windows
 
 on: workflow_dispatch
 
