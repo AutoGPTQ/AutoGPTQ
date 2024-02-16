@@ -87,7 +87,7 @@ jobs:
           # Refer to https://pytorch.org/get-started/locally/
           python -m pip install torch --index-url https://download.pytorch.org/whl/cu118
           python -m pip install --upgrade build setuptools wheel ninja numpy gekko pandas
-        
+
       - name: Check install
         run: |
           python -c "import torch; print('torch version:', torch.__version__)"
@@ -107,7 +107,7 @@ jobs:
           echo $PYPI_RELEASE
 
           python setup.py sdist bdist_wheel
-      
+
       - uses: actions/upload-artifact@v3
         with:
           name: 'linux-cuda-wheels'
