@@ -3,7 +3,7 @@ import json
 import logging
 import os
 from dataclasses import dataclass, field, fields
-from os.path import isdir, isfile, join
+from os.path import isdir, join
 from typing import Dict, List, Optional, Union
 
 import accelerate
@@ -49,6 +49,7 @@ from ._const import CPU, CUDA_0, SUPPORTED_MODELS
 from ._utils import (
     autogptq_post_init,
     find_layers,
+    get_checkpoints,
     get_device,
     get_module_by_name_prefix,
     get_module_by_name_suffix,
@@ -950,42 +951,12 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         model_name_or_path = str(model_name_or_path)
         is_local = isdir(model_name_or_path)
 
-        resolved_archive_file = None
-        true_model_basename = None
-        searched_files = []
-        if is_local:
-            for ext in extensions:
-                for possible_model_basename in possible_model_basenames:
-                    model_save_name = join(model_name_or_path, possible_model_basename)
-                    searched_files.append(possible_model_basename + ext)
-                    if isfile(model_save_name + ext):
-                        resolved_archive_file = model_save_name + ext
-                        true_model_basename = possible_model_basename
-                        break
-        else:  # remote
-            temp = None
-            for ext in extensions:
-                for possible_model_basename in possible_model_basenames:
-                    resolved_archive_file = cached_file(
-                        model_name_or_path,
-                        possible_model_basename + ext,
-                        **cached_file_kwargs,
-                    )
-                    if resolved_archive_file is None:
-                        resolved_archive_file = temp
-                    searched_files.append(possible_model_basename + ext)
-                    if resolved_archive_file is not None:
-                        temp = resolved_archive_file
-                        true_model_basename = possible_model_basename
-                        break
+        # Retrieve (and if necessary download) the quantized checkpoint(s).
+        is_sharded, resolved_archive_file, true_model_basename = get_checkpoints(model_name_or_path=model_name_or_path, extensions=extensions, possible_model_basenames=possible_model_basenames, **cached_file_kwargs)
 
         quantize_config.model_file_base_name = true_model_basename
-        if resolved_archive_file is None:
-            raise FileNotFoundError(
-                f"Could not find a model in {model_name_or_path} with a name in {', '.join(searched_files)}. Please specify the argument model_basename to use a custom file name."
-            )
 
-        model_save_name = resolved_archive_file
+        model_save_name = resolved_archive_file  # In case a model is sharded, this would be `model.safetensors.index.json` which may later break.
 
         if (not disable_exllama or not disable_exllamav2) and trainable:
             logger.warning(
@@ -1101,6 +1072,9 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
 
             # TODO: move this logic in an awq_utils.py file.
             if quantize_config.awq_gemm_checkpoint:
+                if is_sharded:
+                    raise ValueError("The loading of sharded checkpoints with AWQ checkpoints is currently not supported. Please raise an issue in AutoGPTQ repository.")
+
                 if use_marlin:
                     raise ValueError(
                         "Tried to load an AWQ kernel with use_marlin=True. This is currently not supported. Please open an issue in AutoGPTQ repository."
@@ -1220,6 +1194,8 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                         safe_save(new_state_dict, model_save_name)
 
             if use_marlin:
+                if is_sharded:
+                    raise ValueError("The loading of sharded checkpoints with Marlin is currently not supported. Please raise an issue in AutoGPTQ repository.")
                 if torch.version.hip:
                     raise ValueError("Can not use Marlin int4*fp16 kernel with AMD ROCm version of PyTorch as the kernel is not compatible. Please do not use `use_marlin=True` when using ROCm devices.")
                 if not torch.cuda.get_device_capability()[0] >= 8:
@@ -1281,8 +1257,11 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         else:
             # Using QiGen.
 
+            if is_sharded:
+                raise ValueError("The loading of sharded checkpoints with QiGen is currently not supported. Please raise an issue in AutoGPTQ repository.")
+
             if quantize_config.desc_act:
-                NotImplementedError("desc_act=True is not yet supported.")
+                NotImplementedError("desc_act=True is not yet supported with QiGen.")
             model = AutoModelForCausalLM.from_config(
                 config, trust_remote_code=trust_remote_code, torch_dtype=torch_dtype
             )
