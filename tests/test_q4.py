@@ -2083,3 +2083,35 @@ class TestQ4Marlin(unittest.TestCase):
         predicted_text = tokenizer.decode(res[0])
 
         self.assertEqual(predicted_text, reference_output)
+
+    def test_bias(self):
+        # TheBloke/Llama-2-7B-Chat-GPTQ has bias, but they are all zeros, use a checkpoint which really uses bias.
+        model_id = "s3nh/starcoderbase-1b-GPTQ"
+        try:
+            model_q = AutoGPTQForCausalLM.from_quantized(model_id, device="cuda:0", use_marlin=True)
+        except ValueError as e:
+            if torch.version.hip:
+                self.assertTrue("Can not use Marlin int4*fp16 kernel with AMD ROCm" in e.text)
+                self.skipTest("Can not run this test on ROCm")
+            else:
+                raise e
+
+        for _, param in model_q.named_parameters():
+            self.assertTrue(param.device != torch.device("meta"))
+
+        for _, param in model_q.named_buffers():
+            self.assertTrue(param.device != torch.device("meta"))
+
+        self.assertTrue(torch.count_nonzero(model_q.model.transformer.h[0].attn.c_proj.bias) > 0)
+        self.assertTrue(torch.count_nonzero(model_q.model.transformer.h[0].attn.c_attn.bias) > 0)
+
+        tokenizer = AutoTokenizer.from_pretrained("Xenova/starcoderbase-1b")
+
+        prompt = "Today I am in Paris and"
+        inp = tokenizer(prompt, return_tensors="pt").to("cuda:0")
+
+        res = model_q.generate(**inp, num_beams=1, min_new_tokens=60, max_new_tokens=60)
+
+        predicted_text = tokenizer.decode(res[0])
+
+        self.assertTrue(predicted_text.startswith("Today I am in Paris and I am a student of the Master's"))
