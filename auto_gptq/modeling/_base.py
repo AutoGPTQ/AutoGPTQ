@@ -3,7 +3,7 @@ import json
 import logging
 import os
 from dataclasses import dataclass, field, fields
-from os.path import isdir, isfile, join
+from os.path import isdir, join
 from typing import Dict, List, Optional, Union
 
 import accelerate
@@ -49,6 +49,7 @@ from ._const import CPU, CUDA_0, SUPPORTED_MODELS
 from ._utils import (
     autogptq_post_init,
     find_layers,
+    get_checkpoints,
     get_device,
     get_module_by_name_prefix,
     get_module_by_name_suffix,
@@ -950,73 +951,13 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
 
         model_name_or_path = str(model_name_or_path)
         is_local = isdir(model_name_or_path)
-        is_sharded = False
 
-        resolved_archive_file = None
-        true_model_basename = None
-        model_index_file = None
-        searched_files = []
-        if is_local:
-            for ext in extensions:
-                for possible_model_basename in possible_model_basenames:
-                    # check for sharded model
-                    possible_index_file = join(model_name_or_path, possible_model_basename + ext + ".index.json")
-                    if isfile(possible_index_file):
-                        possible_model_basename = possible_index_file.replace(ext + ".index.json", "")
-                        model_index_file = possible_index_file
-                        is_sharded = True
-
-                    model_save_name = join(model_name_or_path, possible_model_basename)
-                    searched_files.append(possible_model_basename + ext)
-                    model_or_index = model_save_name + ext + ("" if not is_sharded else ".index.json")
-                    if isfile(model_or_index):
-                        resolved_archive_file = model_or_index
-                        true_model_basename = possible_model_basename
-                        break
-        else:  # remote
-            temp = None
-            for ext in extensions:
-                for possible_model_basename in possible_model_basenames:
-                    # check for sharded model
-                    if cached_index := cached_file(
-                            model_name_or_path,
-                            possible_model_basename + ext + ".index.json",
-                            **cached_file_kwargs,
-                    ):
-                        with open(str(cached_index)) as f:
-                            index_json = json.load(f)
-                            # find the shards from index.json
-                            shards = list(set(index_json["weight_map"].values()))
-                            for shard in shards:
-                                resolved_archive_file = cached_file(
-                                    model_name_or_path,
-                                    shard,
-                                    **cached_file_kwargs,
-                                )
-                                searched_files.append(shard)
-                            model_index_file = cached_index
-                            is_sharded = True
-                    else:
-                        resolved_archive_file = cached_file(
-                            model_name_or_path,
-                            possible_model_basename + ext,
-                            **cached_file_kwargs,
-                        )
-                        if resolved_archive_file is None:
-                            resolved_archive_file = temp
-                    searched_files.append(possible_model_basename + ext)
-                    if resolved_archive_file is not None:
-                        temp = resolved_archive_file
-                        true_model_basename = possible_model_basename
-                        break
+        # Retrieve
+        is_sharded, resolved_archive_file, true_model_basename = get_checkpoints(model_name_or_path=model_name_or_path, extensions=extensions, possible_model_basenames=possible_model_basenames, **cached_file_kwargs)
 
         quantize_config.model_file_base_name = true_model_basename
-        if resolved_archive_file is None:
-            raise FileNotFoundError(
-                f"Could not find a model in {model_name_or_path} with a name in {', '.join(searched_files)}. Please specify the argument model_basename to use a custom file name."
-            )
 
-        model_save_name = resolved_archive_file
+        model_save_name = resolved_archive_file  # In case a model is sharded, this would be `model.safetensors.index.json` which may later break.
 
         if (not disable_exllama or not disable_exllamav2) and trainable:
             logger.warning(
@@ -1130,6 +1071,9 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
 
             # TODO: move this logic in an awq_utils.py file.
             if quantize_config.awq_gemm_checkpoint:
+                if is_sharded:
+                    raise ValueError("The loading of sharded checkpoints with AWQ checkpoints is currently not supported. Please raise an issue in AutoGPTQ repository.")
+
                 if use_marlin:
                     raise ValueError(
                         "Tried to load an AWQ kernel with use_marlin=True. This is currently not supported. Please open an issue in AutoGPTQ repository."
@@ -1250,6 +1194,9 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
 
             # TODO: Move this logic in a marlin_utils.py file.
             if use_marlin:
+                if is_sharded:
+                    raise ValueError("The loading of sharded checkpoints with Marlin is currently not supported. Please raise an issue in AutoGPTQ repository.")
+
                 # Validate the model can run in Marlin.
                 if torch_dtype != torch.float16:
                     raise ValueError("Marlin kernel requires torch_dtype=torch.float16.")
@@ -1293,7 +1240,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             accelerate.utils.modeling.load_checkpoint_in_model(
                 model,
                 dtype=torch_dtype,  # This is very hacky but works due to https://github.com/huggingface/accelerate/blob/bd72a5f1a80d5146554458823f8aeda0a9db5297/src/accelerate/utils/modeling.py#L292
-                checkpoint=model_index_file if is_sharded else model_save_name,  # for sharded we use index.json
+                checkpoint=model_save_name,
                 device_map=device_map,
                 offload_state_dict=True,
                 offload_buffers=True,
@@ -1304,8 +1251,11 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         else:
             # Using QiGen.
 
+            if is_sharded:
+                raise ValueError("The loading of sharded checkpoints with QiGen is currently not supported. Please raise an issue in AutoGPTQ repository.")
+
             if quantize_config.desc_act:
-                NotImplementedError("desc_act=True is not yet supported.")
+                NotImplementedError("desc_act=True is not yet supported with QiGen.")
             model = AutoModelForCausalLM.from_config(
                 config, trust_remote_code=trust_remote_code, torch_dtype=torch_dtype
             )

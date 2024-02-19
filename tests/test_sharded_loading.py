@@ -1,6 +1,5 @@
 import unittest
 
-import torch
 from transformers import AutoTokenizer
 
 from auto_gptq import AutoGPTQForCausalLM
@@ -13,24 +12,19 @@ class TestShardedLoading(unittest.TestCase):
 
         tokenizer = AutoTokenizer.from_pretrained(model_name, use_fast=True)
 
-        model = AutoGPTQForCausalLM.from_quantized(
-            model_name,
-            use_triton=False,
-            device='cuda:0',
-            warmup_triton=False,
-            disable_exllama=True,
-            disable_exllamav2=True,
-            inject_fused_attention=True,
-            inject_fused_mlp=False,
-            use_safetensors=True
-        )
+        model = AutoGPTQForCausalLM.from_quantized(model_name, device='cuda:0',)
 
         tokens = model.generate(**tokenizer("1337", return_tensors="pt").to(model.device), max_new_tokens=20)[0]
         result = tokenizer.decode(tokens)
 
-        test_tokens = torch.tensor([    1, 29871, 29896, 29941, 29941, 29955, 29955, 29955, 29955, 29955,
-        29955, 29955, 29955, 29955, 29955, 29955, 29955, 29955, 29955, 29955,
-        29955, 29955, 29955, 29955, 29955, 29955], device='cuda:0')
+        self.assertTrue(result == '<s> 133777777777777777777777')
 
-        assert(result == '<s> 133777777777777777777777')
-        assert(torch.equal(tokens, test_tokens))
+    def test_loading_large(self):
+        tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen1.5-7B-Chat-GPTQ-Int4")
+
+        model = AutoGPTQForCausalLM.from_quantized("Qwen/Qwen1.5-7B-Chat-GPTQ-Int4", device='cuda:0')
+
+        tokens = model.generate(**tokenizer("Today I am in Paris and", return_tensors="pt").to(model.device), max_new_tokens=20)[0]
+        result = tokenizer.decode(tokens)
+
+        self.assertTrue(result == 'Today I am in Paris and I am going to the Louvre Museum. I want to see the Mona Lisa painting, but I')
