@@ -1,8 +1,9 @@
+# ruff: noqa: I001
 import unittest
 
+import torch
 import autogptq_cuda_64
 import autogptq_cuda_256
-import torch
 from transformers import AutoTokenizer
 
 from auto_gptq import AutoGPTQForCausalLM
@@ -12,9 +13,8 @@ from auto_gptq.nn_modules.qlinear.qlinear_cuda_old import QuantLinear as CudaOld
 try:
     from awq import AutoAWQForCausalLM
 except ModuleNotFoundError as e:
-    raise ModuleNotFoundError(
-        f"AutoAWQ package (https://github.com/casper-hansen/AutoAWQ) is required to run this test. {e}"
-    )
+    AutoAWQForCausalLM = None
+    AWQ_EXCEPTION = e
 
 
 class TestAwqCompatibility(unittest.TestCase):
@@ -23,6 +23,9 @@ class TestAwqCompatibility(unittest.TestCase):
     # TODO: test exllama v2.
 
     def test_generation_cuda_old_fp32_pytorch(self):
+        if AutoAWQForCausalLM is None:
+            self.skipTest(f"AutoAWQ package (https://github.com/casper-hansen/AutoAWQ) is required to run this test. {AWQ_EXCEPTION}")
+
         device = torch.device("cuda:0")
         quant_path = "TheBloke/Llama-2-7B-Chat-AWQ"
 

@@ -1,4 +1,7 @@
-FROM ubuntu:22.04
+# Build with: `docker build -f Dockerfile -t autogptq .`
+# Run with: `docker run --gpus all --rm -it autogptq:latest /bin/bash`
+
+FROM nvcr.io/nvidia/cuda:12.1.0-runtime-ubuntu22.04
 
 RUN apt update && \
     apt install -y wget git && \
@@ -22,4 +25,4 @@ RUN pip install --upgrade numpy torch setuptools wheel
 RUN git clone https://github.com/AutoGPTQ/AutoGPTQ.git
 WORKDIR /AutoGPTQ
 
-RUN DISABLE_QIGEN=1 pip install -vvv .[quality]
+RUN pip install -vvv .

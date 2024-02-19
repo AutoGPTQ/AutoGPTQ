@@ -826,7 +826,6 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         **kwargs,
     ):
         """load quantized model from local disk"""
-
         # If disable_exllamav2 is True, we want to fall back on the exllama kernel and not the cuda/cuda_old ones.
         if disable_exllama is None:
             if disable_exllamav2:
@@ -1067,6 +1066,8 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                     quantize_config.desc_act,
                     quantize_config.group_size,
                     bits=quantize_config.bits,
+                    disable_exllama=disable_exllama,
+                    disable_exllamav2=disable_exllamav2,
                 )
 
             # TODO: move this logic in an awq_utils.py file.
@@ -1192,10 +1193,13 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
 
                         safe_save(new_state_dict, model_save_name)
 
-            # TODO: Move this logic in a marlin_utils.py file.
             if use_marlin:
                 if is_sharded:
                     raise ValueError("The loading of sharded checkpoints with Marlin is currently not supported. Please raise an issue in AutoGPTQ repository.")
+                if torch.version.hip:
+                    raise ValueError("Can not use Marlin int4*fp16 kernel with AMD ROCm version of PyTorch as the kernel is not compatible. Please do not use `use_marlin=True` when using ROCm devices.")
+                if not torch.cuda.get_device_capability()[0] >= 8:
+                    raise ValueError(f'Can not use Marlin int4*fp16 kernel with a device of compute capability {torch.cuda.get_device_capability()}, the minimum compute capability is 8.0 for Marlin kernel. Please do not use `use_marlin=True`, or please upgrade your GPU ("The more you buy, the more you save." - Taiwanese proverb).')
 
                 # Validate the model can run in Marlin.
                 if torch_dtype != torch.float16:
@@ -1207,6 +1211,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                     )
 
                 # Load the quant linear type we need.
+                # TODO: load directy marlin with the right quantlinear class.
                 quant_linear_class = dynamically_import_QuantLinear(
                     use_triton=use_triton,
                     desc_act=quantize_config.desc_act,
@@ -1214,6 +1219,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                     bits=quantize_config.bits,
                     disable_exllama=disable_exllama,
                     disable_exllamav2=disable_exllamav2,
+                    disable_marlin=True,  # Get the "original" QuantLienar class
                 )
 
                 # Prepare model for marlin load.
@@ -1344,13 +1350,17 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                 cls.fused_mlp_module_type.warmup(model, seqlen=model.seqlen)
 
         # == step7: make model compatible with peft
-        cls.make_sure_compatible_with_peft(
-            model,
-            use_triton,
-            quantize_config.desc_act,
-            quantize_config.group_size,
-            bits=quantize_config.bits,
-        )
+        # cls.make_sure_compatible_with_peft(
+        #     model,
+        #     use_triton,
+        #     quantize_config.desc_act,
+        #     quantize_config.group_size,
+        #     bits=quantize_config.bits,
+        #     disable_exllama=disable_exllama,
+        #     disable_exllamav2=disable_exllamav2,
+        #     use_marlin=use_marlin,
+        #     use_qigen=use_qigen,
+        # )
 
         return cls(
             model,
@@ -1393,10 +1403,14 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         desc_act: bool,
         group_size: int,
         bits: int,
+        disable_exllama: bool = True,
+        disable_exllamav2: bool = False,
+        use_marlin: bool = False,
+        use_qigen: bool = False,
     ):
         GeneralQuantLinear.inject_to_model(
             model,
-            dynamically_import_QuantLinear(use_triton, desc_act, group_size, bits=bits),
+            dynamically_import_QuantLinear(use_triton, desc_act, group_size, bits=bits, disable_exllama=disable_exllama, disable_exllamav2=disable_exllamav2, disable_marlin=not use_marlin, use_qigen=use_qigen),
         )
 
     def __getattr__(self, item):

@@ -13,22 +13,30 @@ except ImportError:
     TRITON_AVAILABLE = False
 
 try:
+    import autogptq_cuda_64  # noqa: F401
+
     AUTOGPTQ_CUDA_AVAILABLE = True
 except Exception:
     AUTOGPTQ_CUDA_AVAILABLE = False
 
 
 try:
+    import exllama_kernels  # noqa: F401
+
     EXLLAMA_KERNELS_AVAILABLE = True
 except Exception:
     EXLLAMA_KERNELS_AVAILABLE = False
 
 try:
+    import exllamav2_kernels  # noqa: F401
+
     EXLLAMAV2_KERNELS_AVAILABLE = True
 except Exception:
     EXLLAMAV2_KERNELS_AVAILABLE = False
 
 try:
+    import cQIGen  # noqa: F401
+
     QIGEN_AVAILABLE = True
     QIGEN_EXCEPTION = None
 except Exception as e:
@@ -36,9 +44,13 @@ except Exception as e:
     QIGEN_EXCEPTION = e
 
 try:
+    import autogptq_marlin_cuda  # noqa: F401
+
     MARLIN_AVAILABLE = True
-except Exception:
+    MARLIN_EXCEPTION = None
+except Exception as e:
     MARLIN_AVAILABLE = False
+    MARLIN_EXCEPTION = e
 
 
 logger = getLogger(__name__)

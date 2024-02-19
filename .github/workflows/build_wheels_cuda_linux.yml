@@ -1,23 +1,22 @@
-name: Build AutoGPTQ Wheels with ROCm
+name: Build AutoGPTQ Wheels with CUDA for Linux
 
 on: workflow_dispatch
 
 jobs:
   build_wheels:
     if: ${{ github.repository_owner == 'AutoGPTQ' }}
-
+    name: Build wheels for ${{ matrix.os }} and Python ${{ matrix.python }} and CUDA ${{ matrix.cuda }}
+    runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         os: [ubuntu-20.04]
-        python: ["3.8", "3.9", "3.10", "3.11"]
-        rocm: ["5.7.3"]  # we build only for ROCm 5.7 to match PyTorch 2.2.0 and PyTorch 2.2 nightly
-
-    name: Build wheels for ${{ matrix.os }} and Python ${{ matrix.python }} and RoCm ${{ matrix.rocm }}
-    runs-on: ${{ matrix.os }}
-
+        pyver: ["3.8", "3.9", "3.10", "3.11"]
+        cuda: ["11.8"]  # wheel for 12.1 are built in build_wheels_pypi.yml
     defaults:
       run:
         shell: bash
+    env:
+        CUDA_VERSION: ${{ matrix.cuda }}
 
     steps:
       - uses: actions/checkout@v3
@@ -64,16 +63,16 @@ jobs:
           sudo rm -rf /usr/lib/heroku > /dev/null 2>&1
           sudo rm -rf /usr/local/share/chromium > /dev/null 2>&1
           df -h
-      
+
       - uses: actions/setup-python@v3
         with:
-          python-version: ${{ matrix.python }}
+          python-version: ${{ matrix.pyver }}
 
       - name: Setup Miniconda
         uses: conda-incubator/setup-miniconda@v2.2.0
         with:
           activate-environment: "build"
-          python-version: ${{ matrix.python }}
+          python-version: ${{ matrix.pyver }}
           mamba-version: "*"
           use-mamba: false
           channels: conda-forge,defaults
@@ -81,51 +80,36 @@ jobs:
           add-pip-as-python-dependency: true
           auto-activate-base: false
 
-      - name: Set up environment
+      - name: Install Dependencies
         run: |
-          echo "Using python:"
-          python --version
-          which python
+          conda install cuda-toolkit -c "nvidia/label/cuda-${CUDA_VERSION}.0"
 
-          if [[ "${{ matrix.rocm }}" == "5.4.2" ]]; then
-            export ROCM_DL_FILE=amdgpu-install_5.4.50402-1_all.deb
-          elif [[ "${{ matrix.rocm }}" == "5.6.1" ]]; then
-            export ROCM_DL_FILE=amdgpu-install_5.6.50601-1_all.deb
-          elif [[ "${{ matrix.rocm }}" == "5.7.3" ]]; then
-            export ROCM_DL_FILE=amdgpu-install_5.7.50703-1_all.deb
-          else
-            echo Unknown rocm version
-            exit 1
-          fi
-
-          curl -O https://repo.radeon.com/amdgpu-install/${{ matrix.rocm }}/ubuntu/focal/$ROCM_DL_FILE
-          sudo dpkg -i $ROCM_DL_FILE
-          sudo DEBIAN_FRONTEND=noninteractive amdgpu-install --usecase=rocm --no-dkms --no-32 -y
-
-      - name: Install dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends rocsparse-dev rocthrust-dev rocblas-dev hipblas-dev hipsparse-dev
-
+          # Refer to https://pytorch.org/get-started/locally/
+          python -m pip install torch --index-url https://download.pytorch.org/whl/cu118
           python -m pip install --upgrade build setuptools wheel ninja numpy gekko pandas
 
-          if [[ "${{ matrix.rocm }}" == "5.7.3" ]]; then
-            echo "Using PyTorch stable"
-            python -m pip install torch --index-url https://download.pytorch.org/whl/rocm5.7
-          else
-            echo Unknown rocm version for python install
-            exit 1
-          fi
-
-      - name: Build wheels
+      - name: Check install
         run: |
-          echo "Using python for build:"
-          python --version
-          which python
+          python -c "import torch; print('torch version:', torch.__version__)"
 
-          ROCM_VERSION=${{ matrix.rocm }} python setup.py sdist bdist_wheel
+      - name: Build Wheel
+        run: |
+          # For some reason $CONDA_PREFIX is empty.
+          export CUDA_HOME=/usr/share/miniconda
+          export CUDA_PATH=/usr/share/miniconda
+          export LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:${CONDA_PREFIX}/lib"
+
+          export TORCH_CUDA_ARCH_LIST="6.0 6.1 7.0 7.5 8.0 8.6 8.9 9.0+PTX"
+
+          echo "CUDA_PATH:"
+          echo $CUDA_PATH
+
+          echo "PYPI_RELEASE:"
+          echo $PYPI_RELEASE
+
+          python setup.py sdist bdist_wheel
 
       - uses: actions/upload-artifact@v3
         with:
-          name: 'linux-rocm-wheels'
+          name: 'linux-cuda-wheels'
           path: ./dist/*.whl
