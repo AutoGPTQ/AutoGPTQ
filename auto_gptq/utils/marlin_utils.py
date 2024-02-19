@@ -142,7 +142,9 @@ def convert_to_marlin(model, model_quantlinear, quantization_config, repack: boo
         if not isinstance(module, model_quantlinear):
             continue
 
-        if module.bias is not None and torch.count_nonzero(module.bias) > 0:
+        # We could use `torch.count_nonzero(module.bias) > 0` here to discard zero bias, but this has issues when loading weights
+        # from checkpoints holding zero bias.
+        if module.bias is not None:
             bias = module.bias
         else:
             bias = None
@@ -191,7 +193,7 @@ def convert_to_marlin(model, model_quantlinear, quantization_config, repack: boo
             new_module.s = s
 
             if bias is not None:
-                new_module.bias.data.copy_(bias)
+                new_module.bias = bias
 
             new_module = new_module.to(module.device)
 
@@ -207,8 +209,5 @@ def convert_to_marlin(model, model_quantlinear, quantization_config, repack: boo
 
     # Set quantization config to be Marlin.
     quantization_config.is_marlin_format = True
-    if hasattr(model.config, "quantization_config"):
-        model.config.quantization_config["is_marlin_format"] = True
-    else:
-        raise ValueError("No quantization config found.")
+
     return model
