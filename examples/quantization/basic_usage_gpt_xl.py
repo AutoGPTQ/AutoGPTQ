@@ -7,6 +7,8 @@ from transformers import TextGenerationPipeline
 
 from auto_gptq import AutoGPTQForCausalLM, BaseQuantizeConfig
 
+CPU = torch.device("cpu")
+CUDA_0 = torch.device("cuda:0")
 
 pretrained_model_dir = "gpt2-xl"
 quantized_model_dir = "gpt2-large-4bit-128g"
@@ -36,6 +38,8 @@ def get_wikitext2(nsamples, seed, seqlen, tokenizer):
 
 
 def main():
+    device = CUDA_0 if torch.cuda.is_available() else CPU
+
     from transformers import AutoTokenizer
 
     try:
@@ -52,6 +56,9 @@ def main():
 
     # get model maximum sequence length
     model = AutoGPTQForCausalLM.from_pretrained(pretrained_model_dir, quantize_config)
+    if device == CPU:
+        model = model.float()
+
     model_config = model.config.to_dict()
     seq_len_keys = ["max_position_embeddings", "seq_length", "n_positions"]
     if any(k in model_config for k in seq_len_keys):
@@ -77,13 +84,15 @@ def main():
     model.save_quantized(quantized_model_dir, use_safetensors=True)
 
     # load quantized model, currently only support cpu or single gpu
-    model = AutoGPTQForCausalLM.from_quantized(quantized_model_dir, device="cuda:0", use_triton=False)
+    model = AutoGPTQForCausalLM.from_quantized(quantized_model_dir, device=device, use_triton=False)
+    if device == CPU:
+        model = model.float()
 
     # inference with model.generate
-    print(tokenizer.decode(model.generate(**tokenizer("test is", return_tensors="pt").to("cuda:0"))[0]))
+    print(tokenizer.decode(model.generate(**tokenizer("test is", return_tensors="pt").to(device))[0]))
 
     # or you can also use pipeline
-    pipeline = TextGenerationPipeline(model=model, tokenizer=tokenizer, device="cuda:0")
+    pipeline = TextGenerationPipeline(model=model, tokenizer=tokenizer, device=device)
     print(pipeline("test is")[0]["generated_text"])
 
 

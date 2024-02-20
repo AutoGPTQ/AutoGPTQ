@@ -2,12 +2,17 @@ from transformers import AutoTokenizer, TextGenerationPipeline
 
 from auto_gptq import AutoGPTQForCausalLM, BaseQuantizeConfig
 
+import torch
+
+CPU = torch.device("cpu")
+CUDA_0 = torch.device("cuda:0")
 
 pretrained_model_dir = "facebook/opt-125m"
 quantized_model_dir = "opt-125m-4bit-128g"
 
-
 def main():
+    device = CUDA_0 if torch.cuda.is_available() else CPU
+
     tokenizer = AutoTokenizer.from_pretrained(pretrained_model_dir, use_fast=True)
     examples = [
         tokenizer(
@@ -23,6 +28,8 @@ def main():
 
     # load un-quantized model, by default, the model will always be loaded into CPU memory
     model = AutoGPTQForCausalLM.from_pretrained(pretrained_model_dir, quantize_config)
+    if device == CPU:
+        model = model.float()
 
     # quantize model, the examples should be list of dict whose keys can only be "input_ids" and "attention_mask"
     model.quantize(examples)
@@ -47,8 +54,10 @@ def main():
     # save quantized model using safetensors
     model.save_quantized(quantized_model_dir, use_safetensors=True)
 
-    # load quantized model to the first GPU
-    model = AutoGPTQForCausalLM.from_quantized(quantized_model_dir, device="cuda:0")
+    # load quantized model to the CPU or first GPU
+    model = AutoGPTQForCausalLM.from_quantized(quantized_model_dir, device=device)
+    if device == CPU:
+        model = model.float()
 
     # download quantized model from Hugging Face Hub and load to the first GPU
     # model = AutoGPTQForCausalLM.from_quantized(repo_id, device="cuda:0", use_safetensors=True, use_triton=False)
