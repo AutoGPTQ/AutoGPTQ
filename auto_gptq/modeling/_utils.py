@@ -263,6 +263,7 @@ def pack_model(
     desc_act=False,
     warmup_triton: bool = False,
     force_layer_back_to_cpu: bool = False,
+    new_checkpoint_format: bool = False,
 ):
     QuantLinear = dynamically_import_QuantLinear(
         use_triton=use_triton,
@@ -304,7 +305,7 @@ def pack_model(
             zero.to(CPU),
             g_idx.to(CPU),
         )
-        qlayers[name].pack(layers[name], scale, zero, g_idx)
+        qlayers[name].pack(layers[name], scale, zero, g_idx, new_checkpoint_format)
         qlayers[name].to(layer_device)
     logger.info("Model packed.")
 
@@ -566,8 +567,6 @@ def unpack_awq(
     zeros = torch.bitwise_right_shift(torch.unsqueeze(qzeros, 2), wf.unsqueeze(0)).to(
         torch.int16 if bits == 8 else torch.int8
     )
-
-    # zeros = zeros + 1
 
     torch.bitwise_and(zeros, (2**bits) - 1, out=zeros)
 

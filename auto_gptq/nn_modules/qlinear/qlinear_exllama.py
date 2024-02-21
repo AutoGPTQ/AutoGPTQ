@@ -115,7 +115,7 @@ class QuantLinear(nn.Module):
             self.qweight.device.index,
         )
 
-    def pack(self, linear, scales, zeros, g_idx=None):
+    def pack(self, linear, scales, zeros, g_idx=None, new_checkpoint_format=False):
         W = linear.weight.data.clone()
         if isinstance(linear, nn.Conv2d):
             W = W.flatten(1)
@@ -157,7 +157,8 @@ class QuantLinear(nn.Module):
         qweight = qweight.astype(np.int32)
         self.qweight = torch.from_numpy(qweight)
 
-        zeros -= 1
+        if not new_checkpoint_format:
+            zeros -= 1
         zeros = zeros.numpy().astype(np.uint32)
         qzeros = np.zeros((zeros.shape[0], zeros.shape[1] // 32 * self.bits), dtype=np.uint32)
         i = 0

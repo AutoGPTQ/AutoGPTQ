@@ -90,6 +90,7 @@ class BaseQuantizeConfig(PushToHubMixin):
     model_name_or_path: Optional[str] = field(default=None)
     model_file_base_name: Optional[str] = field(default=None)
     awq_gemm_checkpoint: Optional[bool] = field(default=False)
+    new_checkpoint_format: Optional[bool] = field(default=False)
 
     def __post_init__(self):
         fields_info = fields(self)
@@ -100,6 +101,9 @@ class BaseQuantizeConfig(PushToHubMixin):
             raise ValueError("unless equal to -1, group_size must greater then 0.")
         if not (0 < self.damp_percent < 1):
             raise ValueError("damp_percent must between 0 and 1.")
+        if self.sym == False:
+            self.new_checkpoint_format = True
+            logger.warning("sym is False, will use new_checkpoint_format. because sym=False is not supported in old checkpoint format.")
 
     def save_pretrained(self, save_dir: str, **kwargs):
         with open(join(save_dir, "quantize_config.json"), "w", encoding="utf-8") as f:
@@ -194,6 +198,7 @@ class BaseQuantizeConfig(PushToHubMixin):
             "model_file_base_name": self.model_file_base_name,
             "is_marlin_format": self.is_marlin_format,
             "quant_method": "gptq",
+            "new_checkpoint_format": self.new_checkpoint_format,
         }
 
 
@@ -501,6 +506,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             desc_act=self.quantize_config.desc_act,
             warmup_triton=autotune_warmup_after_quantized,
             force_layer_back_to_cpu=force_layer_back_to_cpu,
+            new_checkpoint_format=self.quantize_config.new_checkpoint_format,
         )
         if device_map:
             self.model = remove_hook_from_module(self.model, recurse=True)
@@ -1234,6 +1240,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                     torch_dtype=torch_dtype,
                     current_model_save_name=model_save_name,
                     device_map=device_map,
+                    new_checkpoint_format=quantize_config.new_checkpoint_format,
                 )
 
                 # Disable incompatible optimizations.
@@ -1298,6 +1305,42 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                 checkpoint,
             )
             model.load_state_dict(checkpoint)
+
+
+        # Preprocessing for backward compatibility
+        if quantize_config.new_checkpoint_format == False:
+            if quantize_config.sym == "False":
+                raise ValueError("Old checkpoint format is not supported with sym=False. Pelese Check Your Checkpoint File.")
+
+            QuantLinear = dynamically_import_QuantLinear(
+                use_triton = use_triton,
+                desc_act = quantize_config.desc_act,
+                group_size = quantize_config.group_size,
+                bits = quantize_config.bits,
+                disable_exllama = disable_exllama,
+                disable_exllamav2 = disable_exllamav2,
+                use_qigen = use_qigen,
+                disable_marlin = not use_marlin,
+            )
+            for name, submodule in model.named_modules():
+                if isinstance(submodule, QuantLinear):
+                    if use_qigen:
+                        submodule.zeros.data = torch.full_like(submodule.zeros.data, (torch.tensor(2 ** quantize_config.bits - 1) + 1) / 2)
+                    elif use_marlin:
+                        pass
+                    else:
+                        if quantize_config.bits == 2:
+                            submodule.qzeros.data = torch.full_like(submodule.qzeros.data, -1431655766)
+                        elif quantize_config.bits == 3:
+                            submodule.qzeros.data[:,range(0,submodule.qzeros.data.shape[1],3)] = 613566756
+                            submodule.qzeros.data[:,range(1,submodule.qzeros.data.shape[1],3)] = 1227133513
+                            submodule.qzeros.data[:,range(2,submodule.qzeros.data.shape[1],3)] = -1840700270
+                        elif quantize_config.bits == 4:
+                            submodule.qzeros.data = torch.full_like(submodule.qzeros.data, -2004318072)
+                        elif quantize_config.bits == 8:
+                            submodule.qzeros.data = torch.full_like(submodule.qzeros.data, -2139062144)
+                        else:
+                            raise NotImplementedError("Only 2,3,4,8 bits are supported.")
 
         # == step4: set seqlen == #
         model_config = model.config.to_dict()
