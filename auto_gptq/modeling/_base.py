@@ -630,7 +630,8 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
 
         if not self.quantized:
             raise EnvironmentError("can only save quantized model, please execute .quantize first.")
-
+        if self.quantize_config.new_checkpoint_format:
+            logger.warning("New checkpoint format is enabled, the saved model is not supported by older versions of AutoGPTQ(<= 0.7.0).")
         self.model.to(CPU)
 
         model_base_name = (
@@ -1341,6 +1342,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                             submodule.qzeros.data = torch.full_like(submodule.qzeros.data, -2139062144)
                         else:
                             raise NotImplementedError("Only 2,3,4,8 bits are supported.")
+            quantize_config.new_checkpoint_format = True
 
         # == step4: set seqlen == #
         model_config = model.config.to_dict()
