@@ -94,6 +94,11 @@ class BaseQuantizeConfig(PushToHubMixin):
     def __post_init__(self):
         fields_info = fields(self)
 
+        for check_field in ['bits', 'group_size', 'damp_percent']:
+            if isinstance(self.__dict__[check_field], list) and \
+                  len(self.__dict__[check_field]) == 1:
+                self.__dict__[check_field] = self.__dict__[check_field][0]
+
         if self.bits not in fields_info[0].metadata["choices"]:
             raise ValueError(f"only support quantize to {fields_info[0].metadata['choices']} bits.")
         if self.group_size != -1 and self.group_size <= 0:
