@@ -4,6 +4,7 @@ from .baichuan import BaiChuanGPTQForCausalLM
 from .bloom import BloomGPTQForCausalLM
 from .codegen import CodeGenGPTQForCausalLM
 from .decilm import DeciLMGPTQForCausalLM
+from .gemma import GemmaGPTQForCausalLM
 from .gpt2 import GPT2GPTQForCausalLM
 from .gpt_bigcode import GPTBigCodeGPTQForCausalLM
 from .gpt_neox import GPTNeoXGPTQForCausalLM
