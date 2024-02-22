@@ -221,6 +221,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         injected_fused_attention: bool = False,
         injected_fused_mlp: bool = False,
         trainable: bool = False,
+        kerenl_backend_type: Optional = None,
     ):
         super().__init__()
 
@@ -234,6 +235,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         self.injected_fused_attention = injected_fused_attention
         self.injected_fused_mlp = injected_fused_mlp
         self.trainable = trainable
+        self.kerenl_backend_type = kerenl_backend_type
 
     @property
     def quantized(self):
@@ -496,7 +498,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             layer_inputs, layer_outputs = layer_outputs, []
             torch.cuda.empty_cache()
 
-        pack_model(
+        self.kerenl_backend_type = pack_model(
             model=self.model,
             quantizers=quantizers,
             bits=self.quantize_config.bits,
@@ -506,8 +508,8 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             desc_act=self.quantize_config.desc_act,
             warmup_triton=autotune_warmup_after_quantized,
             force_layer_back_to_cpu=force_layer_back_to_cpu,
-            new_checkpoint_format=self.quantize_config.new_checkpoint_format,
         )
+
         if device_map:
             self.model = remove_hook_from_module(self.model, recurse=True)
             self.model = simple_dispatch_model(self.model, device_map)
@@ -632,6 +634,15 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             raise EnvironmentError("can only save quantized model, please execute .quantize first.")
         if self.quantize_config.new_checkpoint_format:
             logger.warning("New checkpoint format is enabled, the saved model is not supported by older versions of AutoGPTQ(<= 0.7.0).")
+
+        if not self.quantize_config.new_checkpoint_format:
+            self.model = convert_new_checkpoint_format(
+                self.model,
+                False,
+                self.quantize_config,
+                self.kerenl_backend_type
+            )
+
         self.model.to(CPU)
 
         model_base_name = (
@@ -1307,42 +1318,24 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             )
             model.load_state_dict(checkpoint)
 
+        kerenl_backend_type = dynamically_import_QuantLinear(
+            use_triton=use_triton,
+            desc_act=quantize_config.desc_act,
+            group_size=quantize_config.group_size,
+            bits=quantize_config.bits,
+            disable_exllama=disable_exllama,
+            disable_exllamav2=disable_exllamav2,
+            use_qigen=use_qigen,
+            disable_marlin=not use_marlin,
+        )
 
-        # Preprocessing for backward compatibility
-        if quantize_config.new_checkpoint_format == False:
-            if quantize_config.sym == "False":
-                raise ValueError("Old checkpoint format is not supported with sym=False. Pelese Check Your Checkpoint File.")
-
-            QuantLinear = dynamically_import_QuantLinear(
-                use_triton = use_triton,
-                desc_act = quantize_config.desc_act,
-                group_size = quantize_config.group_size,
-                bits = quantize_config.bits,
-                disable_exllama = disable_exllama,
-                disable_exllamav2 = disable_exllamav2,
-                use_qigen = use_qigen,
-                disable_marlin = not use_marlin,
+        if not quantize_config.new_checkpoint_format:
+            model = convert_new_checkpoint_format(
+                model,
+                True,
+                quantize_config,
+                kerenl_backend_type
             )
-            for name, submodule in model.named_modules():
-                if isinstance(submodule, QuantLinear):
-                    if use_qigen:
-                        submodule.zeros.data = torch.full_like(submodule.zeros.data, (torch.tensor(2 ** quantize_config.bits - 1) + 1) / 2)
-                    elif use_marlin:
-                        pass
-                    else:
-                        if quantize_config.bits == 2:
-                            submodule.qzeros.data = torch.full_like(submodule.qzeros.data, -1431655766)
-                        elif quantize_config.bits == 3:
-                            submodule.qzeros.data[:,range(0,submodule.qzeros.data.shape[1],3)] = 613566756
-                            submodule.qzeros.data[:,range(1,submodule.qzeros.data.shape[1],3)] = 1227133513
-                            submodule.qzeros.data[:,range(2,submodule.qzeros.data.shape[1],3)] = -1840700270
-                        elif quantize_config.bits == 4:
-                            submodule.qzeros.data = torch.full_like(submodule.qzeros.data, -2004318072)
-                        elif quantize_config.bits == 8:
-                            submodule.qzeros.data = torch.full_like(submodule.qzeros.data, -2139062144)
-                        else:
-                            raise NotImplementedError("Only 2,3,4,8 bits are supported.")
-            quantize_config.new_checkpoint_format = True
 
         # == step4: set seqlen == #
         model_config = model.config.to_dict()
@@ -1382,7 +1375,6 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
 
         # Any post-initialization that require device information, for example buffers initialization on device.
         model = autogptq_post_init(model, use_act_order=quantize_config.desc_act)
-
         model.eval()
 
         # == step6: (optional) warmup triton == #
@@ -1415,6 +1407,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             injected_fused_attention=inject_fused_attention,
             injected_fused_mlp=inject_fused_mlp and use_triton,
             trainable=trainable,
+            kerenl_backend_type=kerenl_backend_type,
         )
 
     def warmup_triton(self, enabled: bool = True):

@@ -146,6 +146,51 @@ def make_quant(
             use_qigen=use_qigen,
         )
 
+def convert_new_checkpoint_format(
+    model,
+    to_new_format,
+    quantize_config,
+    QuantLinear,
+):
+    for name, submodule in model.named_modules():
+        if isinstance(submodule, QuantLinear):
+            if to_new_format:
+                if use_qigen:
+                    submodule.zeros.data += 1
+                elif use_marlin:
+                    pass
+                else:
+                    if quantize_config.bits == 2:
+                        submodule.qzeros.data += 0b01010101010101010101010101010101
+                    elif quantize_config.bits == 3:
+                        submodule.qzeros.data[:,range(0,submodule.qzeros.data.shape[1],3)] += 0b00100100100100100100100100100100
+                        submodule.qzeros.data[:,range(1,submodule.qzeros.data.shape[1],3)] += 0b10010010010010010010010010010010
+                        submodule.qzeros.data[:,range(2,submodule.qzeros.data.shape[1],3)] += 0b01001001001001001001001001001001
+                    elif quantize_config.bits == 4:
+                        submodule.qzeros.data += 0b00010001000100010001000100010001
+                    elif quantize_config.bits == 8:
+                        submodule.qzeros.data += 0b00000001000000010000000100000001
+                    else:
+                        raise NotImplementedError("Only 2,3,4,8 bits are supported.")
+            else:
+                if use_qigen:
+                    submodule.zeros.data -= 1
+                elif use_marlin:
+                    pass
+                else:
+                    if quantize_config.bits == 2:
+                        submodule.qzeros.data -= 0b01010101010101010101010101010101
+                    elif quantize_config.bits == 3:
+                        submodule.qzeros.data[:,range(0,submodule.qzeros.data.shape[1],3)] -= 0b00100100100100100100100100100100
+                        submodule.qzeros.data[:,range(1,submodule.qzeros.data.shape[1],3)] -= 0b10010010010010010010010010010010
+                        submodule.qzeros.data[:,range(2,submodule.qzeros.data.shape[1],3)] -= 0b01001001001001001001001001001001
+                    elif quantize_config.bits == 4:
+                        submodule.qzeros.data -= 0b00010001000100010001000100010001
+                    elif quantize_config.bits == 8:
+                        submodule.qzeros.data -= 0b00000001000000010000000100000001
+                    else:
+                        raise NotImplementedError("Only 2,3,4,8 bits are supported.")
+    return model
 
 def preprocess_checkpoint_qigen(
     module,
@@ -263,7 +308,6 @@ def pack_model(
     desc_act=False,
     warmup_triton: bool = False,
     force_layer_back_to_cpu: bool = False,
-    new_checkpoint_format: bool = False,
 ):
     QuantLinear = dynamically_import_QuantLinear(
         use_triton=use_triton,
@@ -305,7 +349,7 @@ def pack_model(
             zero.to(CPU),
             g_idx.to(CPU),
         )
-        qlayers[name].pack(layers[name], scale, zero, g_idx, new_checkpoint_format)
+        qlayers[name].pack(layers[name], scale, zero, g_idx)
         qlayers[name].to(layer_device)
     logger.info("Model packed.")
 
@@ -314,6 +358,7 @@ def pack_model(
             "using autotune_warmup will move model to GPU, make sure you have enough VRAM to load the whole model."
         )
         QuantLinear.warmup(model.to(CUDA_0), seqlen=model.seqlen)
+    return QuantLinear
 
 
 def check_and_get_model_type(model_dir, trust_remote_code=False):
