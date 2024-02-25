@@ -297,7 +297,6 @@ class QuantLinear(nn.Module):
                     self.wf.unsqueeze(0),
                 ).to(torch.int16 if self.bits == 8 else torch.int8)
 
-                zeros = zeros + 1
                 zeros = torch.bitwise_and(
                     zeros, (2**self.bits) - 1
                 )  # NOTE: It appears that casting here after the `zeros = zeros + 1` is important.
@@ -326,7 +325,6 @@ class QuantLinear(nn.Module):
                     dim=2,
                 )
 
-                zeros = zeros + 1
                 zeros = zeros.reshape(-1, 1, zeros.shape[1] * zeros.shape[2])
 
                 scales = self.scales

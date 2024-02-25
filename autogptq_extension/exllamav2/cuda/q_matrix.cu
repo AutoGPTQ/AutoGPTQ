@@ -215,6 +215,7 @@ __global__ void reconstruct_gptq_kernel
     b_gptq_qzeros_.item4(zeros, group, n);
     b_gptq_scales_.item4_h2(scales, group, n);
 
+    // Avoid zeros overflow with & 0x0f.
     dequant_4bit_8_prep_zero(zeros[0] & 0x0f, z1z16[0], y1y16[0]);
     dequant_4bit_8_prep_zero(zeros[1] & 0x0f, z1z16[1], y1y16[1]);
     dequant_4bit_8_prep_zero(zeros[2] & 0x0f, z1z16[2], y1y16[2]);
@@ -234,6 +235,7 @@ __global__ void reconstruct_gptq_kernel
             b_gptq_qzeros_.item4(zeros, group, n);
             b_gptq_scales_.item4_h2(scales, group, n);
 
+            // Avoid zeros overflow with & 0x0f.
             dequant_4bit_8_prep_zero(zeros[0] & 0x0f, z1z16[0], y1y16[0]);
             dequant_4bit_8_prep_zero(zeros[1] & 0x0f, z1z16[1], y1y16[1]);
             dequant_4bit_8_prep_zero(zeros[2] & 0x0f, z1z16[2], y1y16[2]);

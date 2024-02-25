@@ -152,6 +152,9 @@ def convert_new_checkpoint_format(
     quantize_config,
     QuantLinear,
 ):
+    use_qigen = QuantLinear.QUANT_TYPE == "qigen"
+    use_marlin = QuantLinear.QUANT_TYPE == "marlin"
+
     for name, submodule in model.named_modules():
         if isinstance(submodule, QuantLinear):
             if to_new_format:
@@ -810,4 +813,5 @@ __all__ = [
     "check_and_get_model_type",
     "simple_dispatch_model",
     "make_sure_no_tensor_in_meta_device",
+    "convert_new_checkpoint_format",
 ]

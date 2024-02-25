@@ -61,6 +61,7 @@ from ._utils import (
     preprocess_checkpoint_qigen,
     simple_dispatch_model,
     unpack_awq,
+    convert_new_checkpoint_format,
 )
 
 
@@ -1252,7 +1253,6 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                     torch_dtype=torch_dtype,
                     current_model_save_name=model_save_name,
                     device_map=device_map,
-                    new_checkpoint_format=quantize_config.new_checkpoint_format,
                 )
 
                 # Disable incompatible optimizations.
