@@ -90,7 +90,7 @@ class QuantLinear(nn.Module, TritonModuleMixin):
     def post_init(self):
         pass
 
-    def pack(self, linear, scales, zeros, g_idx=None, new_checkpoint_format=False):
+    def pack(self, linear, scales, zeros, g_idx=None):
         W = linear.weight.data.clone()
         if isinstance(linear, nn.Conv2d):
             W = W.flatten(1)
