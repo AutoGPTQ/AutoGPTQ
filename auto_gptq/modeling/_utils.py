@@ -12,6 +12,7 @@ from transformers import AutoConfig
 from transformers.utils.hub import cached_file
 
 from ..utils.import_utils import dynamically_import_QuantLinear
+from ..utils.modeling_utils import recurse_setattr
 from ._const import CPU, CUDA_0, EXLLAMA_DEFAULT_MAX_INPUT_LENGTH, SUPPORTED_MODELS
 
 
@@ -92,21 +93,20 @@ def make_quant(
 
     if isinstance(module, QuantLinear):
         return
-    for attr in dir(module):
-        tmp = getattr(module, attr)
-        name1 = name + "." + attr if name != "" else attr
-        if name1 in names:
-            ori_layer_device = get_device(getattr(module, attr))
-            delattr(module, attr)
-            if isinstance(tmp, nn.Linear):
-                in_features = tmp.in_features
-                out_features = tmp.out_features
-            elif isinstance(tmp, nn.Conv2d):
-                in_features = tmp.in_channels
-                out_features = tmp.out_channels
-            elif isinstance(tmp, transformers.pytorch_utils.Conv1D):
-                in_features = tmp.weight.shape[0]
-                out_features = tmp.weight.shape[1]
+
+    for name, submodule in module.named_modules():
+        if name in names:
+            ori_layer_device = next(submodule.parameters()).device
+
+            if isinstance(submodule, nn.Linear):
+                in_features = submodule.in_features
+                out_features = submodule.out_features
+            elif isinstance(submodule, nn.Conv2d):
+                in_features = submodule.in_channels
+                out_features = submodule.out_channels
+            elif isinstance(submodule, transformers.pytorch_utils.Conv1D):
+                in_features = submodule.weight.shape[0]
+                out_features = submodule.weight.shape[1]
             if (not (desc_act) or group_size == -1) and not use_triton and not use_qigen:
                 new_layer = QuantLinear(
                     bits,
@@ -116,7 +116,7 @@ def make_quant(
                     True,
                     use_cuda_fp16=use_cuda_fp16,
                     trainable=trainable,
-                    weight_dtype=tmp.weight.dtype,
+                    weight_dtype=submodule.weight.dtype,
                 )
             else:
                 new_layer = QuantLinear(
@@ -126,26 +126,10 @@ def make_quant(
                     out_features,
                     True,
                     trainable=trainable,
-                    weight_dtype=tmp.weight.dtype,
+                    weight_dtype=submodule.weight.dtype,
                 )
             new_layer.device = ori_layer_device
-            setattr(module, attr, new_layer.to(ori_layer_device))
-    for name1, child in module.named_children():
-        make_quant(
-            child,
-            names,
-            bits,
-            group_size,
-            name + "." + name1 if name != "" else name1,
-            use_triton=use_triton,
-            use_cuda_fp16=use_cuda_fp16,
-            desc_act=desc_act,
-            trainable=trainable,
-            disable_exllama=disable_exllama,
-            disable_exllamav2=disable_exllamav2,
-            use_qigen=use_qigen,
-        )
-
+            recurse_setattr(module, name, new_layer.to(ori_layer_device))
 
 def preprocess_checkpoint_qigen(
     module,
