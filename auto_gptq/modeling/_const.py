@@ -37,6 +37,8 @@ if compare_transformers_version("v4.36.0", op="ge"):
     SUPPORTED_MODELS.append("mixtral")
 if compare_transformers_version("v4.37.0", op="ge"):
     SUPPORTED_MODELS.append("qwen2")
+if compare_transformers_version("v4.38.0", op="ge"):
+    SUPPORTED_MODELS.append("gemma")
 
 
 EXLLAMA_DEFAULT_MAX_INPUT_LENGTH = 2048
