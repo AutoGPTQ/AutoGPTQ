@@ -407,7 +407,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             inside_layer_modules = [sum(inside_layer_modules, [])]
         quantizers = {}
         for i in range(len(layers)):
-            logger.info(f"Start quantizing layer {i + 1}/{len(layers)}")
+            logger.info(f"--- Start quantizing layer {i + 1}/{len(layers)} ---")
             layer = layers[i]
             force_layer_back_to_cpu = False
             if get_device(layer) == CPU:
