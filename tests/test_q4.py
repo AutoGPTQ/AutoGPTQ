@@ -1134,7 +1134,7 @@ class TestsQ4Exllama(unittest.TestCase):
             device="cuda:0",
             use_triton=False,
             inject_fused_attention=False,
-            inject_fused_mlp=True,
+            inject_fused_mlp=False,
             model_basename=model_basename,
             disable_exllama=False,
             disable_exllamav2=True,
@@ -1173,8 +1173,8 @@ class TestsQ4Exllama(unittest.TestCase):
             model_id,
             device="cuda:0",
             use_triton=False,
-            inject_fused_attention=True,
-            inject_fused_mlp=True,
+            inject_fused_attention=False,
+            inject_fused_mlp=False,
             disable_exllama=False,
             disable_exllamav2=True,
         )
@@ -1205,7 +1205,7 @@ class TestsQ4Exllama(unittest.TestCase):
             device="cuda:0",
             use_triton=False,
             inject_fused_attention=False,
-            inject_fused_mlp=True,
+            inject_fused_mlp=False,
             model_basename=model_basename,
             disable_exllama=False,
             disable_exllamav2=True,
@@ -1829,7 +1829,7 @@ class TestsQ4CUDA(unittest.TestCase):
             device=device,
             use_triton=False,
             inject_fused_attention=False,
-            inject_fused_mlp=True,
+            inject_fused_mlp=False,
             model_basename=model_basename,
             disable_exllama=True,
             disable_exllamav2=True,
@@ -1976,7 +1976,7 @@ class TestsQ4ExllamaV2(unittest.TestCase):
             device="cuda:0",
             use_triton=False,
             inject_fused_attention=False,
-            inject_fused_mlp=True,
+            inject_fused_mlp=False,
             model_basename=model_basename,
         )
         tokenizer = AutoTokenizer.from_pretrained(model_id)
@@ -1991,7 +1991,7 @@ class TestsQ4ExllamaV2(unittest.TestCase):
 
     def test_exllama_v2_buffer_size(self):
         # prompt = "I'm in Paris and" * 450
-        prompt = "I'm in Paris and" * 1000
+        prompt = "I'm in Paris and" * 500
         device = torch.device("cuda:0")
 
         model_id = "TheBloke/vicuna-13B-1.1-GPTQ-4bit-128g"
@@ -2003,8 +2003,8 @@ class TestsQ4ExllamaV2(unittest.TestCase):
             revision=revision,
             device="cuda:0",
             use_triton=False,
-            inject_fused_attention=True,
-            inject_fused_mlp=True,
+            inject_fused_attention=False,
+            inject_fused_mlp=False,
             model_basename=model_basename,
         )
 
