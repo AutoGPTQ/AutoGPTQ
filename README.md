@@ -50,9 +50,9 @@ AutoGPTQ is available on Linux and Windows only. You can install the latest stab
 
 | CUDA/ROCm version | Installation                                                                                      | Built against PyTorch |
 |-------------------|---------------------------------------------------------------------------------------------------|-----------------------|
-| CUDA 11.8         | `pip install auto-gptq --extra-index-url https://huggingface.github.io/autogptq-index/whl/cu118/`   | 2.2.0+cu118           |
-| CUDA 12.1         | `pip install auto-gptq`                                                                            | 2.2.0+cu121           |
-| ROCm 5.7          | `pip install auto-gptq --extra-index-url https://huggingface.github.io/autogptq-index/whl/rocm573/` | 2.2.0+rocm5.7               |
+| CUDA 11.8         | `pip install auto-gptq --extra-index-url https://huggingface.github.io/autogptq-index/whl/cu118/`   | 2.2.1+cu118           |
+| CUDA 12.1         | `pip install auto-gptq`                                                                            | 2.2.1+cu121           |
+| ROCm 5.7          | `pip install auto-gptq --extra-index-url https://huggingface.github.io/autogptq-index/whl/rocm573/` | 2.2.1+rocm5.7               |
 
 AutoGPTQ can be installed with the Triton dependency with `pip install auto-gptq[triton]` in order to be able to use the Triton backend (currently only supports linux, no 3-bits quantization).
 
