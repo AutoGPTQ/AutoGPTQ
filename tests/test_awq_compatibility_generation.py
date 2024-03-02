@@ -67,6 +67,9 @@ class TestAwqCompatibility(unittest.TestCase):
         self.assertTrue(awq_output == autogptq_output)
 
     def test_generation_cuda_old_cuda_256(self):
+        if AutoAWQForCausalLM is None:
+            self.skipTest(f"AutoAWQ package (https://github.com/casper-hansen/AutoAWQ) is required to run this test. {AWQ_EXCEPTION}")
+
         device = torch.device("cuda:0")
         quant_path = "TheBloke/Llama-2-7B-Chat-AWQ"
 
@@ -113,6 +116,9 @@ class TestAwqCompatibility(unittest.TestCase):
             self.assertTrue(awq_output == autogptq_output)
 
     def test_generation_cuda_old_cuda_64(self):
+        if AutoAWQForCausalLM is None:
+            self.skipTest(f"AutoAWQ package (https://github.com/casper-hansen/AutoAWQ) is required to run this test. {AWQ_EXCEPTION}")
+
         device = torch.device("cuda:0")
         quant_path = "TheBloke/Llama-2-7B-Chat-AWQ"
 
@@ -161,6 +167,9 @@ class TestAwqCompatibility(unittest.TestCase):
             self.assertTrue(awq_output == autogptq_output)
 
     def test_generation_exllama(self):
+        if AutoAWQForCausalLM is None:
+            self.skipTest(f"AutoAWQ package (https://github.com/casper-hansen/AutoAWQ) is required to run this test. {AWQ_EXCEPTION}")
+
         device = torch.device("cuda:0")
         quant_path = "TheBloke/Llama-2-7B-Chat-AWQ"
 
@@ -202,6 +211,9 @@ class TestAwqCompatibility(unittest.TestCase):
         self.assertTrue(awq_output == autogptq_output)
 
     def test_generation_exllamav2(self):
+        if AutoAWQForCausalLM is None:
+            self.skipTest(f"AutoAWQ package (https://github.com/casper-hansen/AutoAWQ) is required to run this test. {AWQ_EXCEPTION}")
+
         device = torch.device("cuda:0")
         quant_path = "TheBloke/Llama-2-7B-Chat-AWQ"
 

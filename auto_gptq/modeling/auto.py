@@ -7,6 +7,7 @@ from .baichuan import BaiChuanGPTQForCausalLM
 from .bloom import BloomGPTQForCausalLM
 from .codegen import CodeGenGPTQForCausalLM
 from .decilm import DeciLMGPTQForCausalLM
+from .gemma import GemmaGPTQForCausalLM
 from .gpt2 import GPT2GPTQForCausalLM
 from .gpt_bigcode import GPTBigCodeGPTQForCausalLM
 from .gpt_neox import GPTNeoXGPTQForCausalLM
@@ -50,6 +51,7 @@ GPTQ_CAUSAL_LM_MODEL_MAP = {
     "mixtral": MixtralGPTQForCausalLM,
     "qwen2": Qwen2GPTQForCausalLM,
     "longllama": LongLlamaGPTQForCausalLM,
+    "gemma": GemmaGPTQForCausalLM,
 }
 
 
@@ -88,8 +90,8 @@ class AutoGPTQForCausalLM:
         device: Optional[Union[str, int]] = None,
         low_cpu_mem_usage: bool = False,
         use_triton: bool = False,
-        inject_fused_attention: bool = True,
-        inject_fused_mlp: bool = True,
+        inject_fused_attention: bool = False,
+        inject_fused_mlp: bool = False,
         use_cuda_fp16: bool = True,
         quantize_config: Optional[BaseQuantizeConfig] = None,
         model_basename: Optional[str] = None,
