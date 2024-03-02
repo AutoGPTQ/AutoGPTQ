@@ -16,6 +16,7 @@ from .mistral import MistralGPTQForCausalLM
 from .mixtral import MixtralGPTQForCausalLM
 from .moss import MOSSGPTQForCausalLM
 from .opt import OPTGPTQForCausalLM
+from .phi import PhiGPTQForCausalLM
 from .qwen import QwenGPTQForCausalLM
 from .qwen2 import Qwen2GPTQForCausalLM
 from .rw import RWGPTQForCausalLM
