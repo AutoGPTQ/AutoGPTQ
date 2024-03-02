@@ -222,7 +222,8 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         injected_fused_attention: bool = False,
         injected_fused_mlp: bool = False,
         trainable: bool = False,
-        kerenl_backend_type: Optional = None,
+        kerenl_backend_type: Optional[str] = None,
+        now_format: Optional = None,
     ):
         super().__init__()
 
@@ -237,6 +238,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         self.injected_fused_mlp = injected_fused_mlp
         self.trainable = trainable
         self.kerenl_backend_type = kerenl_backend_type
+        self.now_format = now_format
 
     @property
     def quantized(self):
@@ -517,6 +519,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         self.model.config.use_cache = forward_pass_use_cache
 
         self._quantized = True
+        self.now_format = "new"
 
         torch.cuda.empty_cache()
 
@@ -531,17 +534,40 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
     def to(self, device: Union[str, torch.device]):
         self.model.to(device)
         return self
-
     def forward(self, *args, **kwargs):
+        if self.now_format == "old":
+            self.model = convert_new_checkpoint_format(
+                self.model,
+                True,
+                self.quantize_config,
+                self.kerenl_backend_type
+            )
+            self.now_format = "new"
         return self.model(*args, **kwargs)
 
     def generate(self, **kwargs):
         """shortcut for model.generate"""
+        if self.now_format == "old":
+            self.model = convert_new_checkpoint_format(
+                self.model,
+                True,
+                self.quantize_config,
+                self.kerenl_backend_type
+            )
+            self.now_format = "new"
         with torch.inference_mode(), torch.amp.autocast(device_type=self.device.type):
             return self.model.generate(**kwargs)
 
     def prepare_inputs_for_generation(self, *args, **kwargs):
         """shortcut for model.prepare_inputs_for_generation"""
+        if self.now_format == "old":
+            self.model = convert_new_checkpoint_format(
+                self.model,
+                True,
+                self.quantize_config,
+                self.kerenl_backend_type
+            )
+            self.now_format = "new"
         return self.model.prepare_inputs_for_generation(*args, **kwargs)
 
     def push_to_hub(
@@ -636,13 +662,14 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         if self.quantize_config.new_checkpoint_format:
             logger.warning("New checkpoint format is enabled, the saved model is not supported by older versions of AutoGPTQ(<= 0.7.0).")
 
-        if not self.quantize_config.new_checkpoint_format:
+        if not self.quantize_config.new_checkpoint_format and self.now_format == "new":
             self.model = convert_new_checkpoint_format(
                 self.model,
                 False,
                 self.quantize_config,
                 self.kerenl_backend_type
             )
+            self.now_format = "old"
 
         self.model.to(CPU)
 
@@ -1408,6 +1435,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             injected_fused_mlp=inject_fused_mlp and use_triton,
             trainable=trainable,
             kerenl_backend_type=kerenl_backend_type,
+            now_format="new",
         )
 
     def warmup_triton(self, enabled: bool = True):

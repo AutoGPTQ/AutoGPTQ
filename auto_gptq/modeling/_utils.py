@@ -326,6 +326,8 @@ def pack_model(
         model.to(CPU)
 
     logger.info("Packing model...")
+    print(QuantLinear)
+
     layers = find_layers(model)
     layers = {n: layers[n] for n in quantizers}
     make_quant(
@@ -711,7 +713,6 @@ def pack_from_tensors(
     qweight = qweight.astype(np.int32)
     qweight = torch.from_numpy(qweight)
 
-    unpacked_qzeros = unpacked_qzeros - 1
     torch.bitwise_and(unpacked_qzeros, (2**bits) - 1, out=unpacked_qzeros)
 
     unpacked_qzeros = unpacked_qzeros.numpy().astype(np.uint32)
