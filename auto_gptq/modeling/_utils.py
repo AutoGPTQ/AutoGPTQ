@@ -326,8 +326,6 @@ def pack_model(
         model.to(CPU)
 
     logger.info("Packing model...")
-    print(QuantLinear)
-
     layers = find_layers(model)
     layers = {n: layers[n] for n in quantizers}
     make_quant(
