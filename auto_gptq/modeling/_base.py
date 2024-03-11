@@ -38,12 +38,16 @@ from ..utils.import_utils import (
     MARLIN_AVAILABLE,
     QIGEN_AVAILABLE,
     TRITON_AVAILABLE,
+    BITBLAS_AVAILABLE,
     dynamically_import_QuantLinear,
 )
 from ..utils.marlin_utils import (
     _validate_marlin_compatibility,
     _validate_marlin_device_support,
     prepare_model_for_marlin_load,
+)
+from ..utils.bitblas_utils import (
+    prepare_model_for_bitblas_load,
 )
 from ._const import CPU, CUDA_0, SUPPORTED_MODELS
 from ._utils import (
@@ -87,6 +91,7 @@ class BaseQuantizeConfig(PushToHubMixin):
     sym: bool = field(default=True)
     true_sequential: bool = field(default=True)
     is_marlin_format: bool = field(default=False)
+    is_bitblas_format: bool = field(default=False)
     model_name_or_path: Optional[str] = field(default=None)
     model_file_base_name: Optional[str] = field(default=None)
     awq_gemm_checkpoint: Optional[bool] = field(default=False)
@@ -193,6 +198,7 @@ class BaseQuantizeConfig(PushToHubMixin):
             "model_name_or_path": self.model_name_or_path,
             "model_file_base_name": self.model_file_base_name,
             "is_marlin_format": self.is_marlin_format,
+            "is_bitblas_format": self.is_bitblas_format,
             "quant_method": "gptq",
         }
 
@@ -298,7 +304,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         if use_triton and not TRITON_AVAILABLE:
             logger.warning("triton is not installed, reset use_triton to False")
             use_triton = False
-
+ 
         device_map = self.hf_device_map
         if device_map:
             for name, device in device_map.items():
@@ -677,6 +683,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             safetensors_metadata["gptq_desc_act"] = str(self.quantize_config.desc_act)
             safetensors_metadata["gptq_damp_percent"] = str(self.quantize_config.damp_percent)
             safetensors_metadata["gptq_is_marlin_format"] = str(self.quantize_config.is_marlin_format)
+            safetensors_metadata["gptq_is_bitblas_format"] = str(self.quantize_config.is_bitblas_format)
 
             safe_save(state_dict, join(save_dir, model_save_name), safetensors_metadata)
         else:
@@ -811,6 +818,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         use_triton: bool = False,
         use_qigen: bool = False,
         use_marlin: bool = False,
+        use_bitblas: bool = False,
         torch_dtype: Optional[torch.dtype] = None,
         inject_fused_attention: bool = False,
         inject_fused_mlp: bool = False,
@@ -862,6 +870,9 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         if use_triton and not TRITON_AVAILABLE:
             logger.warning("Triton is not installed, reset use_triton to False.")
             use_triton = False
+        if use_bitblas and not BITBLAS_AVAILABLE:
+            logger.warning("BitBlas is not installed, reset use_bitblas to False.")
+            use_bitblas = False
         if not disable_exllama and not EXLLAMA_KERNELS_AVAILABLE:
             logger.warning(
                 "Exllama kernel is not installed, reset disable_exllama to True. "
@@ -894,6 +905,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             inject_fused_attention = False
             inject_fused_mlp = False
             use_triton = False
+            use_bitblas = False
             disable_exllama = True
             disable_exllamav2 = True
 
@@ -927,6 +939,12 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             raise ValueError(
                 "You passed a GPTQ model saved in int4*fp16 GPTQ Marlin kernel format but are loading with use_marlin=False. "
                 "Please use `use_marlin=True` to load this model. Example: `model = AutoGPTQForCausalLM.from_quantized(..., use_marlin=True)`."
+            )
+        
+        if hasattr(quantize_config, "is_bitblas_format") and quantize_config.is_bitblas_format and not use_bitblas:
+            raise ValueError(
+                "You passed a GPTQ model saved in BitBlas kernel format but are loading with use_bitblas=False. "
+                "Please use `use_bitblas=True` to load this model. Example: `model = AutoGPTQForCausalLM.from_quantized(..., use_bitblas=True)`."
             )
 
         if model_basename is None:
@@ -1243,6 +1261,39 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                     inject_fused_attention = False
                     inject_fused_mlp = False
 
+            if use_bitblas:
+                if is_sharded:
+                    raise ValueError("The loading of sharded checkpoints with BitBLAS is currently not supported. Please raise an issue in AutoGPTQ repository.")
+
+                # Load the the original gptq quant linear.
+                quant_linear_class = dynamically_import_QuantLinear(
+                    use_triton=use_triton,
+                    desc_act=quantize_config.desc_act,
+                    group_size=quantize_config.group_size,
+                    bits=quantize_config.bits,
+                    disable_exllama=disable_exllama,
+                    disable_exllamav2=disable_exllamav2,
+                    disable_bitblas=True,
+                )
+
+                model, model_save_name = prepare_model_for_bitblas_load(
+                    model_name_or_path=model_name_or_path,
+                    model=model,
+                    quantize_config=quantize_config,
+                    quant_linear_class=quant_linear_class,
+                    torch_dtype=torch_dtype,
+                    current_model_save_name=model_save_name,
+                    device_map=device_map,
+                )
+
+                # Disable incompatible optimizations.
+                if inject_fused_attention or inject_fused_mlp:
+                    # TODO: Validate whether that can be used.
+                    logger.info("Disabling fused attention and mlp injection because BitBLAS kernel is used.")
+                    inject_fused_attention = False
+                    inject_fused_mlp = False
+
+            
             accelerate.utils.modeling.load_checkpoint_in_model(
                 model,
                 dtype=torch_dtype,  # This is very hacky but works due to https://github.com/huggingface/accelerate/blob/bd72a5f1a80d5146554458823f8aeda0a9db5297/src/accelerate/utils/modeling.py#L292

@@ -1,11 +1,13 @@
-from transformers import AutoTokenizer, TextGenerationPipeline
-
+from transformers import AutoTokenizer, TextGenerationPipeline, AutoModelForCausalLM
+import torch
 from auto_gptq import AutoGPTQForCausalLM, BaseQuantizeConfig
 
+use_bitblas = True
+pretrained_model_dir = "dist/opt-125m"
+quantized_model_dir = "dist/opt-125m-4bit-128g"
 
-pretrained_model_dir = "facebook/opt-125m"
-quantized_model_dir = "opt-125m-4bit-128g"
-
+if use_bitblas:
+    quantized_model_dir += "-bitblas"
 
 def main():
     tokenizer = AutoTokenizer.from_pretrained(pretrained_model_dir, use_fast=True)
@@ -45,16 +47,26 @@ def main():
     # model.push_to_hub(repo_id, save_dir=quantized_model_dir, use_safetensors=True, commit_message=commit_message, use_auth_token=True)
 
     # save quantized model using safetensors
-    model.save_quantized(quantized_model_dir, use_safetensors=True)
+    # model.save_quantized(quantized_model_dir, use_safetensors=True)
 
     # load quantized model to the first GPU
-    model = AutoGPTQForCausalLM.from_quantized(quantized_model_dir, device="cuda:0")
+    model = AutoGPTQForCausalLM.from_quantized(quantized_model_dir, device="cuda:0", use_bitblas=True)
 
     # download quantized model from Hugging Face Hub and load to the first GPU
     # model = AutoGPTQForCausalLM.from_quantized(repo_id, device="cuda:0", use_safetensors=True, use_triton=False)
 
+    # -- simple token evaluate --
+    input_ids = torch.ones((1, 1), dtype=torch.long, device="cuda:0")
+    outputs = model(input_ids=input_ids)
+    print(f"output logits {outputs.logits.shape}: \n", outputs.logits)
     # inference with model.generate
-    print(tokenizer.decode(model.generate(**tokenizer("auto_gptq is", return_tensors="pt").to(model.device))[0]))
+    print(
+        tokenizer.decode(
+            model.generate(
+                **tokenizer("auto_gptq is", return_tensors="pt").to(model.device)
+            )[0]
+        )
+    )
 
     # or you can also use pipeline
     pipeline = TextGenerationPipeline(model=model, tokenizer=tokenizer)
