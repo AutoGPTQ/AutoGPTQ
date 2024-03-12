@@ -247,6 +247,7 @@ def pack_model(
     desc_act=False,
     warmup_triton: bool = False,
     force_layer_back_to_cpu: bool = False,
+    is_marlin_format: bool = False,
 ):
     QuantLinear = dynamically_import_QuantLinear(
         use_triton=use_triton,
@@ -255,7 +256,7 @@ def pack_model(
         bits=bits,
         disable_exllama=False,
         disable_exllamav2=True,
-        disable_marlin=True,
+        disable_marlin=not is_marlin_format,
     )
 
     if force_layer_back_to_cpu:
@@ -274,6 +275,7 @@ def pack_model(
         desc_act=desc_act,
         disable_exllama=False,
         disable_exllamav2=True,
+        use_marlin=is_marlin_format,
     )
     qlayers = find_layers(model, [QuantLinear])
     for name in qlayers:
@@ -288,7 +290,10 @@ def pack_model(
             zero.to(CPU),
             g_idx.to(CPU),
         )
-        qlayers[name].pack(layers[name], scale, zero, g_idx)
+        if QuantLinear.QUANT_TYPE == "marlin":
+            qlayers[name].pack(layers[name], scale)
+        else:
+            qlayers[name].pack(layers[name], scale, zero, g_idx)
         qlayers[name].to(layer_device)
     logger.info("Model packed.")
 
