@@ -21,6 +21,7 @@ from .moss import MOSSGPTQForCausalLM
 from .opt import OPTGPTQForCausalLM
 from .qwen import QwenGPTQForCausalLM
 from .qwen2 import Qwen2GPTQForCausalLM
+from .qwen2_moe import Qwen2MoeGPTQForCausalLM
 from .rw import RWGPTQForCausalLM
 from .stablelmepoch import StableLMEpochGPTQForCausalLM
 from .xverse import XverseGPTQForCausalLM
@@ -50,6 +51,7 @@ GPTQ_CAUSAL_LM_MODEL_MAP = {
     "stablelm_epoch": StableLMEpochGPTQForCausalLM,
     "mixtral": MixtralGPTQForCausalLM,
     "qwen2": Qwen2GPTQForCausalLM,
+    "qwen2_moe": Qwen2MoeGPTQForCausalLM,
     "longllama": LongLlamaGPTQForCausalLM,
     "gemma": GemmaGPTQForCausalLM,
 }
