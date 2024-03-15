@@ -42,7 +42,11 @@ def find_layers(module, layers=None, name=""):
             return {name: module}
     res = {}
     for name1, child in module.named_children():
-        res.update(find_layers(child, layers=layers, name=name + "." + name1 if name != "" else name1))
+        res.update(
+            find_layers(
+                child, layers=layers, name=name + "." + name1 if name != "" else name1
+            )
+        )
     return res
 
 
@@ -72,6 +76,7 @@ def make_quant(
     use_cuda_fp16: bool = True,
     desc_act: bool = False,
     trainable: bool = False,
+    use_tritonv2: bool = False,
 ):
     # If disable_exllamav2 is True, we want to fall back on the exllama kernel and not the cuda/cuda_old ones.
     if disable_exllama is None:
@@ -89,6 +94,7 @@ def make_quant(
         disable_exllama=disable_exllama,
         disable_exllamav2=disable_exllamav2,
         use_qigen=use_qigen,
+        use_tritonv2=use_tritonv2,
     )
 
     if isinstance(module, QuantLinear):
@@ -107,7 +113,12 @@ def make_quant(
             elif isinstance(submodule, transformers.pytorch_utils.Conv1D):
                 in_features = submodule.weight.shape[0]
                 out_features = submodule.weight.shape[1]
-            if (not (desc_act) or group_size == -1) and not use_triton and not use_qigen:
+            if (
+                (not (desc_act) or group_size == -1)
+                and not use_triton
+                and not use_qigen
+                and not use_tritonv2
+            ):
                 new_layer = QuantLinear(
                     bits,
                     group_size,
@@ -130,6 +141,7 @@ def make_quant(
                 )
             new_layer.device = ori_layer_device
             recurse_setattr(module, name, new_layer.to(ori_layer_device))
+
 
 def preprocess_checkpoint_qigen(
     module,
@@ -163,9 +175,13 @@ def preprocess_checkpoint_qigen(
         if zeros.dtype != torch.float32:
             new_zeros = torch.zeros_like(scales).float().contiguous()
             if bits == 4:
-                qinfer.unpack_zeros4(zeros, new_zeros, new_zeros.shape[0], new_zeros.shape[1])
+                qinfer.unpack_zeros4(
+                    zeros, new_zeros, new_zeros.shape[0], new_zeros.shape[1]
+                )
             elif bits == 2:
-                qinfer.unpack_zeros2(zeros, new_zeros, new_zeros.shape[0], new_zeros.shape[1])
+                qinfer.unpack_zeros2(
+                    zeros, new_zeros, new_zeros.shape[0], new_zeros.shape[1]
+                )
             elif bits == 3:
                 logger.info("Unpacking zeros for 3 bits")
             new_scales = scales.contiguous()
@@ -191,7 +207,9 @@ def preprocess_checkpoint_qigen(
             checkpoint[name + ".bias"] = torch.zeros(out_features)
         checkpoint_qweight = checkpoint[name + ".qweight"].int().contiguous()
         if bits == 4:
-            qweight = torch.zeros(int(in_features // 8 * out_features)).int().contiguous()
+            qweight = (
+                torch.zeros(int(in_features // 8 * out_features)).int().contiguous()
+            )
             qinfer.pack4(
                 checkpoint_qweight,
                 qweight,
@@ -202,7 +220,11 @@ def preprocess_checkpoint_qigen(
                 module.cutoff,
             )  # * (module.tt//tb))
         elif bits == 3:
-            qweight = torch.zeros(int(in_features // 32 * 3 * out_features)).int().contiguous()
+            qweight = (
+                torch.zeros(int(in_features // 32 * 3 * out_features))
+                .int()
+                .contiguous()
+            )
             qinfer.pack3(
                 checkpoint_qweight,
                 qweight,
@@ -213,7 +235,9 @@ def preprocess_checkpoint_qigen(
                 module.cutoff,
             )
         elif bits == 2:
-            qweight = torch.zeros(int(in_features // 16 * out_features)).int().contiguous()
+            qweight = (
+                torch.zeros(int(in_features // 16 * out_features)).int().contiguous()
+            )
             qinfer.pack2(
                 checkpoint_qweight,
                 qweight,
@@ -329,10 +353,14 @@ def simple_dispatch_model(model, device_map):
     prev_hook = None
     for idx, (n, d) in enumerate(cpu_offload_group):
         m = get_module_by_name_suffix(model, n)
-        _, prev_hook = accelerate.cpu_offload_with_hook(m, execution_device=main_device, prev_module_hook=prev_hook)
+        _, prev_hook = accelerate.cpu_offload_with_hook(
+            m, execution_device=main_device, prev_module_hook=prev_hook
+        )
     # set first cpu offload module's prev_module_hook to the last cpu offload module's hook
     if len(cpu_offload_group) > 1:
-        get_module_by_name_suffix(model, cpu_offload_group[0][0])._hf_hook.prev_module_hook = prev_hook
+        get_module_by_name_suffix(
+            model, cpu_offload_group[0][0]
+        )._hf_hook.prev_module_hook = prev_hook
 
     for n, d in device_map.items():
         m = get_module_by_name_suffix(model, n)
@@ -346,7 +374,9 @@ def simple_dispatch_model(model, device_map):
     return model
 
 
-def autogptq_post_init(model, use_act_order: bool, max_input_length: Optional[int] = None):
+def autogptq_post_init(
+    model, use_act_order: bool, max_input_length: Optional[int] = None
+):
     """
     The max_input_length argument is specific to the exllama backend, that requires to initialize a buffer temp_state.
     """
@@ -480,12 +510,29 @@ def autogptq_post_init(model, use_act_order: bool, max_input_length: Optional[in
 
 
 def make_sure_no_tensor_in_meta_device(
-    model, use_triton: bool, desc_act: bool, group_size: int, bits: int, disable_exllama: bool, disable_exllamav2: bool, use_marlin: bool = False,
+    model,
+    use_triton: bool,
+    desc_act: bool,
+    group_size: int,
+    bits: int,
+    disable_exllama: bool,
+    disable_exllamav2: bool,
+    use_marlin: bool = False,
 ):
-    QuantLinear = dynamically_import_QuantLinear(use_triton, desc_act, group_size, bits=bits, disable_exllama=disable_exllama, disable_exllamav2=disable_exllamav2, disable_marlin=not use_marlin)
+    QuantLinear = dynamically_import_QuantLinear(
+        use_triton,
+        desc_act,
+        group_size,
+        bits=bits,
+        disable_exllama=disable_exllama,
+        disable_exllamav2=disable_exllamav2,
+        disable_marlin=not use_marlin,
+    )
     for n, m in model.named_modules():
         if isinstance(m, QuantLinear) and m.bias.device == torch.device("meta"):
-            m.register_buffer("bias", torch.zeros((m.outfeatures), dtype=torch.float16, device="cpu"))
+            m.register_buffer(
+                "bias", torch.zeros((m.outfeatures), dtype=torch.float16, device="cpu")
+            )
 
 
 def awq_reverse_reorder_int_tensor(int_tensor, bits: int):
@@ -496,7 +543,9 @@ def awq_reverse_reorder_int_tensor(int_tensor, bits: int):
     assert int_tensor.shape[-1] % compress_ratio == 0
 
     order_map = [0, 2, 4, 6, 1, 3, 5, 7]
-    order_tensor = torch.tensor(order_map, dtype=torch.int32, device=int_tensor.device).reshape(1, -1)
+    order_tensor = torch.tensor(
+        order_map, dtype=torch.int32, device=int_tensor.device
+    ).reshape(1, -1)
     order_tensor = order_tensor.repeat(int_tensor.shape[1] // compress_ratio, 1)
     order_tensor = order_tensor + torch.arange(
         0,
@@ -546,7 +595,9 @@ def unpack_awq(
 
     infeatures = awq_qweight.shape[0]
 
-    wf = torch.tensor(list(range(0, 32, bits)), dtype=torch.int32, device=qzeros.device).unsqueeze(0)
+    wf = torch.tensor(
+        list(range(0, 32, bits)), dtype=torch.int32, device=qzeros.device
+    ).unsqueeze(0)
     zeros = torch.bitwise_right_shift(torch.unsqueeze(qzeros, 2), wf.unsqueeze(0)).to(
         torch.int16 if bits == 8 else torch.int8
     )
@@ -557,9 +608,9 @@ def unpack_awq(
 
     zeros = zeros.reshape(-1, 1, zeros.shape[1] * zeros.shape[2])
 
-    weight = torch.bitwise_right_shift(torch.unsqueeze(qweight, 1), wf.unsqueeze(-1)).to(
-        torch.int16 if bits == 8 else torch.int8
-    )
+    weight = torch.bitwise_right_shift(
+        torch.unsqueeze(qweight, 1), wf.unsqueeze(-1)
+    ).to(torch.int16 if bits == 8 else torch.int8)
     torch.bitwise_and(weight, (2**bits) - 1, out=weight)
     weight = weight.reshape(-1, group_size, weight.shape[2])
 
@@ -575,7 +626,9 @@ def unpack_awq(
     zeros = zeros.contiguous()
     scale_zeros = zeros * scales
 
-    g_idx = torch.tensor([i // group_size for i in range(infeatures)], dtype=torch.int32)
+    g_idx = torch.tensor(
+        [i // group_size for i in range(infeatures)], dtype=torch.int32
+    )
     scale_mat = scales[g_idx]
     scale_zeros_mat = scale_zeros[g_idx].half()
 
@@ -631,14 +684,20 @@ def pack_from_tensors(
     for idx in range(infeatures):
         g_idx = idx // group_size
 
-        intweight.append(torch.round((W[:, idx] + scale_zeros[:, g_idx]) / scales[:, g_idx]).to(torch.int)[:, None])
+        intweight.append(
+            torch.round((W[:, idx] + scale_zeros[:, g_idx]) / scales[:, g_idx]).to(
+                torch.int
+            )[:, None]
+        )
     intweight = torch.cat(intweight, dim=1)
     intweight = intweight.t().contiguous()
     intweight = intweight.numpy().astype(np.uint32)
 
     i = 0
     row = 0
-    qweight = np.zeros((intweight.shape[0] // 32 * bits, intweight.shape[1]), dtype=np.uint32)
+    qweight = np.zeros(
+        (intweight.shape[0] // 32 * bits, intweight.shape[1]), dtype=np.uint32
+    )
     while row < qweight.shape[0]:
         for j in range(i, i + (32 // bits)):
             qweight[row] |= intweight[j] << (bits * (j - i))
@@ -669,7 +728,13 @@ def pack_from_tensors(
 
     return qweight, qzeros
 
-def get_checkpoints(model_name_or_path: str, extensions: List[str], possible_model_basenames: List[str], **cached_file_kwargs):
+
+def get_checkpoints(
+    model_name_or_path: str,
+    extensions: List[str],
+    possible_model_basenames: List[str],
+    **cached_file_kwargs,
+):
     """
     Retrives (and if necessary downloads from Hugging Face Hub) the model checkpoint. Sharding is supported. All the `possible_model_basenames` (e.g. `["model", "model-4bit-gptq"]`) will be explored over all `extensions` (e.g. `[".bin", ".safetensors"]`).
     """
@@ -685,10 +750,14 @@ def get_checkpoints(model_name_or_path: str, extensions: List[str], possible_mod
                 possible_index_file = os.path.join(model_name_or_path, shard_index_name)
                 if os.path.isfile(possible_index_file):
                     # The model is sharded over several checkpoints.
-                    possible_model_basename = possible_index_file.replace(ext + ".index.json", "")
+                    possible_model_basename = possible_index_file.replace(
+                        ext + ".index.json", ""
+                    )
                     return True, possible_index_file, possible_model_basename
                 else:
-                    model_save_name = os.path.join(model_name_or_path, possible_model_basename)
+                    model_save_name = os.path.join(
+                        model_name_or_path, possible_model_basename
+                    )
                     searched_files.append(possible_model_basename + ext)
                     if os.path.isfile(model_save_name + ext):
                         resolved_archive_file = model_save_name + ext
@@ -699,9 +768,9 @@ def get_checkpoints(model_name_or_path: str, extensions: List[str], possible_mod
             for possible_model_basename in possible_model_basenames:
                 shard_index_name = possible_model_basename + ext + ".index.json"
                 shard_index = cached_file(
-                        model_name_or_path,
-                        shard_index_name,
-                        **cached_file_kwargs,
+                    model_name_or_path,
+                    shard_index_name,
+                    **cached_file_kwargs,
                 )
                 searched_files.append(shard_index_name)
                 if shard_index is not None:
@@ -736,6 +805,7 @@ def get_checkpoints(model_name_or_path: str, extensions: List[str], possible_mod
         )
 
     return False, resolved_archive_file, true_model_basename
+
 
 __all__ = [
     "get_device",
