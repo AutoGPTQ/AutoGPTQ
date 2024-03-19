@@ -95,9 +95,7 @@ class BaseQuantizeConfig(PushToHubMixin):
         fields_info = fields(self)
 
         if self.bits not in fields_info[0].metadata["choices"]:
-            raise ValueError(
-                f"only support quantize to {fields_info[0].metadata['choices']} bits."
-            )
+            raise ValueError(f"only support quantize to {fields_info[0].metadata['choices']} bits.")
         if self.group_size != -1 and self.group_size <= 0:
             raise ValueError("unless equal to -1, group_size must greater then 0.")
         if not (0 < self.damp_percent < 1):
@@ -170,9 +168,7 @@ class BaseQuantizeConfig(PushToHubMixin):
                 elif key in SYNONYMS and SYNONYMS[key] in field_names:
                     filtered_args[SYNONYMS[key]] = val
                 else:
-                    logger.warning(
-                        f"ignoring unknown parameter in {quantize_config_filename}: {key}."
-                    )
+                    logger.warning(f"ignoring unknown parameter in {quantize_config_filename}: {key}.")
 
             if filtered_args["awq_gemm_checkpoint"]:
                 # AWQ does not reorder the rows.
@@ -298,9 +294,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         cache_examples_on_gpu: bool = True,
     ):
         if self.quantized:
-            raise EnvironmentError(
-                "can't execute quantize because the model is quantized."
-            )
+            raise EnvironmentError("can't execute quantize because the model is quantized.")
         if use_triton and not TRITON_AVAILABLE:
             logger.warning("triton is not installed, reset use_triton to False")
             use_triton = False
@@ -339,9 +333,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                 self.data_device = device if cache_examples_on_gpu else CPU
 
             def forward(self, inp=None, **kwargs):
-                if (
-                    inp is None
-                ):  # some models use all key-value arguments in forward pass call
+                if (inp is None):  # some models use all key-value arguments in forward pass call
                     for kwarg_name in ["hidden_states"]:
                         if kwarg_name in kwargs:
                             inp = kwargs[kwarg_name]
@@ -349,9 +341,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                 layer_inputs.append(move_to_device(inp, self.data_device))
 
                 if kwargs["attention_mask"] is not None:
-                    attention_masks.append(
-                        kwargs["attention_mask"].to(self.data_device)
-                    )
+                    attention_masks.append(kwargs["attention_mask"].to(self.data_device))
                 else:
                     attention_masks.append(None)
 
@@ -450,21 +440,15 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                     handles.append(subset[name].register_forward_hook(add_batch(name)))
                 for j in range(num_batches):
                     layer_input = move_to_device(layer_inputs[j], cur_layer_device)
-                    layer_attention_mask = move_to_device(
-                        attention_masks[j], cur_layer_device
-                    )
+                    layer_attention_mask = move_to_device(attention_masks[j], cur_layer_device)
                     additional_layer_inputs = {"attention_mask": layer_attention_mask}
                     layer_position_ids = (
-                        None
-                        if not position_ids
-                        else move_to_device(position_ids[j], cur_layer_device)
+                        None if not position_ids else move_to_device(position_ids[j], cur_layer_device)
                     )
                     if layer_position_ids is not None:
                         additional_layer_inputs["position_ids"] = layer_position_ids
                     for k, v in layer_input_kwargs[j].items():
-                        additional_layer_inputs[k] = nested_move_to_device(
-                            v, cur_layer_device
-                        )
+                        additional_layer_inputs[k] = nested_move_to_device(v, cur_layer_device)
                     layer(layer_input, **additional_layer_inputs)
                 for h in handles:
                     h.remove()
@@ -478,47 +462,29 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                         static_groups=self.quantize_config.static_groups,
                     )
                     quantizers[f"{self.layers_block_name}.{i}.{name}"] = (
-                        gptq[name].quantizer.to(
-                            CPU if force_layer_back_to_cpu else cur_layer_device
-                        ),
-                        move_to_device(
-                            scale, CPU if force_layer_back_to_cpu else cur_layer_device
-                        ),
-                        move_to_device(
-                            zero, CPU if force_layer_back_to_cpu else cur_layer_device
-                        ),
-                        move_to_device(
-                            g_idx, CPU if force_layer_back_to_cpu else cur_layer_device
-                        ),
+                        gptq[name].quantizer.to(CPU if force_layer_back_to_cpu else cur_layer_device),
+                        move_to_device(scale, CPU if force_layer_back_to_cpu else cur_layer_device),
+                        move_to_device(zero, CPU if force_layer_back_to_cpu else cur_layer_device),
+                        move_to_device(g_idx, CPU if force_layer_back_to_cpu else cur_layer_device),
                     )
                     gptq[name].free()
 
             for j in range(num_batches):
                 layer_input = move_to_device(layer_inputs[j], cur_layer_device)
-                layer_attention_mask = move_to_device(
-                    attention_masks[j], cur_layer_device
-                )
+                layer_attention_mask = move_to_device(attention_masks[j], cur_layer_device)
                 additional_layer_inputs = {"attention_mask": layer_attention_mask}
-                layer_position_ids = (
-                    None
-                    if not position_ids
-                    else move_to_device(position_ids[j], cur_layer_device)
-                )
+                layer_position_ids = None if not position_ids else move_to_device(position_ids[j], cur_layer_device)
                 if layer_position_ids is not None:
                     additional_layer_inputs["position_ids"] = layer_position_ids
                 for k, v in layer_input_kwargs[j].items():
-                    additional_layer_inputs[k] = nested_move_to_device(
-                        v, cur_layer_device
-                    )
+                    additional_layer_inputs[k] = nested_move_to_device(v, cur_layer_device)
                 layer_output = move_to_device(
                     layer(layer_input, **additional_layer_inputs)[0],
                     cur_layer_device if cache_examples_on_gpu else CPU,
                 )
                 layer_outputs.append(layer_output)
 
-            layers[i] = move_to_device(
-                layer, CPU if force_layer_back_to_cpu else cur_layer_device
-            )
+            layers[i] = move_to_device(layer, CPU if force_layer_back_to_cpu else cur_layer_device)
             del layer
             del gptq
             del layer_inputs
@@ -612,10 +578,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             create_pr (`bool`, *optional*, defaults to `False`):
                 Whether or not to create a PR with the uploaded files or directly commit.
         """
-        if (
-            self.quantize_config.model_name_or_path is None
-            or not isdir(self.quantize_config.model_name_or_path)
-        ) and save_dir is None:
+        if (self.quantize_config.model_name_or_path is None or not isdir(self.quantize_config.model_name_or_path)) and save_dir is None:
             raise ValueError(
                 "Quantized model should be saved first, or you can provide save_dir to make sure model is saved to local disk before uploading."
             )
@@ -636,12 +599,9 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         if self.quantize_config.model_name_or_path is not None:
             work_dir = self.quantize_config.model_name_or_path
             operations = [
-                CommitOperationAdd(path_or_fileobj=join(work_dir, f), path_in_repo=f)
-                for f in os.listdir(work_dir)
+                CommitOperationAdd(path_or_fileobj=join(work_dir, f), path_in_repo=f) for f in os.listdir(work_dir)
             ]
-            logger.info(
-                f"Uploading the following files to {repo_id}: {','.join(os.listdir(work_dir))}"
-            )
+            logger.info(f"Uploading the following files to {repo_id}: {','.join(os.listdir(work_dir))}")
             return create_commit(
                 repo_id=repo_id,
                 operations=operations,
@@ -661,9 +621,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         os.makedirs(save_dir, exist_ok=True)
 
         if not self.quantized:
-            raise EnvironmentError(
-                "can only save quantized model, please execute .quantize first."
-            )
+            raise EnvironmentError("can only save quantized model, please execute .quantize first.")
 
         self.model.to(CPU)
 
@@ -713,16 +671,10 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
 
             safetensors_metadata["auto_gptq_version"] = str(__version__)
             safetensors_metadata["gptq_bits"] = str(self.quantize_config.bits)
-            safetensors_metadata["gptq_group_size"] = str(
-                self.quantize_config.group_size
-            )
+            safetensors_metadata["gptq_group_size"] = str(self.quantize_config.group_size)
             safetensors_metadata["gptq_desc_act"] = str(self.quantize_config.desc_act)
-            safetensors_metadata["gptq_damp_percent"] = str(
-                self.quantize_config.damp_percent
-            )
-            safetensors_metadata["gptq_is_marlin_format"] = str(
-                self.quantize_config.is_marlin_format
-            )
+            safetensors_metadata["gptq_damp_percent"] = str(self.quantize_config.damp_percent)
+            safetensors_metadata["gptq_is_marlin_format"] = str(self.quantize_config.is_marlin_format)
 
             safe_save(state_dict, join(save_dir, model_save_name), safetensors_metadata)
         else:
@@ -743,9 +695,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         **kwargs,
     ):
         """alias of save_quantized"""
-        logger.warning(
-            "you are using save_pretrained, which will re-direct to save_quantized."
-        )
+        logger.warning("you are using save_pretrained, which will re-direct to save_quantized.")
         self.save_quantized(save_dir, use_safetensors, safetensors_metadata)
 
     @classmethod
@@ -761,9 +711,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         """load un-quantized pretrained model to cpu"""
 
         if not torch.cuda.is_available():
-            raise EnvironmentError(
-                "Load pretrained model to do quantization requires CUDA available."
-            )
+            raise EnvironmentError("Load pretrained model to do quantization requires CUDA available.")
 
         def skip(*args, **kwargs):
             pass
@@ -834,9 +782,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         torch.cuda.empty_cache()
 
         merged_kwargs = {**model_init_kwargs, **cached_file_kwargs}
-        model = AutoModelForCausalLM.from_pretrained(
-            pretrained_model_name_or_path, **merged_kwargs
-        )
+        model = AutoModelForCausalLM.from_pretrained(pretrained_model_name_or_path, **merged_kwargs)
 
         model_config = model.config.to_dict()
         seq_len_keys = ["max_position_embeddings", "seq_length", "n_positions"]
@@ -846,9 +792,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                     model.seqlen = model_config[key]
                     break
         else:
-            logger.warning(
-                "can't get model's sequence length from model config, will set to 4096."
-            )
+            logger.warning("can't get model's sequence length from model config, will set to 4096.")
             model.seqlen = 4096
         model.eval()
 
