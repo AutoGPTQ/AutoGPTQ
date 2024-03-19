@@ -39,8 +39,6 @@ class QuantLinear(nn.Module, TritonModuleMixin):
     Calls dequant kernel (see triton_utils/dequant) to dequantize the weights then uses
     torch.matmul to compute the output whereas original `triton` quantized linear layer fused
     dequant and matmul into single kernel.add()
-
-    See tests/benchmark_qlinear.py and tests/benchmark_triton_integration.py for benchmarks
     """
 
     QUANT_TYPE = "tritonv2"
@@ -167,7 +165,6 @@ class QuantLinear(nn.Module, TritonModuleMixin):
     def forward(self, x):
         out_shape = x.shape[:-1] + (self.outfeatures,)
         quant_linear_fn = QuantLinearFunction
-        # if self.trainable else QuantLinearInferenceOnlyFunction
 
         out = quant_linear_fn.apply(
             x.reshape(-1, x.shape[-1]),
