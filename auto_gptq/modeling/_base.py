@@ -959,12 +959,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         is_local = isdir(model_name_or_path)
 
         # Retrieve (and if necessary download) the quantized checkpoint(s).
-        is_sharded, resolved_archive_file, true_model_basename = get_checkpoints(
-            model_name_or_path=model_name_or_path,
-            extensions=extensions,
-            possible_model_basenames=possible_model_basenames,
-            **cached_file_kwargs,
-        )
+        is_sharded, resolved_archive_file, true_model_basename = get_checkpoints(model_name_or_path=model_name_or_path, extensions=extensions, possible_model_basenames=possible_model_basenames, **cached_file_kwargs)
 
         quantize_config.model_file_base_name = true_model_basename
 
