@@ -72,6 +72,7 @@ def make_quant(
     use_cuda_fp16: bool = True,
     desc_act: bool = False,
     trainable: bool = False,
+    use_tritonv2: bool = False,
 ):
     # If disable_exllamav2 is True, we want to fall back on the exllama kernel and not the cuda/cuda_old ones.
     if disable_exllama is None:
@@ -89,6 +90,7 @@ def make_quant(
         disable_exllama=disable_exllama,
         disable_exllamav2=disable_exllamav2,
         use_qigen=use_qigen,
+        use_tritonv2=use_tritonv2,
     )
 
     if isinstance(module, QuantLinear):
@@ -107,7 +109,12 @@ def make_quant(
             elif isinstance(submodule, transformers.pytorch_utils.Conv1D):
                 in_features = submodule.weight.shape[0]
                 out_features = submodule.weight.shape[1]
-            if (not (desc_act) or group_size == -1) and not use_triton and not use_qigen:
+            if (
+                (not (desc_act) or group_size == -1)
+                and not use_triton
+                and not use_qigen
+                and not use_tritonv2
+            ):
                 new_layer = QuantLinear(
                     bits,
                     group_size,
@@ -130,6 +137,7 @@ def make_quant(
                 )
             new_layer.device = ori_layer_device
             recurse_setattr(module, name, new_layer.to(ori_layer_device))
+
 
 def preprocess_checkpoint_qigen(
     module,
@@ -671,6 +679,7 @@ def pack_from_tensors(
 
     return qweight, qzeros
 
+
 def get_checkpoints(model_name_or_path: str, extensions: List[str], possible_model_basenames: List[str], **cached_file_kwargs):
     """
     Retrives (and if necessary downloads from Hugging Face Hub) the model checkpoint. Sharding is supported. All the `possible_model_basenames` (e.g. `["model", "model-4bit-gptq"]`) will be explored over all `extensions` (e.g. `[".bin", ".safetensors"]`).
@@ -701,9 +710,9 @@ def get_checkpoints(model_name_or_path: str, extensions: List[str], possible_mod
             for possible_model_basename in possible_model_basenames:
                 shard_index_name = possible_model_basename + ext + ".index.json"
                 shard_index = cached_file(
-                        model_name_or_path,
-                        shard_index_name,
-                        **cached_file_kwargs,
+                    model_name_or_path,
+                    shard_index_name,
+                    **cached_file_kwargs,
                 )
                 searched_files.append(shard_index_name)
                 if shard_index is not None:
@@ -738,6 +747,7 @@ def get_checkpoints(model_name_or_path: str, extensions: List[str], possible_mod
         )
 
     return False, resolved_archive_file, true_model_basename
+
 
 __all__ = [
     "get_device",
