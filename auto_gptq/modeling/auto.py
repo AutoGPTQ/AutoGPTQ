@@ -72,9 +72,7 @@ class AutoGPTQForCausalLM:
         trust_remote_code: bool = False,
         **model_init_kwargs,
     ) -> BaseGPTQForCausalLM:
-        model_type = check_and_get_model_type(
-            pretrained_model_name_or_path, trust_remote_code
-        )
+        model_type = check_and_get_model_type(pretrained_model_name_or_path, trust_remote_code)
         return GPTQ_CAUSAL_LM_MODEL_MAP[model_type].from_pretrained(
             pretrained_model_name_or_path=pretrained_model_name_or_path,
             quantize_config=quantize_config,
@@ -132,8 +130,7 @@ class AutoGPTQForCausalLM:
         # TODO: do we need this filtering of kwargs? @PanQiWei is there a reason we can't just pass all kwargs?
         keywords = {
             key: kwargs[key]
-            for key in list(signature(quant_func).parameters.keys())
-            + huggingface_kwargs
+            for key in list(signature(quant_func).parameters.keys()) + huggingface_kwargs
             if key in kwargs
         }
         return quant_func(
