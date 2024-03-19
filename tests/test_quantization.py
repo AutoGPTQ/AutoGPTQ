@@ -1,13 +1,15 @@
 import tempfile
 import unittest
 
+from parameterized import parameterized
 from transformers import AutoTokenizer
 
 from auto_gptq import AutoGPTQForCausalLM, BaseQuantizeConfig
 
 
 class TestQuantization(unittest.TestCase):
-    def test_quantize(self):
+    @parameterized.expand([(False,), (True,)])
+    def test_quantize(self, use_marlin: bool):
         pretrained_model_dir = "saibo/llama-1B"
 
         tokenizer = AutoTokenizer.from_pretrained(pretrained_model_dir, use_fast=True)
@@ -20,6 +22,7 @@ class TestQuantization(unittest.TestCase):
             bits=4,
             group_size=128,
             desc_act=False,
+            is_marlin_format=use_marlin,
         )
 
         model = AutoGPTQForCausalLM.from_pretrained(
@@ -32,3 +35,5 @@ class TestQuantization(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as tmpdirname:
             model.save_pretrained(tmpdirname)
+
+            model = AutoGPTQForCausalLM.from_quantized(tmpdirname, device="cuda:0", use_marlin=use_marlin)

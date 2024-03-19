@@ -501,6 +501,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             desc_act=self.quantize_config.desc_act,
             warmup_triton=autotune_warmup_after_quantized,
             force_layer_back_to_cpu=force_layer_back_to_cpu,
+            is_marlin_format=self.quantize_config.is_marlin_format,
         )
         if device_map:
             self.model = remove_hook_from_module(self.model, recurse=True)
