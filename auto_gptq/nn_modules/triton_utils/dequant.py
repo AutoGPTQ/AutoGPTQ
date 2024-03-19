@@ -96,7 +96,7 @@ def dequant248(qweight, scales, qzeros, g_idx, bits, maxq=None):
     out = torch.empty((infeatures, outfeatures), device="cuda", dtype=torch.float16)
     numels = out.numel()
     maxq = 2**bits - 1 if maxq is None else maxq
-    grid = lambda meta: (triton.cdiv(numels, meta["X_BLOCK"]),)
+    grid = lambda meta: (triton.cdiv(numels, meta["X_BLOCK"]),)  # noqa: E731
 
     dequant_kernel_248[grid](
         g_idx,
