@@ -546,9 +546,6 @@ def unpack_awq(
     qweight = awq_qweight.cuda()
     qweight = qweight.T.contiguous()
 
-    scales = awq_scales
-    scales = scales.reshape(-1, 1, scales.shape[-1])
-
     infeatures = awq_qweight.shape[0]
 
     wf = torch.tensor(list(range(0, 32, bits)), dtype=torch.int32, device=qzeros.device).unsqueeze(0)
