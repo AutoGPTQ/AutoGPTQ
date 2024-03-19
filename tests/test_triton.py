@@ -93,7 +93,6 @@ class TestTriton(unittest.TestCase):
         qlinear_ref = ref_model.model.model.layers[0].self_attn.q_proj
         qlinear_test = test_model.model.model.layers[0].self_attn.q_proj
 
-        # test_batch = next(iter(data_loader))
         test_out = qlinear_test(test_data)
         ref_out = qlinear_ref(test_data)
 
