@@ -333,7 +333,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                 self.data_device = device if cache_examples_on_gpu else CPU
 
             def forward(self, inp=None, **kwargs):
-                if (inp is None):  # some models use all key-value arguments in forward pass call
+                if inp is None:  # some models use all key-value arguments in forward pass call
                     for kwarg_name in ["hidden_states"]:
                         if kwarg_name in kwargs:
                             inp = kwargs[kwarg_name]
@@ -578,7 +578,9 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             create_pr (`bool`, *optional*, defaults to `False`):
                 Whether or not to create a PR with the uploaded files or directly commit.
         """
-        if (self.quantize_config.model_name_or_path is None or not isdir(self.quantize_config.model_name_or_path)) and save_dir is None:
+        if (
+            self.quantize_config.model_name_or_path is None or not isdir(self.quantize_config.model_name_or_path)
+        ) and save_dir is None:
             raise ValueError(
                 "Quantized model should be saved first, or you can provide save_dir to make sure model is saved to local disk before uploading."
             )
@@ -919,9 +921,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             raise TypeError(f"{config.model_type} isn't supported yet.")
 
         if quantize_config is None:
-            quantize_config = BaseQuantizeConfig.from_pretrained(
-                model_name_or_path, **cached_file_kwargs, **kwargs
-            )
+            quantize_config = BaseQuantizeConfig.from_pretrained(model_name_or_path, **cached_file_kwargs, **kwargs)
 
         if not use_marlin and MARLIN_AVAILABLE:
             unsupported_reason = _validate_marlin_compatibility(quantize_config)
@@ -930,11 +930,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                     "You passed a model that is compatible with the Marlin int4*fp16 GPTQ kernel but use_marlin is False. We recommend using `use_marlin=True` to use the optimized Marlin kernels for inference. Example: `model = AutoGPTQForCausalLM.from_quantized(..., use_marlin=True)`."
                 )
 
-        if (
-            hasattr(quantize_config, "is_marlin_format")
-            and quantize_config.is_marlin_format
-            and not use_marlin
-        ):
+        if hasattr(quantize_config, "is_marlin_format") and quantize_config.is_marlin_format and not use_marlin:
             raise ValueError(
                 "You passed a GPTQ model saved in int4*fp16 GPTQ Marlin kernel format but are loading with use_marlin=False. "
                 "Please use `use_marlin=True` to load this model. Example: `model = AutoGPTQForCausalLM.from_quantized(..., use_marlin=True)`."
@@ -997,9 +993,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                 torch_dtype = torch.float32
 
         if torch_dtype != torch.float16:
-            logger.warning(
-                "Overriding use_cuda_fp16 to False since torch_dtype is not torch.float16."
-            )
+            logger.warning("Overriding use_cuda_fp16 to False since torch_dtype is not torch.float16.")
             use_cuda_fp16 = False
 
         if not use_qigen:
@@ -1011,9 +1005,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
 
             init_contexts = [no_init_weights()]
             if low_cpu_mem_usage:
-                init_contexts.append(
-                    accelerate.init_empty_weights(include_buffers=False)
-                )
+                init_contexts.append(accelerate.init_empty_weights(include_buffers=False))
 
             with ContextManagers(init_contexts):
                 model = AutoModelForCausalLM.from_config(
@@ -1023,9 +1015,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                 layers = find_layers(model)
                 ignore_layers = [cls.lm_head_name] + cls.outside_layer_modules
                 for name in list(layers.keys()):
-                    if any(
-                        name.startswith(ignore_layer) for ignore_layer in ignore_layers
-                    ) or all(
+                    if any(name.startswith(ignore_layer) for ignore_layer in ignore_layers) or all(
                         not name.endswith(ignore_layer)
                         for sublist in cls.inside_layer_modules
                         for ignore_layer in sublist
@@ -1067,9 +1057,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                 if device is not None:
                     device = torch.device(device)
                     if not max_memory and not device_map:
-                        device_map = {
-                            "": device.index if device.type == "cuda" else device.type
-                        }
+                        device_map = {"": device.index if device.type == "cuda" else device.type}
                 if not isinstance(device_map, dict) and device_map != "sequential":
                     max_memory = accelerate.utils.get_balanced_memory(
                         model=model,
@@ -1099,9 +1087,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             # TODO: move this logic in an awq_utils.py file.
             if quantize_config.awq_gemm_checkpoint:
                 if is_sharded:
-                    raise ValueError(
-                        "The loading of sharded checkpoints with AWQ checkpoints is currently not supported. Please raise an issue in AutoGPTQ repository."
-                    )
+                    raise ValueError("The loading of sharded checkpoints with AWQ checkpoints is currently not supported. Please raise an issue in AutoGPTQ repository.")
 
                 if use_marlin:
                     raise ValueError(
@@ -1109,9 +1095,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                     )
 
                 if is_local:
-                    is_cached = os.path.isfile(
-                        os.path.join(model_name_or_path, "autogptq_model.safetensors")
-                    )
+                    is_cached = os.path.isfile(os.path.join(model_name_or_path, "autogptq_model.safetensors"))
                 else:
                     namespace, subfolder = model_name_or_path.split("/")
                     assets_path = huggingface_hub.cached_assets_path(
@@ -1119,17 +1103,13 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                         namespace=namespace,
                         subfolder=subfolder,
                     )
-                    weight_path = os.path.join(
-                        assets_path, "autogptq_model.safetensors"
-                    )
+                    weight_path = os.path.join(assets_path, "autogptq_model.safetensors")
 
                     is_cached = os.path.isfile(weight_path)
 
                 if is_cached:
                     if is_local:
-                        model_save_name = os.path.join(
-                            model_name_or_path, "autogptq_model.safetensors"
-                        )
+                        model_save_name = os.path.join(model_name_or_path, "autogptq_model.safetensors")
                     else:
                         namespace, subfolder = model_name_or_path.split("/")
                         assets_path = huggingface_hub.cached_assets_path(
@@ -1137,13 +1117,9 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                             namespace=namespace,
                             subfolder=subfolder,
                         )
-                        model_save_name = os.path.join(
-                            assets_path, "autogptq_model.safetensors"
-                        )
+                        model_save_name = os.path.join(assets_path, "autogptq_model.safetensors")
 
-                    logger.info(
-                        f"Loading an AWQ model, detected a cached repacked weight at {model_save_name}."
-                    )
+                    logger.info(f"Loading an AWQ model, detected a cached repacked weight at {model_save_name}.")
                 else:
                     logger.info(
                         "Loading an AWQ model. This requires repacking the weights, and no repacking cached weight was found. Grab a coffee!"
@@ -1176,9 +1152,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                         new_state_dict = {}
 
                         for state_dict_key in non_gptq_params:
-                            new_state_dict[state_dict_key] = f.get_tensor(
-                                state_dict_key
-                            )
+                            new_state_dict[state_dict_key] = f.get_tensor(state_dict_key)
 
                         gptq_layers = sorted(gptq_layers)
                         max_layer_name_length = len(max(gptq_layers, key=len))
@@ -1220,9 +1194,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
 
                     # Cache the converted model.
                     if is_local:
-                        model_save_name = os.path.join(
-                            model_name_or_path, "autogptq_model.safetensors"
-                        )
+                        model_save_name = os.path.join(model_name_or_path, "autogptq_model.safetensors")
                         safe_save(new_state_dict, model_save_name)
                     else:
                         namespace, subfolder = model_name_or_path.split("/")
@@ -1231,31 +1203,21 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                             namespace=namespace,
                             subfolder=subfolder,
                         )
-                        model_save_name = os.path.join(
-                            assets_path, "autogptq_model.safetensors"
-                        )
+                        model_save_name = os.path.join(assets_path, "autogptq_model.safetensors")
 
                         safe_save(new_state_dict, model_save_name)
 
             if use_marlin:
                 if is_sharded:
-                    raise ValueError(
-                        "The loading of sharded checkpoints with Marlin is currently not supported. Please raise an issue in AutoGPTQ repository."
-                    )
+                    raise ValueError("The loading of sharded checkpoints with Marlin is currently not supported. Please raise an issue in AutoGPTQ repository.")
                 if torch.version.hip:
-                    raise ValueError(
-                        "Can not use Marlin int4*fp16 kernel with AMD ROCm version of PyTorch as the kernel is not compatible. Please do not use `use_marlin=True` when using ROCm devices."
-                    )
+                    raise ValueError("Can not use Marlin int4*fp16 kernel with AMD ROCm version of PyTorch as the kernel is not compatible. Please do not use `use_marlin=True` when using ROCm devices.")
                 if not torch.cuda.get_device_capability()[0] >= 8:
-                    raise ValueError(
-                        f'Can not use Marlin int4*fp16 kernel with a device of compute capability {torch.cuda.get_device_capability()}, the minimum compute capability is 8.0 for Marlin kernel. Please do not use `use_marlin=True`, or please upgrade your GPU ("The more you buy, the more you save." - Taiwanese proverb).'
-                    )
+                    raise ValueError(f'Can not use Marlin int4*fp16 kernel with a device of compute capability {torch.cuda.get_device_capability()}, the minimum compute capability is 8.0 for Marlin kernel. Please do not use `use_marlin=True`, or please upgrade your GPU ("The more you buy, the more you save." - Taiwanese proverb).')
 
                 # Validate the model can run in Marlin.
                 if torch_dtype != torch.float16:
-                    raise ValueError(
-                        "Marlin kernel requires torch_dtype=torch.float16."
-                    )
+                    raise ValueError("Marlin kernel requires torch_dtype=torch.float16.")
                 unsupported_reason = _validate_marlin_compatibility(quantize_config)
                 if unsupported_reason is not None:
                     raise ValueError(
@@ -1292,9 +1254,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                 # Disable incompatible optimizations.
                 if inject_fused_attention or inject_fused_mlp:
                     # TODO: Validate whether that can be used.
-                    logger.info(
-                        "Disabling fused attention and mlp injection because Marlin kernel is used."
-                    )
+                    logger.info("Disabling fused attention and mlp injection because Marlin kernel is used.")
                     inject_fused_attention = False
                     inject_fused_mlp = False
 
@@ -1313,9 +1273,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             # Using QiGen.
 
             if is_sharded:
-                raise ValueError(
-                    "The loading of sharded checkpoints with QiGen is currently not supported. Please raise an issue in AutoGPTQ repository."
-                )
+                raise ValueError("The loading of sharded checkpoints with QiGen is currently not supported. Please raise an issue in AutoGPTQ repository.")
 
             if quantize_config.desc_act:
                 NotImplementedError("desc_act=True is not yet supported with QiGen.")
@@ -1327,9 +1285,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             ignore_layers = [cls.lm_head_name] + cls.outside_layer_modules
             for name in list(layers.keys()):
                 if any(name.startswith(ignore_layer) for ignore_layer in ignore_layers):
-                    logger.info(
-                        f"{name} not been quantized, will be ignored when make_quant."
-                    )
+                    logger.info(f"{name} not been quantized, will be ignored when make_quant.")
                     del layers[name]
 
             if model_save_name.endswith(".safetensors"):
@@ -1368,18 +1324,14 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                     model.seqlen = model_config[key]
                     break
         else:
-            logger.warning(
-                "can't get model's sequence length from model config, will set to 4096."
-            )
+            logger.warning("can't get model's sequence length from model config, will set to 4096.")
             model.seqlen = 4096
 
         # == step5: (optional) inject optimized module == #
         if inject_fused_attention:
             if cls.fused_attn_module_type is None:
                 inject_fused_attention = False
-                logger.warning(
-                    f"{cls.__name__} hasn't fused attention module yet, will skip inject fused attention."
-                )
+                logger.warning(f"{cls.__name__} hasn't fused attention module yet, will skip inject fused attention.")
             else:
                 cls.fused_attn_module_type.inject_to_model(
                     model,
@@ -1396,9 +1348,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         if inject_fused_mlp:
             if cls.fused_mlp_module_type is None:
                 inject_fused_mlp = False
-                logger.warning(
-                    f"{cls.__name__} hasn't fused mlp module yet, will skip inject fused mlp."
-                )
+                logger.warning(f"{cls.__name__} hasn't fused mlp module yet, will skip inject fused mlp.")
             else:
                 cls.fused_mlp_module_type.inject_to_model(model, use_triton=use_triton)
 
@@ -1458,9 +1408,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
 
     def enable_trainable_mode(self, enabled: bool = True):
         if not self.is_triton_backend and enabled:
-            raise NotImplementedError(
-                "For now, trainable mode only supports triton backend."
-            )
+            raise NotImplementedError("For now, trainable mode only supports triton backend.")
         for n, m in self.model.named_modules():
             if hasattr(m, "trainable"):
                 setattr(m, "trainable", enabled)
@@ -1483,17 +1431,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
     ):
         GeneralQuantLinear.inject_to_model(
             model,
-            dynamically_import_QuantLinear(
-                use_triton,
-                desc_act,
-                group_size,
-                bits=bits,
-                disable_exllama=disable_exllama,
-                disable_exllamav2=disable_exllamav2,
-                disable_marlin=not use_marlin,
-                use_qigen=use_qigen,
-                use_tritonv2=use_tritonv2,
-            ),
+            dynamically_import_QuantLinear(use_triton, desc_act, group_size, bits=bits, disable_exllama=disable_exllama, disable_exllamav2=disable_exllamav2, disable_marlin=not use_marlin, use_qigen=use_qigen),
         )
 
     def __getattr__(self, item):
