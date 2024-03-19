@@ -5,6 +5,9 @@ import torch.nn as nn
 from auto_gptq import AutoGPTQForCausalLM, BaseQuantizeConfig
 
 
+CPU = torch.device("cpu")
+CUDA_0 = torch.device("cuda:0")
+
 pretrained_model_dir = "facebook/opt-125m"
 quantized_model_dir = "opt-125m-4bit-128g"
 
@@ -135,6 +138,8 @@ def opt_eval(model, testenc, dev, seqlen=2048):
 
 
 def main():
+    device = CUDA_0 if torch.cuda.is_available() else CPU
+
     traindataset, testenc = get_wikitext2(128, 0, 2048, pretrained_model_dir)
 
     quantize_config = BaseQuantizeConfig(
@@ -145,6 +150,8 @@ def main():
 
     # load un-quantized model, the model will always be force loaded into cpu
     model = AutoGPTQForCausalLM.from_pretrained(pretrained_model_dir, quantize_config)
+    if device == CPU:
+        model = model.float()
 
     # quantize model, the examples should be list of dict whose keys can only be "input_ids" and "attention_mask"
     # with value under torch.LongTensor type.
@@ -157,9 +164,11 @@ def main():
     model.save_quantized(quantized_model_dir, use_safetensors=True)
 
     # load quantized model, currently only support cpu or single gpu
-    model = AutoGPTQForCausalLM.from_quantized(quantized_model_dir, device="cuda:0", use_triton=False)
+    model = AutoGPTQForCausalLM.from_quantized(quantized_model_dir, device=device, use_triton=False)
+    if device == CPU:
+        model = model.float()
 
-    opt_eval(model.model, testenc, "cuda:0")
+    opt_eval(model.model, testenc, device)
 
 
 if __name__ == "__main__":

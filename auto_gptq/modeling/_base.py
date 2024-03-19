@@ -365,7 +365,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         layers = get_module_by_name_prefix(self.model, self.layers_block_name)
 
         force_layer_back_to_cpu = False
-        if get_device(layers[0]) == CPU:
+        if get_device(layers[0]) == CPU and torch.cuda.is_available():
             layers[0] = layers[0].to(CUDA_0)
             force_layer_back_to_cpu = True
 
@@ -400,7 +400,8 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             if module is not None:
                 move_to_device(module, ori_outside_layer_module_devices[module_name])
 
-        torch.cuda.empty_cache()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
 
         inside_layer_modules = self.inside_layer_modules
         if not self.quantize_config.true_sequential:
@@ -410,7 +411,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             logger.info(f"Start quantizing layer {i + 1}/{len(layers)}")
             layer = layers[i]
             force_layer_back_to_cpu = False
-            if get_device(layer) == CPU:
+            if get_device(layer) == CPU and torch.cuda.is_available():
                 move_to_device(layer, CUDA_0)
                 force_layer_back_to_cpu = True
             cur_layer_device = get_device(layer)
@@ -489,7 +490,8 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             del gptq
             del layer_inputs
             layer_inputs, layer_outputs = layer_outputs, []
-            torch.cuda.empty_cache()
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
 
         pack_model(
             model=self.model,
@@ -510,7 +512,8 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
 
         self._quantized = True
 
-        torch.cuda.empty_cache()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
 
     @property
     def device(self):
@@ -713,9 +716,6 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
     ):
         """load un-quantized pretrained model to cpu"""
 
-        if not torch.cuda.is_available():
-            raise EnvironmentError("Load pretrained model to do quantization requires CUDA available.")
-
         def skip(*args, **kwargs):
             pass
 
@@ -782,7 +782,8 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             model_init_kwargs["device_map"] = None
             model_init_kwargs["low_cpu_mem_usage"] = False
 
-        torch.cuda.empty_cache()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
 
         merged_kwargs = {**model_init_kwargs, **cached_file_kwargs}
         model = AutoModelForCausalLM.from_pretrained(pretrained_model_name_or_path, **merged_kwargs)
