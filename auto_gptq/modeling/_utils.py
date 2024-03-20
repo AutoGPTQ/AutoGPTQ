@@ -103,15 +103,13 @@ def make_quant(
             if isinstance(submodule, nn.Linear):
                 in_features = submodule.in_features
                 out_features = submodule.out_features
-                bias = submodule.bias is not None
             elif isinstance(submodule, nn.Conv2d):
                 in_features = submodule.in_channels
                 out_features = submodule.out_channels
-                bias = submodule.bias is not None
             elif isinstance(submodule, transformers.pytorch_utils.Conv1D):
                 in_features = submodule.weight.shape[0]
                 out_features = submodule.weight.shape[1]
-                bias = submodule.bias is not None
+            bias = submodule.bias is not None
             if (
                 (not (desc_act) or group_size == -1)
                 and not use_triton
