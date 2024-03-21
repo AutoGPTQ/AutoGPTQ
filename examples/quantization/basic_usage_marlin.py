@@ -2,70 +2,36 @@ from transformers import AutoTokenizer, TextGenerationPipeline, AutoModelForCaus
 import torch
 from auto_gptq import AutoGPTQForCausalLM, BaseQuantizeConfig
 
-use_bitblas = True
-# pretrained_model_dir = "facebook/opt-125m"
-# pretrained_model_dir = "dist/opt-125m"
-# quantized_model_dir = "dist/opt-125m-4bit-128g"
-# quantized_model_dir = "dist/opt-125m-4bit-128g-BitBLAS"
-quantized_model_dir = "dist/Llama-2-70B-Chat-BitBLAS"
-# quantized_model_dir = "dist/Wizard-Vicuna-7B-Uncensored-BitBLAS-propagate-all"
-# pretrained_model_dir = "dist/Wizard-Vicuna-7B-Uncensored-GPTQ"
-pretrained_model_dir = "dist/Llama-2-70B-Chat-BitBLAS"
+use_marlin = False
+pretrained_model_dir = "dist/opt-125m"
+quantized_model_dir = "dist/opt-125m-4bit-128g"
 
-# if use_bitblas:
-#     quantized_model_dir += "-BitBLAS"
-# else:
-#     quantized_model_dir += "-GPTQ"
-
-
-def profile(model, input_data):
-    import numpy as np
-    import time
-    model = model.cuda()
-    model.eval()
-
-    def get_runtime(num_repeats=1):
-        tic = time.time()
-        for _ in range(num_repeats):
-            _ = model(input_data)
-        torch.cuda.synchronize()
-        return (time.time() - tic) * 1000 / num_repeats
-
-    with torch.no_grad():
-        # print("Warming up ...")
-        st = time.time()
-        while time.time() - st < 1.0:
-            get_runtime()  # warmup
-        warmup_runtime = get_runtime()
-        num_repeats = max(1, int(1000 / warmup_runtime))
-        times = get_runtime(num_repeats)
-    return np.mean(times)
+if use_marlin:
+    quantized_model_dir += "-marlin"
 
 def main():
     tokenizer = AutoTokenizer.from_pretrained(pretrained_model_dir, use_fast=True)
-    # examples = [
-    #     tokenizer(
-    #         "auto-gptq is an easy-to-use model quantization library with user-friendly apis, based on GPTQ algorithm."
-    #     )
-    # ]
+    examples = [
+        tokenizer(
+            "auto-gptq is an easy-to-use model quantization library with user-friendly apis, based on GPTQ algorithm."
+        )
+    ]
 
-    # quantize_config = BaseQuantizeConfig(
-    #     bits=4,  # quantize model to 4-bit
-    #     group_size=128,  # it is recommended to set the value to 128
-    #     desc_act=False,  # set to False can significantly speed up inference but the perplexity may slightly bad
-    #     is_bitblas_format=False,
-    # )
+    quantize_config = BaseQuantizeConfig(
+        bits=4,  # quantize model to 4-bit
+        group_size=128,  # it is recommended to set the value to 128
+        desc_act=False,  # set to False can significantly speed up inference but the perplexity may slightly bad
+    )
 
-    # # load un-quantized model, by default, the model will always be loaded into CPU memory
-    # model = AutoGPTQForCausalLM.from_pretrained(pretrained_model_dir, quantize_config)
+    # load un-quantized model, by default, the model will always be loaded into CPU memory
+    model = AutoGPTQForCausalLM.from_pretrained(pretrained_model_dir, quantize_config)
 
-    # # quantize model, the examples should be list of dict whose keys can only be "input_ids" and "attention_mask"
-    # model.quantize(examples)
+    # quantize model, the examples should be list of dict whose keys can only be "input_ids" and "attention_mask"
+    model.quantize(examples)
 
-    # # save quantized model
-    # model.save_quantized(quantized_model_dir)
-    # tokenizer.save_pretrained(quantized_model_dir)
-
+    # save quantized model
+    model.save_quantized(quantized_model_dir)
+    tokenizer.save_pretrained(quantized_model_dir)
     # push quantized model to Hugging Face Hub.
     # to use use_auth_token=True, Login first via huggingface-cli login.
     # or pass explcit token with: use_auth_token="hf_xxxxxxx"
@@ -84,16 +50,16 @@ def main():
     # model.save_quantized(quantized_model_dir, use_safetensors=True)
 
     # load quantized model to the first GPU
-    model = AutoGPTQForCausalLM.from_quantized(quantized_model_dir, device="cuda:0", use_bitblas=use_bitblas)
-    model.save_quantized(quantized_model_dir)
-    model = model.cuda()
+    model = AutoGPTQForCausalLM.from_quantized(
+        quantized_model_dir, device="cuda:0", use_marlin=use_marlin
+    )
+
     # download quantized model from Hugging Face Hub and load to the first GPU
     # model = AutoGPTQForCausalLM.from_quantized(repo_id, device="cuda:0", use_safetensors=True, use_triton=False)
 
     # -- simple token evaluate --
     input_ids = torch.ones((1, 1), dtype=torch.long, device="cuda:0")
     outputs = model(input_ids=input_ids)
-    print("Profile ", profile(model, input_ids))
     print(f"output logits {outputs.logits.shape}: \n", outputs.logits)
     # inference with model.generate
     print(

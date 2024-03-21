@@ -40,7 +40,12 @@ from bitblas.ops.matmul_dequantize import (
 )
 from bitblas.utils import get_target_from_env
 from bitblas.cache import global_operator_cache
-from typing import List, Union, Literal
+from typing import List, Union
+
+BITBLAS_TARGET = get_target_from_env()
+BITBLAS_DATABASE_PATH = ".bitblas_database"
+BITBLAS_PROPAGATE_WEIGHTS = True
+global_operator_cache.load_from_database(BITBLAS_DATABASE_PATH, BITBLAS_TARGET)
 
 
 def unpack_qzeros(qzeros, bits):
@@ -62,6 +67,17 @@ def unpack_qzeros(qzeros, bits):
 
 class QuantLinear(nn.Module):
     QUANT_TYPE = "bitblas"
+    SUPPORTED_BITS = [1, 2, 4]
+    OPT_FEATURES = [1, 16, 32, 64, 128, 256, 512]
+    TORCH_DTYPE = torch.float16
+    STORAGE_DTYPE = "int8"  # assume int8 storage
+    TORCH_STORAGE_DTYPE = getattr(torch, STORAGE_DTYPE)
+    BITBLAS_DTYPES = {
+        torch.float32: "float32",
+        torch.float16: "float16",
+        torch.half: "float16",
+        torch.int8: "int8",
+    }
 
     def __init__(
         self,
@@ -70,84 +86,77 @@ class QuantLinear(nn.Module):
         infeatures: int,
         outfeatures: int,
         bias: bool,
-        enable_tuning: bool = False,
-        fast_decoding: bool = False,
-        propagate_a: bool = False,
-        propagate_b: bool = False,
-        opt_features: Union[int, List[int]] = [1, 16, 32],
-        layout: Literal["nt"] = "nt",
-        trainable=False,
+        enable_tuning: bool = True,
+        fast_decoding: bool = True,
+        propagate_b: bool = BITBLAS_PROPAGATE_WEIGHTS,
+        opt_features: Union[int, List[int]] = OPT_FEATURES,
+        layout: str = "nt",
+        trainable: bool = False,
         **kwargs,
     ):
         super().__init__()
-        if group_size == -1:
-            group_size = infeatures
+        self._validate_parameters(bits, group_size, infeatures, outfeatures, trainable)
 
+        self.bits = bits
+        self.infeatures = infeatures
+        self.outfeatures = outfeatures
+        self.group_size = self._set_group_size(group_size, infeatures)
+        self.opt_features = opt_features
+        self.target = BITBLAS_TARGET
+        self._configure_bitblas_matmul(
+            enable_tuning, fast_decoding, bias, propagate_b, layout, bits
+        )
+        self._initialize_buffers(infeatures, outfeatures, bias)
+
+        self.reset_parameters()
+
+    def _validate_parameters(
+        self, bits, group_size, infeatures, outfeatures, trainable
+    ):
         if infeatures % 16 != 0 or outfeatures % 16 != 0:
-            raise ValueError(
-                "`infeatures` must be divisible by 16 and `outfeatures` by 16."
-            )
-        if bits not in [1, 2, 4]:
+            raise ValueError("`infeatures` and `outfeatures` must be divisible by 16.")
+        if bits not in self.SUPPORTED_BITS:
             raise NotImplementedError("Only 1/2/4 bits are supported.")
-        if group_size not in [-1, 128] and group_size != infeatures:
-            raise ValueError("Only group_size -1 and 128 are supported.")
         if infeatures % group_size != 0:
             raise ValueError("`infeatures` must be divisible by `group_size`.")
         if trainable:
-            raise NotImplementedError("Marlin does not support train.")
+            raise NotImplementedError("Training is not supported.")
 
-        self.bits = bits
-        self.storage_torch_dtype = torch.int8
-        storage_dtype = "int8"  # assume int8 storage
-        storage_nbit = 8
-        n_float_per_elem = storage_nbit // bits
+    def _set_group_size(self, group_size, infeatures):
+        return infeatures if group_size == -1 else group_size
 
-        self.opt_features = opt_features
-        self.infeatures = infeatures
-        self.outfeatures = outfeatures
-        self.group_size = group_size if group_size != -1 else infeatures
+    def _initialize_buffers(self, infeatures, outfeatures, bias):
         self.register_buffer(
             "qweight",
             torch.empty(
-                (self.outfeatures, self.infeatures // n_float_per_elem),
-                dtype=self.storage_torch_dtype,
+                self.bitblas_matmul.retrieve_weight_shape(),
+                dtype=self.TORCH_STORAGE_DTYPE,
             ),
         )
         self.register_buffer(
             "scales",
             torch.empty(
-                (self.outfeatures, self.infeatures // self.group_size),
-                dtype=torch.float16,
+                (outfeatures, infeatures // self.group_size), dtype=self.TORCH_DTYPE
             ),
         )
         self.register_buffer(
             "zeros",
-            torch.full(
-                (self.outfeatures, self.infeatures // self.group_size),
-                0,
-                dtype=torch.float16,
+            torch.zeros(
+                (outfeatures, infeatures // self.group_size), dtype=self.TORCH_DTYPE
             ),
         )
         if bias:
             self.register_buffer(
-                "bias", torch.zeros((outfeatures), dtype=torch.float16)
+                "bias", torch.zeros((outfeatures), dtype=self.TORCH_DTYPE)
             )
         else:
             self.bias = None
 
-        self.fast_type_conversion = False
-        self.weight_propagation = False
-
-        dtype = self.scales.dtype
-        BITBLAS_DTYPES = {
-            torch.float32: "float32",
-            torch.float16: "float16",
-            torch.half: "float16",
-            torch.int8: "int8",
-        }
-        assert dtype in BITBLAS_DTYPES, f"Unsupported dtype: {dtype}"
-        bitblas_dtype = BITBLAS_DTYPES[dtype]
-        self.target = get_target_from_env()
+    def _configure_bitblas_matmul(
+        self, enable_tuning, fast_decoding, bias, propagate_b, layout, bits
+    ):
+        # Assuming MatmulWeightOnlyDequantizeConfig and MatmulWeightOnlyDequantize are defined elsewhere
+        bitblas_dtype = self.BITBLAS_DTYPES[self.TORCH_DTYPE]
         matmul_config = MatmulWeightOnlyDequantizeConfig(
             M=self.opt_features,
             N=self.outfeatures,
@@ -156,33 +165,40 @@ class QuantLinear(nn.Module):
             out_dtype=bitblas_dtype,
             accum_dtype="int32" if bitblas_dtype == "int8" else bitblas_dtype,
             bit=bits,
-            storage_dtype=storage_dtype,
+            storage_dtype=self.STORAGE_DTYPE,
             source_format="uint",
             with_scaling=True,
             with_zeros=True,
-            group_size=group_size,
+            group_size=self.group_size,
             fast_decoding=fast_decoding,
             with_bias=bias,
-            propagate_a=propagate_a,
+            propagate_a=False,
             propagate_b=propagate_b,
             layout=layout,
             zeros_type="original",
         )
-        bitblas_matmul = global_operator_cache.get(matmul_config)
-        if bitblas_matmul is not None:
-            self.bitblas_matmul = bitblas_matmul
-            print("BitBLAS Operator found in global_operator_cache.")
-        else:
-            self.bitblas_matmul = MatmulWeightOnlyDequantize(
-                matmul_config, target=self.target
-            )
+        self.bitblas_matmul = self._get_or_create_bitblas_operator(
+            matmul_config, enable_tuning
+        )
 
+    def _get_or_create_bitblas_operator(self, config, enable_tuning):
+        bitblas_matmul = global_operator_cache.get(config)
+        if bitblas_matmul is None:
+            bitblas_matmul = MatmulWeightOnlyDequantize(config, target=self.target)
             if enable_tuning:
-                self.bitblas_matmul.hardware_aware_finetune(topk=20)
-                global_operator_cache.add(matmul_config, self.bitblas_matmul)
-                print("BitBLAS Tuning done, Append Operator to global_operator_cache.")
-
-        self.reset_parameters()
+                bitblas_matmul.hardware_aware_finetune(topk=20)
+                global_operator_cache.add(config, bitblas_matmul)
+                global_operator_cache.save_into_database(
+                    BITBLAS_DATABASE_PATH, BITBLAS_TARGET
+                )
+                print(
+                    "BitBLAS Tuning done, appended operator to global_operator_cache."
+                )
+            else:
+                print("BitBLAS Operator created.")
+        else:
+            print("BitBLAS Operator found in global_operator_cache.")
+        return bitblas_matmul
 
     def reset_parameters(self):
         # init for char
@@ -199,64 +215,17 @@ class QuantLinear(nn.Module):
             nn.init.zeros_(self.bias)
 
     def post_init(self):
+        # TODO(lei): eliminate runtime overhead like exllama state
         pass
-
-    def pack(self, linear, scales, zeros=None):
-        """Pack a fake-quantized linear layer into this actual Bitblas representation.
-        @linear: fake-quantized `torch.nn.Linear` layer to convert (must be of type `torch.half`)
-        @scales: corresponding quantization scales of shape `(infeatures, groups)`
-        """
-        if linear.weight.dtype != torch.half:
-            raise ValueError("Only `torch.half` weights are supported.")
-
-        # do permutation with (n, k) layout
-        w = linear.weight.data
-        # scales shape should be (n, k) as well.
-        s = scales
-
-        scale_zeros = torch.zeros_like(zeros, dtype=torch.float16)
-        if zeros is not None:
-            scale_zeros[:, :] = zeros[:, :] * scales[:, :]
-            self.zeros = zeros.to(scales.device).to(scales.dtype).contiguous()
-
-        # do permutation on weight
-        intweight = []
-        for idx in range(self.infeatures):
-            g_idx = idx // self.group_size
-            intweight.append(
-                torch.round((w[:, idx] + scale_zeros[:, g_idx]) / scales[:, g_idx]).to(
-                    torch.int
-                )[:, None]
-            )
-        intweight = torch.cat(intweight, dim=1)
-        intweight = intweight.contiguous()
-        intweight = intweight.cpu().numpy().astype(np.int8)
-        # quantize to 4bit
-        qw_np = general_compress(
-            intweight, source_bits=self.bits, storage_dtype=np.int8
-        )
-        # do interleave for fast type conversion
-        if self.fast_type_conversion:
-            qw_np = interleave_weight(qw_np, nbits=self.bits, target_dtype="float16")
-        if self.weight_propagation:
-            # do permutation on weight
-            pass
-
-        q = torch.from_numpy(qw_np).to(w.device)
-        self.qweight = q.to(self.qweight.device).contiguous()
-        self.scales = s.to(self.qweight.device).contiguous()
-        self.zeros = self.zeros.to(self.qweight.device).contiguous()
-        if self.bias is not None:
-            self.bias[:] = linear.bias.data.to(self.bias.device).contiguous()
 
     def repack_from_gptq(self, gptq_module: QuantLinearOld):
         # qweight in gptq old quant linear stored with (outfeatures, infeatures), should be transposed.
-        qweight = gptq_module.qweight.T.contiguous().view(self.storage_torch_dtype)
+        qweight = gptq_module.qweight.T.contiguous().view(self.TORCH_STORAGE_DTYPE)
         if self.bitblas_matmul.weight_transform is not None:
-            qweight = self.bitblas_matmul.weight_transform(qweight)
+            qweight = self.bitblas_matmul.weight_transform(qweight.cpu()).cuda()
         self.qweight = qweight
         # scales in gptq old quant linear stored with (infeatures // group_size, outfeatures), should be transposed.
-        scales = gptq_module.scales.T.contiguous().view(torch.float16)
+        scales = gptq_module.scales.T.contiguous().view(self.TORCH_DTYPE)
         self.scales = scales
         # qzeros should be dequantized to int zeros.
         intzeros = unpack_qzeros(gptq_module.qzeros, self.bits).T.contiguous()
@@ -271,22 +240,29 @@ class QuantLinear(nn.Module):
         if self.bias is not None:
             self.bias = gptq_module.bias.data.to(torch.float16).contiguous()
 
-    def forward(self, A, Output=None):
-        output_dtype = A.dtype
-        output_shape = A.shape[:-1] + (self.qweight.shape[0],)
-        A = A.view(-1, A.shape[-1]).to(self.scales.dtype)
-        args = [A, self.qweight, self.scales, self.zeros]
-        if self.bias is not None:
-            args.append(self.bias)
-        if Output is None:
-            Output = torch.empty(
-                A.shape[:-1] + (self.qweight.shape[0],), dtype=A.dtype, device=A.device
-            )
-        args.append(Output)
+    def forward(self, A):
 
-        self.bitblas_matmul(*args)
-        Output = Output.view(output_shape).to(output_dtype)
-        return Output
+        C = torch.empty(
+            A.shape[:-1] + (self.scales.shape[0],), dtype=A.dtype, device=A.device
+        )
+        if self.bias is not None:
+            self.bitblas_matmul(
+                A.view((-1, A.shape[-1])),
+                self.qweight,
+                self.scales,
+                self.zeros,
+                self.bias,
+                C.view((-1, C.shape[-1])),
+            )
+        else:
+            self.bitblas_matmul(
+                A.view((-1, A.shape[-1])),
+                self.qweight,
+                self.scales,
+                self.zeros,
+                C.view((-1, C.shape[-1])),
+            )
+        return C
 
 
 __all__ = ["QuantLinear"]
