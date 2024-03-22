@@ -16,7 +16,9 @@ from logging import getLogger
 import numpy as np
 import torch
 import torch.nn as nn
-
+import ctypes
+from functools import reduce
+import operator
 
 logger = getLogger(__name__)
 
@@ -108,8 +110,6 @@ class QuantLinear(nn.Module):
         )
         self._initialize_buffers(infeatures, outfeatures, bias)
 
-        self.reset_parameters()
-
     def _validate_parameters(
         self, bits, group_size, infeatures, outfeatures, trainable
     ):
@@ -128,14 +128,14 @@ class QuantLinear(nn.Module):
     def _initialize_buffers(self, infeatures, outfeatures, bias):
         self.register_buffer(
             "qweight",
-            torch.empty(
+            torch.zeros(
                 self.bitblas_matmul.retrieve_weight_shape(),
                 dtype=self.TORCH_STORAGE_DTYPE,
             ),
         )
         self.register_buffer(
             "scales",
-            torch.empty(
+            torch.zeros(
                 (outfeatures, infeatures // self.group_size), dtype=self.TORCH_DTYPE
             ),
         )
@@ -213,10 +213,14 @@ class QuantLinear(nn.Module):
         nn.init.zeros_(self.zeros)
         if self.bias is not None:
             nn.init.zeros_(self.bias)
+        self.q_params = None
 
     def post_init(self):
-        # TODO(lei): eliminate runtime overhead like exllama state
-        pass
+        # eliminate runtime overhead like exllama state
+        param_list = [self.qweight, self.scales, self.zeros]
+        if self.bitblas_matmul.config.with_bias:
+            param_list.append(self.bias)
+        self.q_params = [ctypes.c_void_p(arr.data_ptr()) for arr in param_list]
 
     def repack_from_gptq(self, gptq_module: QuantLinearOld):
         # qweight in gptq old quant linear stored with (outfeatures, infeatures), should be transposed.
@@ -245,23 +249,12 @@ class QuantLinear(nn.Module):
         C = torch.empty(
             A.shape[:-1] + (self.scales.shape[0],), dtype=A.dtype, device=A.device
         )
-        if self.bias is not None:
-            self.bitblas_matmul(
-                A.view((-1, A.shape[-1])),
-                self.qweight,
-                self.scales,
-                self.zeros,
-                self.bias,
-                C.view((-1, C.shape[-1])),
-            )
-        else:
-            self.bitblas_matmul(
-                A.view((-1, A.shape[-1])),
-                self.qweight,
-                self.scales,
-                self.zeros,
-                C.view((-1, C.shape[-1])),
-            )
+        A_void = ctypes.c_void_p(A.data_ptr())
+        # m is the product of the last n - 1 dimensions of A
+        m = ctypes.c_int32(reduce(operator.mul, A.shape[:-1], 1))
+        self.bitblas_matmul.lib.call(
+            A_void, *self.q_params, ctypes.c_void_p(C.data_ptr()), m
+        )
         return C
 
 
