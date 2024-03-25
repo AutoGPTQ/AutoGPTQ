@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 from logging import getLogger
 from typing import List, Optional, Union
@@ -8,6 +9,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 import transformers
+from tqdm import tqdm
 from transformers import AutoConfig
 from transformers.utils.hub import cached_file
 
@@ -17,6 +19,11 @@ from ._const import CPU, CUDA_0, EXLLAMA_DEFAULT_MAX_INPUT_LENGTH, SUPPORTED_MOD
 
 
 logger = getLogger(__name__)
+handler = logging.StreamHandler()
+formatter = logging.Formatter("%(levelname)s - %(message)s")
+handler.setFormatter(formatter)
+logger.addHandler(handler)
+logger.setLevel(logging.INFO)
 
 
 def get_device(obj: Union[torch.Tensor, nn.Module]):
@@ -286,8 +293,11 @@ def pack_model(
         use_marlin=is_marlin_format,
     )
     qlayers = find_layers(model, [QuantLinear])
-    for name in qlayers:
-        logger.info(name)
+
+    pbar = tqdm(qlayers.keys(), leave=True)
+    for name in pbar:
+        pbar.set_description(f"Packing {name}...", refresh=True)
+
         quantizers[name], scale, zero, g_idx = quantizers[name]
         # so far can only pack layer on CPU
         layer_device = qlayers[name].device

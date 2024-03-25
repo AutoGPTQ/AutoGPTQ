@@ -197,6 +197,14 @@ class BaseQuantizeConfig(PushToHubMixin):
         }
 
 
+def nested_move_to_device(v, device):
+    if isinstance(v, torch.Tensor):
+        return move_to_device(v, device)
+    elif isinstance(v, (list, tuple)):
+        return type(v)([nested_move_to_device(e, device) for e in v])
+    else:
+        return v
+
 class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
     layer_type: str = None
     layers_block_name: str = None
@@ -316,60 +324,45 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
 
         examples = self._prepare_examples_for_quantization(examples, batch_size)
 
-        def nested_move_to_device(v, device):
-            if isinstance(v, torch.Tensor):
-                return move_to_device(v, device)
-            elif isinstance(v, (list, tuple)):
-                return type(v)([nested_move_to_device(e, device) for e in v])
-            else:
-                return v
-
-        class LayerHijacker(nn.Module):
-            """hijack layer's forward pass to cache data"""
-
-            def __init__(self, m, device):
-                super().__init__()
-                self.module = m
-                self.data_device = device if cache_examples_on_gpu else CPU
-
-            def forward(self, inp=None, **kwargs):
-                if inp is None:  # some models use all key-value arguments in forward pass call
-                    for kwarg_name in ["hidden_states"]:
-                        if kwarg_name in kwargs:
-                            inp = kwargs[kwarg_name]
-                            break
-                layer_inputs.append(move_to_device(inp, self.data_device))
-
-                if kwargs["attention_mask"] is not None:
-                    attention_masks.append(kwargs["attention_mask"].to(self.data_device))
-                else:
-                    attention_masks.append(None)
-
-                pos_ids = kwargs.get("position_ids", None)
-                if pos_ids is not None:
-                    position_ids.append(move_to_device(pos_ids, self.data_device))
-                one_kwargs = {}
-                for (
-                    k,
-                    v,
-                ) in kwargs.items():  # make sure other arguments also be captured
-                    if k not in ["hidden_states", "attention_mask", "position_ids"]:
-                        one_kwargs[k] = nested_move_to_device(v, self.data_device)
-                layer_input_kwargs.append(one_kwargs)
-                raise ValueError
-
         forward_pass_use_cache = self.model.config.use_cache
         self.model.config.use_cache = False
 
         num_batches = len(examples)
         layers = get_module_by_name_prefix(self.model, self.layers_block_name)
 
+        cur_layer_device = get_device(layers[0])
+        data_device = cur_layer_device if cache_examples_on_gpu else CPU
+        def store_input_hook(_, args, kwargs):
+            # Positional arguments.
+            layer_input = []
+            for inp in args:
+                layer_input.append(move_to_device(inp, data_device))
+            layer_inputs.append(layer_input)
+
+            # Keyword arguments.
+            if kwargs["attention_mask"] is not None:
+                attention_masks.append(kwargs["attention_mask"].to(data_device))
+            else:
+                attention_masks.append(None)
+
+            pos_ids = kwargs.get("position_ids", None)
+            if pos_ids is not None:
+                position_ids.append(move_to_device(pos_ids, data_device))
+            one_kwargs = {}
+            for (
+                k,
+                v,
+            ) in kwargs.items():  # make sure other arguments also be captured
+                if k not in ["hidden_states", "attention_mask", "position_ids"]:
+                    one_kwargs[k] = nested_move_to_device(v, data_device)
+            layer_input_kwargs.append(one_kwargs)
+            raise ValueError
+
         force_layer_back_to_cpu = False
         if get_device(layers[0]) == CPU:
             layers[0] = layers[0].to(CUDA_0)
             force_layer_back_to_cpu = True
 
-        cur_layer_device = get_device(layers[0])
         ori_outside_layer_module_devices = {}
         for module_name in self.outside_layer_modules:
             module = get_module_by_name_prefix(self.model, module_name)
@@ -381,8 +374,8 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             if module is not None:
                 move_to_device(module, cur_layer_device)
 
-        # get inputs for first layer
-        layers[0] = LayerHijacker(layers[0], cur_layer_device)
+        # TODO: make this optional, backporting https://github.com/huggingface/optimum/blob/main/optimum/gptq/quantizer.py
+        handle = layers[0].register_forward_pre_hook(store_input_hook, with_kwargs=True)
         for example in examples:
             for k, v in example.items():
                 if len(v.shape) == 1:
@@ -392,7 +385,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                 self.model(**example)
             except ValueError:
                 pass
-        layers[0] = layers[0].module
+        handle.remove()
 
         move_to_device(layers[0], CPU if force_layer_back_to_cpu else cur_layer_device)
         for module_name in self.outside_layer_modules:
@@ -439,7 +432,10 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                 for name in subset:
                     handles.append(subset[name].register_forward_hook(add_batch(name)))
                 for j in range(num_batches):
-                    layer_input = move_to_device(layer_inputs[j], cur_layer_device)
+                    layer_input = []
+                    for k, layer_inp in enumerate(layer_inputs[j]):
+                        layer_input.append(move_to_device(layer_inp, cur_layer_device))
+
                     layer_attention_mask = move_to_device(attention_masks[j], cur_layer_device)
                     additional_layer_inputs = {"attention_mask": layer_attention_mask}
                     layer_position_ids = (
@@ -449,7 +445,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                         additional_layer_inputs["position_ids"] = layer_position_ids
                     for k, v in layer_input_kwargs[j].items():
                         additional_layer_inputs[k] = nested_move_to_device(v, cur_layer_device)
-                    layer(layer_input, **additional_layer_inputs)
+                    layer(*layer_input, **additional_layer_inputs)
                 for h in handles:
                     h.remove()
 
@@ -470,7 +466,10 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                     gptq[name].free()
 
             for j in range(num_batches):
-                layer_input = move_to_device(layer_inputs[j], cur_layer_device)
+                layer_input = []
+                for k, layer_inp in enumerate(layer_inputs[j]):
+                    layer_input.append(move_to_device(layer_inp, cur_layer_device))
+
                 layer_attention_mask = move_to_device(attention_masks[j], cur_layer_device)
                 additional_layer_inputs = {"attention_mask": layer_attention_mask}
                 layer_position_ids = None if not position_ids else move_to_device(position_ids[j], cur_layer_device)
@@ -479,7 +478,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                 for k, v in layer_input_kwargs[j].items():
                     additional_layer_inputs[k] = nested_move_to_device(v, cur_layer_device)
                 layer_output = move_to_device(
-                    layer(layer_input, **additional_layer_inputs)[0],
+                    layer(*layer_input, **additional_layer_inputs)[0],
                     cur_layer_device if cache_examples_on_gpu else CPU,
                 )
                 layer_outputs.append(layer_output)
@@ -488,7 +487,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             del layer
             del gptq
             del layer_inputs
-            layer_inputs, layer_outputs = layer_outputs, []
+            layer_inputs, layer_outputs = [layer_outputs], []  # TODO: is it really OK to cache only the first positional argument?
             torch.cuda.empty_cache()
 
         pack_model(
