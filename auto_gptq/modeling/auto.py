@@ -19,11 +19,13 @@ from .mistral import MistralGPTQForCausalLM
 from .mixtral import MixtralGPTQForCausalLM
 from .moss import MOSSGPTQForCausalLM
 from .opt import OPTGPTQForCausalLM
+from .phi import PhiGPTQForCausalLM
 from .qwen import QwenGPTQForCausalLM
 from .qwen2 import Qwen2GPTQForCausalLM
 from .qwen2_moe import Qwen2MoeGPTQForCausalLM
 from .rw import RWGPTQForCausalLM
 from .stablelmepoch import StableLMEpochGPTQForCausalLM
+from .starcoder2 import Starcoder2GPTQForCausalLM
 from .xverse import XverseGPTQForCausalLM
 from .yi import YiGPTQForCausalLM
 
@@ -49,11 +51,13 @@ GPTQ_CAUSAL_LM_MODEL_MAP = {
     "xverse": XverseGPTQForCausalLM,
     "deci": DeciLMGPTQForCausalLM,
     "stablelm_epoch": StableLMEpochGPTQForCausalLM,
+    "starcoder2": Starcoder2GPTQForCausalLM,
     "mixtral": MixtralGPTQForCausalLM,
     "qwen2": Qwen2GPTQForCausalLM,
     "qwen2_moe": Qwen2MoeGPTQForCausalLM,
     "longllama": LongLlamaGPTQForCausalLM,
     "gemma": GemmaGPTQForCausalLM,
+    "phi": PhiGPTQForCausalLM,
 }
 
 
@@ -104,6 +108,7 @@ class AutoGPTQForCausalLM:
         disable_exllama: Optional[bool] = None,
         disable_exllamav2: bool = False,
         use_marlin: bool = False,
+        use_tritonv2: bool = False,
         **kwargs,
     ) -> BaseGPTQForCausalLM:
         # If disable_exllamav2 is True, we want to fall back on the exllama kernel and not the cuda/cuda_old ones.
@@ -153,6 +158,7 @@ class AutoGPTQForCausalLM:
             disable_exllama=disable_exllama,
             disable_exllamav2=disable_exllamav2,
             use_marlin=use_marlin,
+            use_tritonv2=use_tritonv2,
             **keywords,
         )
 

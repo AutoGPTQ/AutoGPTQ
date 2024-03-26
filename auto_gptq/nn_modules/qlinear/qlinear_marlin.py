@@ -169,8 +169,11 @@ class QuantLinear(nn.Module):
         q = torch.from_numpy(q.astype(np.int32)).to(w.device)
         self.B[:, :] = q.to(self.B.device)
         self.s[:, :] = s.to(self.s.device)
-        if self.bias is not None:
-            self.bias[:] = linear.bias.data.to(self.bias.device)
+        if linear.bias is not None:
+            if self.bias is not None:
+                self.bias[:] = linear.bias.data.to(self.bias.device)
+            else:
+                self.bias = linear.bias.clone()
 
     def forward(self, A):
         A = A.half()
