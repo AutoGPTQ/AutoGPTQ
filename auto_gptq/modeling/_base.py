@@ -481,13 +481,13 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                     layer(*layer_input, **additional_layer_inputs)[0],
                     cur_layer_device if cache_examples_on_gpu else CPU,
                 )
-                layer_outputs.append(layer_output)
+                layer_outputs.append([layer_output])
 
             layers[i] = move_to_device(layer, CPU if force_layer_back_to_cpu else cur_layer_device)
             del layer
             del gptq
             del layer_inputs
-            layer_inputs, layer_outputs = [layer_outputs], []  # TODO: is it really OK to cache only the first positional argument?
+            layer_inputs, layer_outputs = layer_outputs, []  # TODO: is it really OK to cache only the first positional argument?
             torch.cuda.empty_cache()
 
         pack_model(

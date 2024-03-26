@@ -16,7 +16,10 @@ class TestQuantization(unittest.TestCase):
         examples = [
             tokenizer(
                 "auto-gptq is an easy-to-use model quantization library with user-friendly apis, based on GPTQ algorithm."
-            )
+            ),
+            tokenizer(
+                "Today I am in Paris and it is a wonderful day."
+            ),
         ]
         quantize_config = BaseQuantizeConfig(
             bits=4,
