@@ -2,7 +2,6 @@ import gc
 import os
 from logging import getLogger
 
-import accelerate
 import huggingface_hub
 import torch
 from accelerate.utils import find_tied_parameters
@@ -11,6 +10,7 @@ from tqdm import tqdm
 
 from ..nn_modules.qlinear.qlinear_marlin import QuantLinear as MarlinQuantLinear
 from ..nn_modules.qlinear.qlinear_marlin import _get_perms, unpack_qzeros
+from .accelerate_utils import load_checkpoint_in_model
 from .import_utils import MARLIN_AVAILABLE, MARLIN_EXCEPTION
 from .modeling_utils import recurse_getattr, recurse_setattr
 
@@ -51,7 +51,7 @@ def prepare_model_for_marlin_load(
             # TODO: Avoid loading the model with wrong QuantLinear, and directly use
             # Marlin ones. The repacking can be done directly on the safetensors, just
             # as for AWQ checkpoints.
-            accelerate.utils.modeling.load_checkpoint_in_model(
+            load_checkpoint_in_model(
                 model,
                 dtype=torch_dtype,  # This is very hacky but works due to https://github.com/huggingface/accelerate/blob/bd72a5f1a80d5146554458823f8aeda0a9db5297/src/accelerate/utils/modeling.py#L292
                 checkpoint=current_model_save_name,

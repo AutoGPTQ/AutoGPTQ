@@ -30,6 +30,7 @@ from transformers.utils.hub import (
 from ..nn_modules._fused_base import FusedBaseAttentionModule, FusedBaseMLPModule
 from ..nn_modules.qlinear import GeneralQuantLinear
 from ..quantization import GPTQ
+from ..utils.accelerate_utils import load_checkpoint_in_model
 from ..utils.data_utils import collate_data
 from ..utils.import_utils import (
     AUTOGPTQ_CUDA_AVAILABLE,
@@ -68,6 +69,7 @@ logger = logging.getLogger(__name__)
 handler = logging.StreamHandler()
 formatter = logging.Formatter("%(levelname)s - %(message)s")
 handler.setFormatter(formatter)
+logger.propagate = False
 logger.addHandler(handler)
 logger.setLevel(logging.INFO)
 
@@ -1253,7 +1255,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                     inject_fused_attention = False
                     inject_fused_mlp = False
 
-            accelerate.utils.modeling.load_checkpoint_in_model(
+            load_checkpoint_in_model(
                 model,
                 dtype=torch_dtype,  # This is very hacky but works due to https://github.com/huggingface/accelerate/blob/bd72a5f1a80d5146554458823f8aeda0a9db5297/src/accelerate/utils/modeling.py#L292
                 checkpoint=model_save_name,
