@@ -62,6 +62,7 @@ from ._utils import (
     preprocess_checkpoint_qigen,
     simple_dispatch_model,
     unpack_awq,
+    convert_new_checkpoint_format,
 )
 
 
@@ -92,6 +93,7 @@ class BaseQuantizeConfig(PushToHubMixin):
     model_name_or_path: Optional[str] = field(default=None)
     model_file_base_name: Optional[str] = field(default=None)
     awq_gemm_checkpoint: Optional[bool] = field(default=False)
+    new_checkpoint_format: Optional[bool] = field(default=False)
 
     def __post_init__(self):
         fields_info = fields(self)
@@ -102,6 +104,9 @@ class BaseQuantizeConfig(PushToHubMixin):
             raise ValueError("unless equal to -1, group_size must greater then 0.")
         if not (0 < self.damp_percent < 1):
             raise ValueError("damp_percent must between 0 and 1.")
+        if self.sym == False:
+            self.new_checkpoint_format = True
+            logger.warning("sym is False, will use new_checkpoint_format. because sym=False is not supported in old checkpoint format.")
 
     def save_pretrained(self, save_dir: str, **kwargs):
         with open(join(save_dir, "quantize_config.json"), "w", encoding="utf-8") as f:
@@ -196,6 +201,7 @@ class BaseQuantizeConfig(PushToHubMixin):
             "model_file_base_name": self.model_file_base_name,
             "is_marlin_format": self.is_marlin_format,
             "quant_method": "gptq",
+            "new_checkpoint_format": self.new_checkpoint_format,
         }
 
 
@@ -226,6 +232,8 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         injected_fused_attention: bool = False,
         injected_fused_mlp: bool = False,
         trainable: bool = False,
+        kerenl_backend_type: Optional[str] = None,
+        now_format: Optional = None,
     ):
         super().__init__()
 
@@ -239,6 +247,8 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         self.injected_fused_attention = injected_fused_attention
         self.injected_fused_mlp = injected_fused_mlp
         self.trainable = trainable
+        self.kerenl_backend_type = kerenl_backend_type
+        self.now_format = now_format
 
     @property
     def quantized(self):
@@ -492,7 +502,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             layer_inputs, layer_outputs = layer_outputs, []  # TODO: is it really OK to cache only the first positional argument?
             torch.cuda.empty_cache()
 
-        pack_model(
+        self.kerenl_backend_type = pack_model(
             model=self.model,
             quantizers=quantizers,
             bits=self.quantize_config.bits,
@@ -504,12 +514,14 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             force_layer_back_to_cpu=force_layer_back_to_cpu,
             is_marlin_format=self.quantize_config.is_marlin_format,
         )
+
         if device_map:
             self.model = remove_hook_from_module(self.model, recurse=True)
             self.model = simple_dispatch_model(self.model, device_map)
         self.model.config.use_cache = forward_pass_use_cache
 
         self._quantized = True
+        self.now_format = "new"
 
         torch.cuda.empty_cache()
 
@@ -524,17 +536,40 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
     def to(self, device: Union[str, torch.device]):
         self.model.to(device)
         return self
-
     def forward(self, *args, **kwargs):
+        if self.now_format == "old":
+            self.model = convert_new_checkpoint_format(
+                self.model,
+                True,
+                self.quantize_config,
+                self.kerenl_backend_type
+            )
+            self.now_format = "new"
         return self.model(*args, **kwargs)
 
     def generate(self, **kwargs):
         """shortcut for model.generate"""
+        if self.now_format == "old":
+            self.model = convert_new_checkpoint_format(
+                self.model,
+                True,
+                self.quantize_config,
+                self.kerenl_backend_type
+            )
+            self.now_format = "new"
         with torch.inference_mode(), torch.amp.autocast(device_type=self.device.type):
             return self.model.generate(**kwargs)
 
     def prepare_inputs_for_generation(self, *args, **kwargs):
         """shortcut for model.prepare_inputs_for_generation"""
+        if self.now_format == "old":
+            self.model = convert_new_checkpoint_format(
+                self.model,
+                True,
+                self.quantize_config,
+                self.kerenl_backend_type
+            )
+            self.now_format = "new"
         return self.model.prepare_inputs_for_generation(*args, **kwargs)
 
     def push_to_hub(
@@ -626,6 +661,17 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
 
         if not self.quantized:
             raise EnvironmentError("can only save quantized model, please execute .quantize first.")
+        if self.quantize_config.new_checkpoint_format:
+            logger.warning("New checkpoint format is enabled, the saved model is not supported by older versions of AutoGPTQ(<= 0.7.0).")
+
+        if not self.quantize_config.new_checkpoint_format and self.now_format == "new":
+            self.model = convert_new_checkpoint_format(
+                self.model,
+                False,
+                self.quantize_config,
+                self.kerenl_backend_type
+            )
+            self.now_format = "old"
 
         self.model.to(CPU)
 
@@ -1312,6 +1358,25 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             )
             model.load_state_dict(checkpoint)
 
+        kerenl_backend_type = dynamically_import_QuantLinear(
+            use_triton=use_triton,
+            desc_act=quantize_config.desc_act,
+            group_size=quantize_config.group_size,
+            bits=quantize_config.bits,
+            disable_exllama=disable_exllama,
+            disable_exllamav2=disable_exllamav2,
+            use_qigen=use_qigen,
+            disable_marlin=not use_marlin,
+        )
+
+        if not quantize_config.new_checkpoint_format:
+            model = convert_new_checkpoint_format(
+                model,
+                True,
+                quantize_config,
+                kerenl_backend_type
+            )
+
         # == step4: set seqlen == #
         model_config = model.config.to_dict()
         seq_len_keys = ["max_position_embeddings", "seq_length", "n_positions"]
@@ -1351,7 +1416,6 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
 
         # Any post-initialization that require device information, for example buffers initialization on device.
         model = autogptq_post_init(model, use_act_order=quantize_config.desc_act)
-
         model.eval()
 
         # == step6: (optional) warmup triton == #
@@ -1387,6 +1451,8 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             injected_fused_attention=inject_fused_attention,
             injected_fused_mlp=inject_fused_mlp and (use_triton or use_tritonv2),
             trainable=trainable,
+            kerenl_backend_type=kerenl_backend_type,
+            now_format="new",
         )
 
     def warmup_triton(self, enabled: bool = True):

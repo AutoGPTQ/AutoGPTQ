@@ -1087,6 +1087,7 @@ class TestsQ4Exllama(unittest.TestCase):
 
         linear.qweight = torch.randint(-100, 100, size=linear.qweight.shape, dtype=torch.int32)
         linear.scales = linear.scales + 0.002
+        linear.qzeros += 0b00010001000100010001000100010001 # for new weight format
 
         linear = linear.eval()
         linear = linear.to(device)
@@ -1782,6 +1783,7 @@ class TestsQ4CUDA(unittest.TestCase):
 
         linear.qweight = torch.randint(-100, 100, size=linear.qweight.shape, dtype=torch.int32)
         linear.scales = linear.scales + 0.002
+        linear.qzeros += 0b00010001000100010001000100010001  # for new weight format
         linear.use_cuda_fp16 = use_half2
         self.assertTrue(linear.autogptq_cuda_available)
 
@@ -1922,6 +1924,7 @@ class TestsQ4ExllamaV2(unittest.TestCase):
 
         linear.qweight = torch.randint(-100, 100, size=linear.qweight.shape, dtype=torch.int32)
         linear.scales = linear.scales + 0.002
+        linear.qzeros += 0b00010001000100010001000100010001 # for new weight format
 
         linear = linear.eval()
         linear = linear.to(device)

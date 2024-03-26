@@ -229,7 +229,7 @@ def unpack_qzeros(qzeros):
         i = col % 8
         unpacked_zeros[:, col] = (qzeros[:, col // 8] >> (4 * i)) & 0xF
 
-    return unpacked_zeros + 1
+    return unpacked_zeros
 
 
 # Copied from https://github.com/IST-DASLab/marlin/pull/1

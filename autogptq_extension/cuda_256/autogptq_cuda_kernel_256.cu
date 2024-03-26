@@ -30,9 +30,9 @@
 // }
 // #endif
 
+
 #if (defined(__CUDA_ARCH__) && __CUDA_ARCH__ < 700) || defined(USE_ROCM)
 // adapted from https://github.com/torch/cutorch/blob/master/lib/THC/THCAtomics.cuh
-
 __device__ __forceinline__ void atomicAdd(c10::Half* address, c10::Half val) {
     unsigned int *address_as_ui = reinterpret_cast<unsigned int *>(reinterpret_cast<char *>(address) - (reinterpret_cast<size_t>(address) & 2));
     unsigned int old = *address_as_ui;
@@ -112,6 +112,7 @@ __global__ void VecQuant4MatMulKernel(
     int width,
 	int zero_width
 );
+
 
 template <typename scalar_t>
 __global__ void VecQuant8MatMulKernel(
@@ -313,8 +314,7 @@ __global__ void VecQuant2MatMulKernel(
     g = as_int(g_idx[g_h + k]);
     scalar_t scale = scales[g * width + w];
 
-    // Avoid overflows with & 0x0f.
-    scalar_t zero = scalar_t(((as_unsigned(zeros[g * zero_width + z_w]) >> z_mod & 0x3) + 1) & 0x0f);
+    scalar_t zero = scalar_t((as_unsigned(zeros[g * zero_width + z_w]) >> z_mod & 0x3) & 0x0f);
 
     w_tmp = ((as_unsigned(mat[i + (k_w * width)]) >> k_bit) & 0x3);
 
@@ -448,12 +448,12 @@ __global__ void VecQuant3MatMulKernel(
     scalar_t zero;
     if (z_mod == 10) {
       z_tmp = (as_unsigned(zeros[g * zero_width + z_w]) >> 30) | ((as_unsigned(zeros[g * zero_width + (z_w + 1)]) << 2) & 0x4);
-      zero = scalar_t(((z_tmp) + 1) & 0x0f);  // Avoid overflows
+      zero = scalar_t(z_tmp & 0x0f);
     } else if (z_mod == 21){
       z_tmp = (as_unsigned(zeros[g * zero_width + z_w]) >> 31) | ((as_unsigned(zeros[g * zero_width + (z_w + 1)]) << 1) & 0x6);
-      zero = scalar_t(((z_tmp) + 1) & 0x0f);
+      zero = scalar_t(z_tmp & 0x0f);
     } else {
-      zero = scalar_t((((as_unsigned(zeros[g * zero_width + z_w]) >> z_bit) & 0x7) + 1) & 0x0f);
+      zero = scalar_t(((as_unsigned(zeros[g * zero_width + z_w]) >> z_bit) & 0x7) & 0x0f);
     }
 
     if (k_mod == 10) {
@@ -547,7 +547,7 @@ __global__ void VecQuant4MatMulKernel(
 
     g = as_int(g_idx[g_h + k]);
     scalar_t scale = scales[g * width + w];
-    scalar_t zero = scalar_t((((as_unsigned(zeros[g * zero_width + z_w]) >> z_mod) & 0xF) + 1) & 0x0f);
+    scalar_t zero = scalar_t(((as_unsigned(zeros[g * zero_width + z_w]) >> z_mod) & 0xF) & 0x0f);
 
     w_tmp = ((as_unsigned(mat[i + (k_w * width)]) >> k_bit) & 0xF);
 
@@ -634,7 +634,7 @@ __global__ void VecQuant8MatMulKernel(
 
     g = as_int(g_idx[g_h + k]);
     scalar_t scale = scales[g * width + w];
-    scalar_t zero = scalar_t((((as_unsigned(zeros[g * zero_width + z_w]) >> z_mod) & 0xFF) + 1) & 0x0f);
+    scalar_t zero = scalar_t(((as_unsigned(zeros[g * zero_width + z_w]) >> z_mod) & 0xFF) & 0x0f);
 
     w_tmp = ((as_unsigned(mat[i + (k_w * width)]) >> k_bit) & 0xFF);
 
@@ -725,7 +725,7 @@ __global__ void VecQuant2MatMulKernel_old(
 
     int g = (g_h + k) / groupsize;
     scalar_t scale = scales[g * width + w];
-    scalar_t zero = scale * scalar_t(((as_unsigned(zeros[g * zero_width + z_w]) >> z_mod & 0x3) + 1) & 0x0f);
+    scalar_t zero = scale * scalar_t((as_unsigned(zeros[g * zero_width + z_w]) >> z_mod & 0x3) & 0x0f);
 
     res += (scale * scalar_t((tmp >> 0) & 0x3) - zero) * blockvec[k + 0];
     res += (scale * scalar_t((tmp >> 2) & 0x3) - zero) * blockvec[k + 1];
@@ -848,12 +848,12 @@ __global__ void VecQuant3MatMulKernel_old(
     scalar_t zero;
     if (z_mod == 10) {
       z_tmp = (as_unsigned(zeros[g * zero_width + z_w]) >> 30) | ((as_unsigned(zeros[g * zero_width + (z_w + 1)]) << 2) & 0x4);
-      zero = scale * scalar_t(((z_tmp) + 1) & 0x0f);
+      zero = scale * scalar_t(z_tmp & 0x0f);
     } else if (z_mod == 21){
       z_tmp = (as_unsigned(zeros[g * zero_width + z_w]) >> 31) | ((as_unsigned(zeros[g * zero_width + (z_w + 1)]) << 1) & 0x6);
-      zero = scale * scalar_t(((z_tmp) + 1) & 0x0f);
+      zero = scale * scalar_t(z_tmp & 0x0f);
     } else {
-      zero = scale * scalar_t((((as_unsigned(zeros[g * zero_width + z_w]) >> z_bit) & 0x7) + 1) & 0x0f);
+      zero = scale * scalar_t(((as_unsigned(zeros[g * zero_width + z_w]) >> z_bit) & 0x7) & 0x0f);
     }
 
     res += (scale * scalar_t((tmp1 >>  0) & 0x7) - zero) * blockvec[k + 0];
@@ -979,7 +979,7 @@ __global__ void VecQuant4MatMulKernel_old(
 
     int g = (g_h + k) / groupsize;
     scalar_t scale = scales[g * width + w];
-    scalar_t zero = scale * scalar_t((((as_unsigned(zeros[g * zero_width + z_w]) >> z_mod) & 0xF) + 1) & 0x0f);
+    scalar_t zero = scale * scalar_t(((as_unsigned(zeros[g * zero_width + z_w]) >> z_mod) & 0xF) & 0x0f);
 
     res += (scale * scalar_t((tmp >> 0) & 0xF) - zero) * blockvec[k + 0];
     res += (scale * scalar_t((tmp >> 4) & 0xF) - zero) * blockvec[k + 1];
@@ -1066,7 +1066,7 @@ __global__ void VecQuant8MatMulKernel_old(
 
     int g = (g_h + k) / groupsize;
     scalar_t scale = scales[g * width + w];
-    scalar_t zero = scale * scalar_t((((as_unsigned(zeros[g * zero_width + z_w]) >> z_mod) & 0xFF) + 1) & 0x0f);
+    scalar_t zero = scale * scalar_t(((as_unsigned(zeros[g * zero_width + z_w]) >> z_mod) & 0xFF) & 0x0f);
 
     res += (scale * scalar_t((tmp >> 0) & 0xFF) - zero) * blockvec[k + 0];
     res += (scale * scalar_t((tmp >> 8) & 0xFF) - zero) * blockvec[k + 1];
@@ -1161,7 +1161,7 @@ __global__ void VecQuant2MatMulKernelFaster_old(
     int g = (g_h + (k * 2)) / groupsize;
 	float scale_f = scales[g * width + w];
     half2 scale = __float2half2_rn(scale_f);
-    half2 zero = __float2half2_rn(-(scale_f * ((((as_unsigned(zeros[g * zero_width + z_w]) >> z_mod) & 0x3) + 1) & 0x0f)));
+    half2 zero = __float2half2_rn(-(scale_f * (((as_unsigned(zeros[g * zero_width + z_w]) >> z_mod) & 0x3) & 0x0f)));
 
     std::memset(&res2, 0, sizeof(half2));
     tmp = as_unsigned(mat[i]);
@@ -1289,12 +1289,12 @@ __global__ void VecQuant3MatMulKernelFaster_old(
     half2 zero;
     if (z_mod == 10) {
       z_tmp = (as_unsigned(zeros[g * zero_width + z_w]) >> 30) | ((as_unsigned(zeros[g * zero_width + (z_w + 1)]) << 2) & 0x4);
-      zero = __float2half2_rn(-(scale_f * (((z_tmp) + 1) & 0x0f)));
+      zero = __float2half2_rn(-(scale_f * (z_tmp & 0x0f)));
     } else if (z_mod == 21){
       z_tmp = (as_unsigned(zeros[g * zero_width + z_w]) >> 31) | ((as_unsigned(zeros[g * zero_width + (z_w + 1)]) << 1) & 0x6);
-      zero = __float2half2_rn(-(scale_f * (((z_tmp) + 1) & 0x0f)));
+      zero = __float2half2_rn(-(scale_f * (z_tmp & 0x0f)));
     } else {
-      zero = __float2half2_rn(-(scale_f * ((((as_unsigned(zeros[g * zero_width + z_w]) >> z_bit) & 0x7) + 1) & 0x0f)));
+      zero = __float2half2_rn(-(scale_f * (((as_unsigned(zeros[g * zero_width + z_w]) >> z_bit) & 0x7) & 0x0f)));
     }
 
     std::memset(&res2, 0, sizeof(half2));
@@ -1412,13 +1412,8 @@ __global__ void VecQuant4MatMulKernelFaster_old(
   while (k < blockwidth2) {
     int g = (g_h + (k * 2)) / groupsize;
 	float scale_f = scales[g * width + w];
-
     half2 scale = __float2half2_rn(scale_f);
-    half2 zero = __float2half2_rn(-(scale_f * ((((as_unsigned(zeros[g * zero_width + z_w]) >> z_mod) & 0xF) + 1) & 0x0f)));
-
-    //std::memset(&res2, 0, sizeof(half2));
-
-    //res2 = __float2half2_rn((float)0.);
+    half2 zero = __float2half2_rn(-(scale_f * (((as_unsigned(zeros[g * zero_width + z_w]) >> z_mod) & 0xF) & 0x0f)));
 
     std::memset(&res2, 0, sizeof(half2));
     tmp = as_unsigned(mat[i]);
@@ -1428,9 +1423,7 @@ __global__ void VecQuant4MatMulKernelFaster_old(
     res2 = __hfma2(__hfma2(deq2[(tmp >> 24) & 0xff][off], scale, zero), blockvec[k + 3], res2);
 	i += width;
     k += 4;
-
     res += __low2float(res2) + __high2float(res2);
-
   }
 
   atomicAdd(&mul[b * width + w], res);
