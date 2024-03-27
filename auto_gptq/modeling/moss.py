@@ -1,4 +1,4 @@
-from ._base import *
+from ._base import BaseGPTQForCausalLM
 
 
 class MOSSGPTQForCausalLM(BaseGPTQForCausalLM):
@@ -9,7 +9,7 @@ class MOSSGPTQForCausalLM(BaseGPTQForCausalLM):
         ["attn.qkv_proj"],
         ["attn.out_proj"],
         ["mlp.fc_in"],
-        ["mlp.fc_out"]
+        ["mlp.fc_out"],
     ]
 
 

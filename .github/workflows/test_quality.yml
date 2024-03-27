@@ -1,0 +1,124 @@
+name: check_code_quality
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - "auto_gptq/**.py"
+      - "tests/**.py"
+      - "examples/**.py"
+      - "setup.py"
+
+  pull_request:
+    branches: [ main ]
+    paths:
+      - "auto_gptq/**.py"
+      - "tests/**.py"
+      - "examples/**.py"
+      - "setup.py"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: [3.9]
+        os: [ubuntu-22.04]
+    runs-on: ${{ matrix.os }}
+  
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Free disk space
+        run: |
+          # Go from 19G to 54G free disk space in 3min
+          df -h
+          sudo apt-get update
+          sudo apt-get purge -y '^apache.*'
+          sudo apt-get purge -y '^imagemagick.*'
+          sudo apt-get purge -y '^dotnet.*'
+          sudo apt-get purge -y '^aspnetcore.*'
+          sudo apt-get purge -y 'php.*'
+          sudo apt-get purge -y '^temurin.*'
+          sudo apt-get purge -y '^mysql.*'
+          sudo apt-get purge -y '^java.*'
+          sudo apt-get purge -y '^openjdk.*'
+          sudo apt-get purge -y microsoft-edge-stable google-cloud-cli azure-cli google-chrome-stable firefox powershell mono-devel
+          df -h
+          sudo apt-get autoremove -y >/dev/null 2>&1
+          sudo apt-get clean
+          df -h
+          echo "https://github.com/actions/virtual-environments/issues/709"
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+          df -h
+          echo "remove big /usr/local"
+          sudo rm -rf "/usr/local/share/boost"
+          sudo rm -rf /usr/local/lib/android >/dev/null 2>&1
+          df -h
+          echo "remove /usr/share leftovers"
+          sudo rm -rf /usr/share/dotnet/sdk > /dev/null 2>&1
+          sudo rm -rf /usr/share/dotnet/shared > /dev/null 2>&1
+          sudo rm -rf /usr/share/swift > /dev/null 2>&1
+          df -h
+          echo "remove other leftovers"
+          sudo rm -rf /var/lib/mysql > /dev/null 2>&1
+          sudo rm -rf /home/runner/.dotnet > /dev/null 2>&1
+          sudo rm -rf /home/runneradmin/.dotnet > /dev/null 2>&1
+          sudo rm -rf /etc/skel/.dotnet > /dev/null 2>&1
+          sudo rm -rf /usr/local/.ghcup > /dev/null 2>&1
+          sudo rm -rf /usr/local/aws-cli > /dev/null 2>&1
+          sudo rm -rf /usr/local/lib/node_modules > /dev/null 2>&1
+          sudo rm -rf /usr/lib/heroku > /dev/null 2>&1
+          sudo rm -rf /usr/local/share/chromium > /dev/null 2>&1
+          df -h
+
+      - uses: actions/setup-python@v3
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Setup Miniconda
+        uses: conda-incubator/setup-miniconda@v2.2.0
+        with:
+          activate-environment: "build"
+          python-version: ${{ matrix.python-version }}
+          mamba-version: "*"
+          use-mamba: false
+          channels: conda-forge,defaults
+          channel-priority: true
+          add-pip-as-python-dependency: true
+          auto-activate-base: false
+
+      - name: Install dependencies
+        run: |
+          conda install cuda-toolkit -c "nvidia/label/cuda-12.1.0"
+
+          # Refer to https://pytorch.org/get-started/locally/
+          python -m pip install torch
+          
+          python -m pip install --upgrade build setuptools wheel numpy
+
+      - name: Check install
+        run: |
+          python -c "import torch; print('torch version:', torch.__version__)"
+
+      - name: Install AutoGPTQ
+        run: |
+          # For some reason $CONDA_PREFIX is empty.
+          export CUDA_HOME=/usr/share/miniconda
+          export CUDA_PATH=/usr/share/miniconda
+
+          echo "CUDA_HOME:"
+          echo $CUDA_HOME
+
+          echo "CUDA_PATH:"
+          echo $CUDA_PATH
+
+          pip install -vvv .[quality]
+      
+      - name: Check style with ruff
+        run: |
+          ruff auto_gptq examples tests setup.py

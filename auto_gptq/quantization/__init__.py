@@ -1,2 +1,2 @@
-from .gptq import *
-from .quantizer import *
+from .gptq import GPTQ
+from .quantizer import Quantizer, quantize
