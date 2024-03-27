@@ -15,4 +15,5 @@ class MPTGPTQForCausalLM(BaseGPTQForCausalLM):
         ["ffn.down_proj"]
     ]
 
+
 __all__ = ["MPTGPTQForCausalLM"]
