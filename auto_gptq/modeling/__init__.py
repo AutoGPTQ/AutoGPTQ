@@ -15,6 +15,7 @@ from .longllama import LongLlamaGPTQForCausalLM
 from .mistral import MistralGPTQForCausalLM
 from .mixtral import MixtralGPTQForCausalLM
 from .moss import MOSSGPTQForCausalLM
+from .mpt import MPTGPTQForCausalLM
 from .opt import OPTGPTQForCausalLM
 from .phi import PhiGPTQForCausalLM
 from .qwen import QwenGPTQForCausalLM

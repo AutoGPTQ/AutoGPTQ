@@ -18,6 +18,7 @@ from .longllama import LongLlamaGPTQForCausalLM
 from .mistral import MistralGPTQForCausalLM
 from .mixtral import MixtralGPTQForCausalLM
 from .moss import MOSSGPTQForCausalLM
+from .mpt import MPTGPTQForCausalLM
 from .opt import OPTGPTQForCausalLM
 from .phi import PhiGPTQForCausalLM
 from .qwen import QwenGPTQForCausalLM
@@ -56,6 +57,7 @@ GPTQ_CAUSAL_LM_MODEL_MAP = {
     "longllama": LongLlamaGPTQForCausalLM,
     "gemma": GemmaGPTQForCausalLM,
     "phi": PhiGPTQForCausalLM,
+    "mpt": MPTGPTQForCausalLM,
 }
 
 
