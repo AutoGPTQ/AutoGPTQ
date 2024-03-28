@@ -40,12 +40,40 @@ PYPI_RELEASE = os.environ.get('PYPI_RELEASE', None)
 BUILD_CUDA_EXT = int(os.environ.get('BUILD_CUDA_EXT', '1')) == 1
 DISABLE_QIGEN = int(os.environ.get('DISABLE_QIGEN', '1')) == 1
 COMPILE_MARLIN = int(os.environ.get('COMPILE_MARLIN', '1')) == 1
+UNSUPPORTED_COMPUTE_CAPABILITIES = ['3.5', '3.7', '5.0', '5.2', '5.3']
+
+def detect_local_sm_architectures():
+    """
+    Detect compute capabilities of one machine's GPUs as PyTorch does.
+
+    Copied from https://github.com/pytorch/pytorch/blob/v2.2.2/torch/utils/cpp_extension.py#L1962-L1976
+    """
+    arch_list = []
+
+    for i in range(torch.cuda.device_count()):
+        capability = torch.cuda.get_device_capability(i)
+        supported_sm = [int(arch.split('_')[1])
+                        for arch in torch.cuda.get_arch_list() if 'sm_' in arch]
+        max_supported_sm = max((sm // 10, sm % 10) for sm in supported_sm)
+        # Capability of the device may be higher than what's supported by the user's
+        # NVCC, causing compilation error. User's NVCC is expected to match the one
+        # used to build pytorch, so we use the maximum supported capability of pytorch
+        # to clamp the capability.
+        capability = min(max_supported_sm, capability)
+        arch = f'{capability[0]}.{capability[1]}'
+        if arch not in arch_list:
+            arch_list.append(arch)
+
+    arch_list = sorted(arch_list)
+    arch_list[-1] += '+PTX'
+    return arch_list
+
 
 if BUILD_CUDA_EXT:
     try:
         import torch
     except Exception as e:
-        print(f"Building cuda extension requires PyTorch (>=1.13.0) being installed, please install PyTorch first: {e}")
+        print(f"Building PyTorch CUDA extension requires PyTorch being installed, please install PyTorch first: {e}.\n NOTE: This issue may be raised due to pip build isolation system (ignoring local packages). Please use `--no-build-isolation` when installing with pip, and refer to https://github.com/AutoGPTQ/AutoGPTQ/pull/620 for more details.")
         sys.exit(1)
 
     CUDA_VERSION = None
@@ -70,6 +98,20 @@ if BUILD_CUDA_EXT:
                 "is installed without CUDA support."
             )
             sys.exit(1)
+
+        torch_cuda_arch_list = os.environ.get("TORCH_CUDA_ARCH_LIST", None)
+        if torch_cuda_arch_list is not None:
+            torch_cuda_arch_list = torch_cuda_arch_list.replace(' ', ';')
+            archs = torch_cuda_arch_list.split(';')
+
+            requested_but_unsupported_archs = {arch for arch in archs if arch in UNSUPPORTED_COMPUTE_CAPABILITIES }
+            if len(requested_but_unsupported_archs) > 0:
+                raise ValueError(f"Trying to compile AutoGPTQ for CUDA compute capabilities {torch_cuda_arch_list}, but AutoGPTQ does not support the compute capabilities {requested_but_unsupported_archs} (AutoGPTQ requires Pascal or higher). Please fix your environment variable TORCH_CUDA_ARCH_LIST (Reference: https://github.com/pytorch/pytorch/blob/v2.2.2/setup.py#L135-L139).")
+        else:
+            local_arch_list = detect_local_sm_architectures()
+            local_but_unsupported_archs = {arch for arch in local_arch_list if arch in UNSUPPORTED_COMPUTE_CAPABILITIES}
+            if len(local_but_unsupported_archs) > 0:
+                raise ValueError(f"PyTorch detected the compute capabilities {local_arch_list} for the NVIDIA GPUs on the current machine, but AutoGPTQ can not be built for compute capabilities {local_but_unsupported_archs} (AutoGPTQ requires Pascal or higher). Please set the environment variable TORCH_CUDA_ARCH_LIST (Reference: https://github.com/pytorch/pytorch/blob/v2.2.2/setup.py#L135-L139) with your necessary architectures.")
 
         # For the PyPI release, the version is simply x.x.x to comply with PEP 440.
         if not PYPI_RELEASE:
