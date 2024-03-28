@@ -980,7 +980,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
 
                 if use_marlin:
                     raise ValueError(
-                        "Tried to load an AWQ kernel with use_marlin=True. This is currently not supported. Please open an issue in AutoGPTQ repository."
+                        "Tried to load an AWQ model with use_marlin=True. This is currently not supported. Please open an issue in AutoGPTQ repository."
                     )
 
                 model_cache_name, is_cached = quantize_config.get_cache_file_path()
@@ -990,7 +990,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                     logger.info(f"Loading an AWQ model, detected a cached repacked weight at {model_save_name}.")
                 else:
                     logger.info(
-                        "Loading an AWQ model. This requires repacking the weights, and no repacking cached weight was found. Grab a coffee!"
+                        "Loading an AWQ model. This requires repacking the weights, and no cached repacked checkpoint was found. Grab a coffee!"
                     )
 
                     if "safetensors" not in model_save_name:

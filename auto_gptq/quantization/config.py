@@ -10,6 +10,12 @@ from transformers.utils.hub import PushToHubMixin, cached_file
 
 
 logger = logging.getLogger(__name__)
+handler = logging.StreamHandler()
+formatter = logging.Formatter("%(levelname)s - %(message)s")
+handler.setFormatter(formatter)
+logger.propagate = False
+logger.addHandler(handler)
+logger.setLevel(logging.INFO)
 
 CHECKPOINT_FORMAT_FIELD = "checkpoint_format"
 CHECKPOINT_FORMAT_FIELD_COMPAT_MARLIN = "is_marlin_format"
@@ -95,6 +101,7 @@ class BaseQuantizeConfig(PushToHubMixin):
     def from_quant_config(cls, quantize_cfg, checkpoint_format: str = None):
         valid_formats = {CHECKPOINT_FORMAT.GPTQ, CHECKPOINT_FORMAT.MARLIN, CHECKPOINT_FORMAT.AWQ_GEMM}
 
+        checkpoint_format_auto_inferred = False
         # compat: checkpoint_format can be passed in via from_quantized() if field missing from json
         if checkpoint_format:
             if checkpoint_format not in valid_formats:
@@ -103,7 +110,7 @@ class BaseQuantizeConfig(PushToHubMixin):
                 raise ValueError("Conflict: quantization checkpoint_format is passed in and also exists in model config.")
         # compat: warn if checkpoint_format is missing
         elif quantize_cfg.get(CHECKPOINT_FORMAT_FIELD) is None:
-            logger.warning("checkpoint_format missing from quantization configuration and is inferred.")
+            checkpoint_format_auto_inferred = True
 
         field_names = [field.name for field in fields(cls)]
 
@@ -139,7 +146,10 @@ class BaseQuantizeConfig(PushToHubMixin):
             elif key in field_names:
                 normalized[key] = val
             else:
-                logger.warning(f"Ignoring unknown parameter in D configuration: {key}.")
+                logger.info(f"Ignoring unknown parameter in the quantization configuration: {key}.")
+
+        if checkpoint_format_auto_inferred:
+            logger.info(f"`checkpoint_format` is missing from the quantization configuration and is automatically inferred to {normalized[CHECKPOINT_FORMAT_FIELD]}.")
 
         if normalized[CHECKPOINT_FORMAT_FIELD] in {CHECKPOINT_FORMAT.AWQ_GEMM, CHECKPOINT_FORMAT.MARLIN}:
             # AWQ and Marlin do not reorder the rows.
