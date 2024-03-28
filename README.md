@@ -58,6 +58,8 @@ AutoGPTQ can be installed with the Triton dependency with `pip install auto-gptq
 
 For older AutoGPTQ, please refer to [the previous releases installation table](docs/INSTALLATION.md).
 
+On NVIDIA systems, AutoGPTQ does not support [Maxwell or lower](https://qiita.com/uyuni/items/733a93b975b524f89f46) GPUs.
+
 ### Install from source
 
 Clone the source code:
