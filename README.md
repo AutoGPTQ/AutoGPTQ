@@ -50,11 +50,11 @@ AutoGPTQ is available on Linux and Windows only. You can install the latest stab
 
 | CUDA/ROCm version | Installation                                                                                      | Built against PyTorch |
 |-------------------|---------------------------------------------------------------------------------------------------|-----------------------|
-| CUDA 11.8         | `pip install auto-gptq --extra-index-url https://huggingface.github.io/autogptq-index/whl/cu118/`   | 2.2.1+cu118           |
-| CUDA 12.1         | `pip install auto-gptq`                                                                            | 2.2.1+cu121           |
-| ROCm 5.7          | `pip install auto-gptq --extra-index-url https://huggingface.github.io/autogptq-index/whl/rocm573/` | 2.2.1+rocm5.7               |
+| CUDA 11.8         | `pip install auto-gptq --no-build-isolation --extra-index-url https://huggingface.github.io/autogptq-index/whl/cu118/`   | 2.2.1+cu118           |
+| CUDA 12.1         | `pip install auto-gptq --no-build-isolation`                                                                            | 2.2.1+cu121           |
+| ROCm 5.7          | `pip install auto-gptq --no-build-isolation --extra-index-url https://huggingface.github.io/autogptq-index/whl/rocm573/` | 2.2.1+rocm5.7               |
 
-AutoGPTQ can be installed with the Triton dependency with `pip install auto-gptq[triton]` in order to be able to use the Triton backend (currently only supports linux, no 3-bits quantization).
+AutoGPTQ can be installed with the Triton dependency with `pip install auto-gptq[triton] --no-build-isolation` in order to be able to use the Triton backend (currently only supports linux, no 3-bits quantization).
 
 For older AutoGPTQ, please refer to [the previous releases installation table](docs/INSTALLATION.md).
 
@@ -69,16 +69,18 @@ A few packages are required in order to build from source: `pip install numpy ge
 
 Then, install locally from source:
 ```bash
-pip install -vvv -e .
+pip install -vvv --no-build-isolation -e .
 ```
 You can set `BUILD_CUDA_EXT=0` to disable pytorch extension building, but this is **strongly discouraged** as AutoGPTQ then falls back on a slow python implementation.
+
+As a last resort, if the above command fails, you can try `python setup.py install`.
 
 #### On ROCm systems
 
 To install from source for AMD GPUs supporting ROCm, please specify the `ROCM_VERSION` environment variable. Example:
 
 ```bash
-ROCM_VERSION=5.6 pip install -vvv -e .
+ROCM_VERSION=5.6 pip install -vvv --no-build-isolation -e .
 ```
 
 The compilation can be speeded up by specifying the `PYTORCH_ROCM_ARCH` variable ([reference](https://github.com/pytorch/pytorch/blob/7b73b1e8a73a1777ebe8d2cd4487eb13da55b3ba/setup.py#L132)) in order to build for a single target device, for example `gfx90a` for MI200 series devices.
