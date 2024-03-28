@@ -1,8 +1,7 @@
 import gc
-import os
 from logging import getLogger
+from typing import Tuple
 
-import huggingface_hub
 import torch
 from accelerate.utils import find_tied_parameters
 from safetensors.torch import save_file as safe_save
@@ -10,6 +9,7 @@ from tqdm import tqdm
 
 from ..nn_modules.qlinear.qlinear_marlin import QuantLinear as MarlinQuantLinear
 from ..nn_modules.qlinear.qlinear_marlin import _get_perms, unpack_qzeros
+from ..quantization import CHECKPOINT_FORMAT, QUANT_METHOD, BaseQuantizeConfig
 from .accelerate_utils import load_checkpoint_in_model
 from .import_utils import MARLIN_AVAILABLE, MARLIN_EXCEPTION
 from .modeling_utils import recurse_getattr, recurse_setattr
@@ -22,24 +22,24 @@ logger = getLogger(__name__)
 
 
 def prepare_model_for_marlin_load(
-    model_name_or_path,
     model,
-    quantize_config,
+    quantize_config: BaseQuantizeConfig,
     quant_linear_class,
     torch_dtype,
     current_model_save_name,
     device_map,
 ):
     # The model (e.g. model.safetensors) is already serialized in the Marlin format, load it directly.
-    if hasattr(quantize_config, "is_marlin_format") and quantize_config.is_marlin_format:
+    if quantize_config.checkpoint_format == CHECKPOINT_FORMAT.MARLIN:
         model_save_name = current_model_save_name
         logger.info(f"Loading a GPTQ model, detected Marlin serialized format at {model_save_name}.")
         model = convert_to_marlin(model, quant_linear_class, quantize_config, repack=False)
     else:
-        model_save_name = _get_cached_marlin_save_name(model_name_or_path)
+        model_save_name, is_cached = quantize_config.get_cache_file_path(quant_method=QUANT_METHOD.GPTQ,
+                                                              checkpoint_format=CHECKPOINT_FORMAT.MARLIN)
 
         # If GPTQ model has Marlin version cached locally, load from the cached version (no repacking needed).
-        if os.path.isfile(model_save_name):
+        if is_cached:
             logger.info(
                 f"Loading a GPTQ model, detected a cached repacked weight for Marlin kernel at {model_save_name}."
             )
@@ -86,45 +86,50 @@ def prepare_model_for_marlin_load(
     return model, model_save_name
 
 
-def _get_cached_marlin_save_name(model_name_or_path):
+# Validate marlin support
+def _validate_marlin_device_support() -> Tuple[bool, bool]:
     """
-    Gets The Cached Weight Path.
-    If remote:   $HF_HOME/assets/autogptq/{model_name_or_path}/autogptq_model.safetensors
-    If local:    {model_name_or_path}/autogptq_model.safetensors
-    """
-    if os.path.isdir(model_name_or_path):
-        return os.path.join(model_name_or_path, "autogptq_model.safetensors")
-    else:
-        namespace, subfolder = model_name_or_path.split("/")
-        assets_path = huggingface_hub.cached_assets_path(
-            library_name="auto_gptq", namespace=namespace, subfolder=subfolder
-        )
-        return os.path.join(assets_path, "autogptq_model.safetensors")
+        Validates if the current device is compatible and optimized for Marlin.
+        ref: https://github.com/IST-DASLab/marlin?tab=readme-ov-file#requirements
 
+        Returns:
+            Tuple[bool, bool]: The first indicates if CUDA device is compatible for Marlin,
+                               the second indicates if CUDA device is optimized for Marlin.
+        """
+    supported = False
+    optimized = False
 
-# Validate marlin suppor
-def _validate_marlin_device_support():
-    device_capacity = torch.cuda.get_device_capability()
-    return device_capacity[0] == 8 and (device_capacity[1] == 0 or device_capacity[1] == 6)
+    # >=hopper is compatible but not optimized
+    if torch.cuda.get_device_capability()[0] >= 9:
+        supported = True
+        optimized = False
+    # ampere and ada are supported and optimized
+    elif torch.cuda.get_device_capability()[0] >= 8:
+        supported = True
+        optimized = True
+
+    return supported, optimized
 
 
 # Adapted from https://github.com/rib-2/marlin/tree/conversion
-def _validate_marlin_compatibility(quantization_config):
+def _validate_marlin_compatibility(cfg: BaseQuantizeConfig):
     if not MARLIN_AVAILABLE:
         return f"AutoGPTQ is not compiled with the Marlin kernel, with the following error: {MARLIN_EXCEPTION}"
-    if quantization_config.bits != 4:
-        return f"The quantized model uses a bitwidth different than 4 (found {quantization_config.bits})"
-    if quantization_config.group_size != 128 and quantization_config.group_size != -1:
+    if cfg.bits != 4:
+        return f"The quantized model uses a bitwidth different than 4 (found {cfg.bits})"
+    if cfg.group_size != 128 and cfg.group_size != -1:
         return "The quantized model uses a group size that is not 128 or -1 (found quantization_config.group_size)"
-    if not quantization_config.sym:
+    if not cfg.sym:
         return "The quantized model uses asymmetric quantization"
-    if quantization_config.desc_act:
+    if cfg.desc_act:
         return "The quantized model uses act-order (also called desc-act) scheme"
+    if cfg.quant_method == QUANT_METHOD.AWQ:
+        return "awq_gemm format is currently not compatible with marlin"
     return None
 
 
 @torch.no_grad()
-def convert_to_marlin(model, model_quantlinear, quantization_config, repack: bool, strict: bool = False):
+def convert_to_marlin(model, model_quantlinear, quantization_config: BaseQuantizeConfig, repack: bool, strict: bool = False):
     """
     Converts GPTQ-packed weights to the Marlin format. This assumes that the model already meets Marlin kernel constraints.
 
@@ -142,12 +147,11 @@ def convert_to_marlin(model, model_quantlinear, quantization_config, repack: boo
         if not isinstance(module, model_quantlinear):
             continue
 
-
         parent_name = ".".join(name.split(".")[:-1])
         layer_name = name[len(parent_name) + 1 :]
 
-        # We could use `torch.count_nonzero(module.bias) > 0` here to discard zero bias, but this has issues when loading weights
-        # from checkpoints holding zero bias.
+        # We could use `torch.count_nonzero(module.bias) > 0` here to discard zero bias, but this has issues when
+        # loading weights from checkpoints holding zero bias.
         with torch.device("meta"):
             new_module = MarlinQuantLinear(
                 bits=4,
@@ -170,7 +174,7 @@ def convert_to_marlin(model, model_quantlinear, quantization_config, repack: boo
 
                 if not torch.all(dequantized_qzeros == 8):
                     raise ValueError(
-                        "Marlin kernel is compatible only with checkpoints using symetric quantization. "
+                        "Marlin kernel is compatible only with checkpoints using symmetric quantization."
                         "Found non-symmetric quantization for the weight {name}."
                     )
 
@@ -202,6 +206,6 @@ def convert_to_marlin(model, model_quantlinear, quantization_config, repack: boo
         gc.collect()
 
     # Set quantization config to be Marlin.
-    quantization_config.is_marlin_format = True
+    quantization_config.checkpoint_format = CHECKPOINT_FORMAT.MARLIN
 
     return model
