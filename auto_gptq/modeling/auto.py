@@ -6,6 +6,7 @@ from ._utils import check_and_get_model_type
 from .baichuan import BaiChuanGPTQForCausalLM
 from .bloom import BloomGPTQForCausalLM
 from .codegen import CodeGenGPTQForCausalLM
+from .dbrx import DbrxGPTQForCausalLM
 from .decilm import DeciLMGPTQForCausalLM
 from .gemma import GemmaGPTQForCausalLM
 from .gpt2 import GPT2GPTQForCausalLM
@@ -58,6 +59,7 @@ GPTQ_CAUSAL_LM_MODEL_MAP = {
     "gemma": GemmaGPTQForCausalLM,
     "phi": PhiGPTQForCausalLM,
     "mpt": MPTGPTQForCausalLM,
+    "dbrx": DbrxGPTQForCausalLM,
 }
 
 
