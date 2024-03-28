@@ -73,6 +73,8 @@ pip install -vvv --no-build-isolation -e .
 ```
 You can set `BUILD_CUDA_EXT=0` to disable pytorch extension building, but this is **strongly discouraged** as AutoGPTQ then falls back on a slow python implementation.
 
+As a last resort, if the above command fails, you can try `python setup.py install`.
+
 #### On ROCm systems
 
 To install from source for AMD GPUs supporting ROCm, please specify the `ROCM_VERSION` environment variable. Example:
