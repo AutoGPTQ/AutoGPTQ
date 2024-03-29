@@ -94,6 +94,14 @@ class QuantLinear(nn.Module):
         if not torch.cuda.get_device_capability()[0] >= 8:
             raise ValueError(f'Can not use Marlin int4*fp16 kernel with a device of compute capability {torch.cuda.get_device_capability()}, the minimum compute capability is 8.0 for Marlin kernel. Please do not use `use_marlin=True`, or please upgrade your GPU ("The more you buy, the more you save." - Taiwanese proverb).')
 
+        padding = -outfeatures % 256
+        self.outfeatures = outfeatures + self.padding
+        outfeatures = self.outfeatures
+
+        padding = -infeatures % 128
+        self.infeatures = infeatures + self.padding
+        infeatures = self.infeatures
+
         if infeatures % 128 != 0 or outfeatures % 256 != 0:
             raise ValueError("`infeatures` must be divisible by 128 and `outfeatures` by 256.")
         if bits not in [4]:
