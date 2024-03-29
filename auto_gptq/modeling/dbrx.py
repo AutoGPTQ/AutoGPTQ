@@ -10,6 +10,7 @@ class DbrxGPTQForCausalLM(BaseGPTQForCausalLM):
         ["norm_attn_norm.norm_2"],
         ["norm_attn_norm.attn.Wqkv"],
         ["norm_attn_norm.attn.out_proj"],
+        ["ffn.router.layer"],
         ["ffn.experts.mlp"],
     ]
 
