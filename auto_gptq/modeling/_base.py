@@ -816,12 +816,12 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             # format marlin requires marlin kernel
             use_marlin = True
 
-        marlin_compatible, marlin_optimized = _validate_marlin_device_support()
+        marlin_compatible, marlin_validated = _validate_marlin_device_support()
         if use_marlin and (not MARLIN_AVAILABLE or not marlin_compatible):
             raise TypeError("use_marlin is true but Marlin is not availble due to cuda/device support.")
-        elif use_marlin and not marlin_optimized:
-            logger.info(
-                "use_marlin is true and your gpu device is supported but not optimized for Marlin."
+        elif use_marlin and not marlin_validated:
+            logger.warn(
+                "use_marlin is true but your gpu device is not validated for Marlin and may exhibit errors."
             )
 
         if not use_marlin and MARLIN_AVAILABLE:
