@@ -59,7 +59,8 @@ class QuantLinear(nn.Module):
             raise NotImplementedError("Exllama kernel does not support training.")
 
         self.infeatures = infeatures
-        self.outfeatures = outfeatures
+        self.padding = -outfeatures % 32
+        self.outfeatures = outfeatures + self.padding
         self.bits = bits
         self.group_size = group_size if group_size != -1 else infeatures
         self.trainable = trainable
