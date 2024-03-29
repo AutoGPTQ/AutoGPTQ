@@ -121,10 +121,12 @@ class QuantLinear(nn.Module):
 
         self.q_handle = None
         self.q_tensors = None
+
         self.padding = -outfeatures % 32
+        self.outfeatures = outfeatures + self.padding
+        outfeatures = self.outfeatures
 
         self.infeatures = infeatures
-        self.outfeatures = outfeatures + self.padding
         self.bits = bits
         self.group_size = group_size if group_size != -1 else infeatures
         self.trainable = trainable
