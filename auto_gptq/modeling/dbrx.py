@@ -6,11 +6,11 @@ class DbrxGPTQForCausalLM(BaseGPTQForCausalLM):
     layers_block_name = "transformer.blocks"
     outside_layer_modules = ["transformer.wte", "transformer.norm_f"]
     inside_layer_modules = [
-        ["ffn.router.layer"],
+        ["ffn.router.layer"], # TODO remove pending test of quant inference
         ["norm_attn_norm.attn.q_proj", "norm_attn_norm.attn.k_proj", "norm_attn_norm.attn.v_proj"],
         ["norm_attn_norm.attn.out_proj"],
-        ["norm_attn_norm.norm_1"],
-        ["norm_attn_norm.norm_2"],
+        ["norm_attn_norm.norm_1"], # TODO remove pending test of quant inference
+        ["norm_attn_norm.norm_2"], # TODO remove pending test of quant inference
         [
             "ffn.experts.mlp.0.w1",  "ffn.experts.mlp.0.v1",
             "ffn.experts.mlp.1.w1",  "ffn.experts.mlp.1.v1",
