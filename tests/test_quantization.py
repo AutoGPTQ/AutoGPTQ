@@ -1,4 +1,14 @@
 import os
+import math
+
+max_threads = str(min(8, os.cpu_count()))
+os.environ['OMP_NUM_THREADS'] = max_threads
+os.environ['OPENBLAS_NUM_THREADS'] = max_threads
+os.environ['MKL_NUM_THREADS'] = max_threads
+os.environ['VECLIB_MAXIMUM_THREADS'] = max_threads
+os.environ['NUMEXPR_NUM_THREADS'] = max_threads
+os.environ['NUMEXPR_MAX_THREADS'] = max_threads
+
 import tempfile
 import unittest
 
