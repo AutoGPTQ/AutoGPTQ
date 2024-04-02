@@ -30,24 +30,24 @@ from transformers.utils.hub import (
 from ..nn_modules._fused_base import FusedBaseAttentionModule, FusedBaseMLPModule
 from ..nn_modules.qlinear import GeneralQuantLinear
 from ..quantization import GPTQ
+from ..utils.bitblas_utils import (
+    prepare_model_for_bitblas_load,
+)
 from ..utils.data_utils import collate_data
 from ..utils.import_utils import (
     AUTOGPTQ_CUDA_AVAILABLE,
+    BITBLAS_AVAILABLE,
     EXLLAMA_KERNELS_AVAILABLE,
     EXLLAMAV2_KERNELS_AVAILABLE,
     MARLIN_AVAILABLE,
     QIGEN_AVAILABLE,
     TRITON_AVAILABLE,
-    BITBLAS_AVAILABLE,
     dynamically_import_QuantLinear,
 )
 from ..utils.marlin_utils import (
     _validate_marlin_compatibility,
     _validate_marlin_device_support,
     prepare_model_for_marlin_load,
-)
-from ..utils.bitblas_utils import (
-    prepare_model_for_bitblas_load,
 )
 from ._const import CPU, CUDA_0, SUPPORTED_MODELS
 from ._utils import (
@@ -304,7 +304,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         if use_triton and not TRITON_AVAILABLE:
             logger.warning("triton is not installed, reset use_triton to False")
             use_triton = False
- 
+
         device_map = self.hf_device_map
         if device_map:
             for name, device in device_map.items():
@@ -940,7 +940,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                 "You passed a GPTQ model saved in int4*fp16 GPTQ Marlin kernel format but are loading with use_marlin=False. "
                 "Please use `use_marlin=True` to load this model. Example: `model = AutoGPTQForCausalLM.from_quantized(..., use_marlin=True)`."
             )
-        
+
         if hasattr(quantize_config, "is_bitblas_format") and quantize_config.is_bitblas_format and not use_bitblas:
             raise ValueError(
                 "You passed a GPTQ model saved in BitBlas kernel format but are loading with use_bitblas=False. "
@@ -1293,7 +1293,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                     inject_fused_attention = False
                     inject_fused_mlp = False
 
-            
+
             accelerate.utils.modeling.load_checkpoint_in_model(
                 model,
                 dtype=torch_dtype,  # This is very hacky but works due to https://github.com/huggingface/accelerate/blob/bd72a5f1a80d5146554458823f8aeda0a9db5297/src/accelerate/utils/modeling.py#L292

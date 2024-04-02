@@ -133,7 +133,6 @@ class AutoGPTQForCausalLM:
             for key in list(signature(quant_func).parameters.keys()) + huggingface_kwargs
             if key in kwargs
         }
-        print("------------invoking quant_func-------------")
         return quant_func(
             model_name_or_path=model_name_or_path,
             device_map=device_map,

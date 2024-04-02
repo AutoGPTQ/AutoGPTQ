@@ -11,14 +11,14 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import ctypes
+import operator
+from functools import reduce
 from logging import getLogger
 
-import numpy as np
 import torch
 import torch.nn as nn
-import ctypes
-from functools import reduce
-import operator
+
 
 logger = getLogger(__name__)
 
@@ -34,19 +34,22 @@ except ImportError as e:
 
     autogptq_bitblas_cuda = bitblas_import_exception
 
-from .qlinear_cuda_old import QuantLinear as QuantLinearOld
-from bitblas.quantization.utils import general_compress, interleave_weight
-from bitblas.ops.matmul_dequantize import (
-    MatmulWeightOnlyDequantizeConfig,
-    MatmulWeightOnlyDequantize,
-)
-from bitblas.utils import get_target_from_env
-from bitblas.cache import global_operator_cache
 from typing import List, Union
+
+from bitblas.cache import global_operator_cache
+from bitblas.ops.matmul_dequantize import (
+    MatmulWeightOnlyDequantize,
+    MatmulWeightOnlyDequantizeConfig,
+)
+from bitblas.quantization.utils import general_compress
+from bitblas.utils import get_target_from_env
+
+from .qlinear_cuda_old import QuantLinear as QuantLinearOld
+
 
 BITBLAS_TARGET = get_target_from_env()
 BITBLAS_DATABASE_PATH = ".bitblas_database"
-BITBLAS_PROPAGATE_WEIGHTS = True
+BITBLAS_PROPAGATE_WEIGHTS = False
 global_operator_cache.load_from_database(BITBLAS_DATABASE_PATH, BITBLAS_TARGET)
 
 
@@ -71,6 +74,7 @@ class QuantLinear(nn.Module):
     QUANT_TYPE = "bitblas"
     SUPPORTED_BITS = [1, 2, 4]
     OPT_FEATURES = [1, 16, 32, 64, 128, 256, 512]
+    ZEROS_TYPE = "quantized"  # "original" or "rescale" or "quantized"
     TORCH_DTYPE = torch.float16
     STORAGE_DTYPE = "int8"  # assume int8 storage
     TORCH_STORAGE_DTYPE = getattr(torch, STORAGE_DTYPE)
@@ -109,6 +113,7 @@ class QuantLinear(nn.Module):
             enable_tuning, fast_decoding, bias, propagate_b, layout, bits
         )
         self._initialize_buffers(infeatures, outfeatures, bias)
+        self.reset_parameters()
 
     def _validate_parameters(
         self, bits, group_size, infeatures, outfeatures, trainable
@@ -139,12 +144,21 @@ class QuantLinear(nn.Module):
                 (outfeatures, infeatures // self.group_size), dtype=self.TORCH_DTYPE
             ),
         )
-        self.register_buffer(
-            "zeros",
-            torch.zeros(
-                (outfeatures, infeatures // self.group_size), dtype=self.TORCH_DTYPE
-            ),
-        )
+        if self.ZEROS_TYPE == "quantized":
+            storage_nbit = int("".join(c for c in self.STORAGE_DTYPE if c.isdigit()))
+            self.register_buffer(
+                "zeros",
+                torch.zeros(
+                    (infeatures // self.group_size, outfeatures // storage_nbit * self.bits), dtype=self.TORCH_STORAGE_DTYPE
+                ),
+            )
+        else:
+            self.register_buffer(
+                "zeros",
+                torch.zeros(
+                    (outfeatures, infeatures // self.group_size), dtype=self.TORCH_DTYPE
+                ),
+            )
         if bias:
             self.register_buffer(
                 "bias", torch.zeros((outfeatures), dtype=self.TORCH_DTYPE)
@@ -175,7 +189,7 @@ class QuantLinear(nn.Module):
             propagate_a=False,
             propagate_b=propagate_b,
             layout=layout,
-            zeros_type="original",
+            zeros_type=self.ZEROS_TYPE,
         )
         self.bitblas_matmul = self._get_or_create_bitblas_operator(
             matmul_config, enable_tuning
@@ -237,6 +251,15 @@ class QuantLinear(nn.Module):
             self.zeros = intzeros.to(torch.float16).contiguous()
         elif self.bitblas_matmul.config.zeros_type == "rescale":
             self.zeros[:, :] = intzeros.to(torch.float16)[:, :] * self.scales[:, :]
+        elif self.bitblas_matmul.config.zeros_type == "quantized":
+            self.zeros = (
+                torch.Tensor(
+                    general_compress(intzeros.T.contiguous().cpu().numpy(), self.bits)
+                )
+                .to(self.qweight.device)
+                .to(self.zeros.dtype)
+                .contiguous()
+            )
         else:
             raise ValueError(
                 f"Unsupported zeros type: {self.bitblas_matmul.config.zeros_type}"
@@ -245,6 +268,8 @@ class QuantLinear(nn.Module):
             self.bias = gptq_module.bias.data.to(torch.float16).contiguous()
 
     def forward(self, A):
+        if A.dtype != torch.float16:
+            A = A.half()
 
         C = torch.empty(
             A.shape[:-1] + (self.scales.shape[0],), dtype=A.dtype, device=A.device
@@ -253,7 +278,7 @@ class QuantLinear(nn.Module):
         # m is the product of the last n - 1 dimensions of A
         m = ctypes.c_int32(reduce(operator.mul, A.shape[:-1], 1))
         self.bitblas_matmul.lib.call(
-            A_void, *self.q_params, ctypes.c_void_p(C.data_ptr()), m
+            A_void , *self.q_params, ctypes.c_void_p(C.data_ptr()), m
         )
         return C
 

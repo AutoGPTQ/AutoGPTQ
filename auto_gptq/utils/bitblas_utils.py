@@ -54,7 +54,7 @@ def prepare_model_for_bitblas_load(
             # as for AWQ checkpoints.
             accelerate.utils.modeling.load_checkpoint_in_model(
                 model,
-                dtype=torch_dtype, 
+                dtype=torch_dtype,
                 checkpoint=current_model_save_name,
                 device_map=device_map,
                 offload_state_dict=True,
