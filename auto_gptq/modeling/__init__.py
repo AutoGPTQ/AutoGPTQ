@@ -3,6 +3,7 @@ from .auto import GPTQ_CAUSAL_LM_MODEL_MAP, AutoGPTQForCausalLM
 from .baichuan import BaiChuanGPTQForCausalLM
 from .bloom import BloomGPTQForCausalLM
 from .codegen import CodeGenGPTQForCausalLM
+from .cohere import CohereGPTQForCausalLM
 from .decilm import DeciLMGPTQForCausalLM
 from .gemma import GemmaGPTQForCausalLM
 from .gpt2 import GPT2GPTQForCausalLM
