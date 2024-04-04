@@ -6,6 +6,7 @@ from ._utils import check_and_get_model_type
 from .baichuan import BaiChuanGPTQForCausalLM
 from .bloom import BloomGPTQForCausalLM
 from .codegen import CodeGenGPTQForCausalLM
+from .cohere import CohereGPTQForCausalLM
 from .decilm import DeciLMGPTQForCausalLM
 from .gemma import GemmaGPTQForCausalLM
 from .gpt2 import GPT2GPTQForCausalLM
@@ -40,6 +41,7 @@ GPTQ_CAUSAL_LM_MODEL_MAP = {
     "moss": MOSSGPTQForCausalLM,
     "gpt_bigcode": GPTBigCodeGPTQForCausalLM,
     "codegen": CodeGenGPTQForCausalLM,
+    "cohere": CohereGPTQForCausalLM,
     "RefinedWebModel": RWGPTQForCausalLM,
     "RefinedWeb": RWGPTQForCausalLM,
     "falcon": RWGPTQForCausalLM,
