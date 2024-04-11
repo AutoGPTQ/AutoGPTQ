@@ -1,0 +1,2620 @@
+---
+MainSourceFile:  ''
+Replacements:
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          49
+    Length:          18
+    ReplacementText: "#include <sycl/sycl.hpp>\n#include <dpct/dpct.hpp>\n"
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          67
+    Length:          26
+    ReplacementText: ''
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          93
+    Length:          23
+    ReplacementText: ''
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          954
+    Length:          13
+    ReplacementText: DPCT_COMPATIBILITY_TEMP
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          972
+    Length:          13
+    ReplacementText: DPCT_COMPATIBILITY_TEMP
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          2523
+    Length:          11
+    ReplacementText: ''
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          2879
+    Length:          0
+    ReplacementText: ",\n\tconst sycl::nd_item<3> &item_ct1,\n\tscalar_t *blockvec"
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          2912
+    Length:          11
+    ReplacementText: ''
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          3268
+    Length:          0
+    ReplacementText: ",\n\tconst sycl::nd_item<3> &item_ct1,\n\tscalar_t *blockvec"
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          3301
+    Length:          11
+    ReplacementText: ''
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          3657
+    Length:          0
+    ReplacementText: ",\n\tconst sycl::nd_item<3> &item_ct1,\n\tscalar_t *blockvec"
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          3690
+    Length:          11
+    ReplacementText: ''
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          4046
+    Length:          0
+    ReplacementText: ",\n\tconst sycl::nd_item<3> &item_ct1,\n\tscalar_t *blockvec"
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          4079
+    Length:          11
+    ReplacementText: ''
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          4423
+    Length:          0
+    ReplacementText: ",\n    const sycl::nd_item<3> &item_ct1,\n    scalar_t *blockvec"
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          4456
+    Length:          11
+    ReplacementText: ''
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          4799
+    Length:          0
+    ReplacementText: ",\n    const sycl::nd_item<3> &item_ct1,\n    scalar_t *blockvec"
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          4832
+    Length:          11
+    ReplacementText: ''
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          5175
+    Length:          0
+    ReplacementText: ",\n    const sycl::nd_item<3> &item_ct1,\n    scalar_t *blockvec"
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          5208
+    Length:          11
+    ReplacementText: ''
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          5551
+    Length:          0
+    ReplacementText: ",\n    const sycl::nd_item<3> &item_ct1,\n    scalar_t *blockvec"
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          5555
+    Length:          11
+    ReplacementText: ''
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          5615
+    Length:          5
+    ReplacementText: 'sycl::half2'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          5893
+    Length:          0
+    ReplacementText: ",\n    const sycl::nd_item<3> &item_ct1,\n    sycl::half2 *blockvec,\n    sycl::local_accessor<sycl::half2, 2> deq2"
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          5897
+    Length:          11
+    ReplacementText: ''
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          5957
+    Length:          5
+    ReplacementText: 'sycl::half2'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          6235
+    Length:          0
+    ReplacementText: ",\n    const sycl::nd_item<3> &item_ct1,\n    sycl::half2 *blockvec,\n    sycl::local_accessor<sycl::half2, 2> deq2"
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          6239
+    Length:          11
+    ReplacementText: ''
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          6299
+    Length:          5
+    ReplacementText: 'sycl::half2'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          6577
+    Length:          0
+    ReplacementText: ",\n    const sycl::nd_item<3> &item_ct1,\n    sycl::half2 *blockvec,\n    sycl::local_accessor<sycl::half2, 2> deq2"
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          6732
+    Length:          11
+    ReplacementText: ''
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          6834
+    Length:          11
+    ReplacementText: ''
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          7228
+    Length:          4
+    ReplacementText: 'sycl::range<3>'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          7240
+    Length:          93
+    ReplacementText: '1, (width + BLOCKWIDTH - 1) / BLOCKWIDTH, (height + BLOCKHEIGHT2 - 1) / BLOCKHEIGHT2'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          7338
+    Length:          4
+    ReplacementText: 'sycl::range<3>'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          7351
+    Length:          10
+    ReplacementText: 1, 1, BLOCKWIDTH
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          7738
+    Length:          11
+    ReplacementText: "/*\nDPCT1110:0: The total declared local variable size in device function VecQuant2MatMulKernel exceeds 128 bytes and may cause high register pressure. Consult with your hardware vendor to find the total register size available and adjust the code, or use smaller sub-group size to avoid high register pressure.\n*/\n"
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          8094
+    Length:          0
+    ReplacementText: ",\n\tconst sycl::nd_item<3> &item_ct1,\n\tscalar_t *blockvec"
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          8123
+    Length:          10
+    ReplacementText: 'item_ct1.get_group(2)'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          8158
+    Length:          10
+    ReplacementText: 'item_ct1.get_group(1)'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          8171
+    Length:          11
+    ReplacementText: 'item_ct1.get_local_id(2)'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          8187
+    Length:          41
+    ReplacementText: ''
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          8886
+    Length:          11
+    ReplacementText: 'item_ct1.get_local_id(2)'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          8922
+    Length:          10
+    ReplacementText: 'item_ct1.get_group(2)'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          8948
+    Length:          11
+    ReplacementText: 'item_ct1.get_local_id(2)'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          8962
+    Length:          0
+    ReplacementText: "    /*\n    DPCT1118:1: SYCL group functions and algorithms must be encountered in converged control flow. You may need to adjust the code.\n    */\n"
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          8966
+    Length:          15
+    ReplacementText: "/*\n    DPCT1065:12: Consider replacing sycl::nd_item::barrier() with sycl::nd_item::barrier(sycl::access::fence_space::local_space) for better performance if there is no access to global memory.\n    */\n    item_ct1.barrier()"
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          9101
+    Length:          0
+    ReplacementText: "    /*\n    DPCT1118:2: SYCL group functions and algorithms must be encountered in converged control flow. You may need to adjust the code.\n    */\n"
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          9105
+    Length:          15
+    ReplacementText: "/*\n    DPCT1065:13: Consider replacing sycl::nd_item::barrier() with sycl::nd_item::barrier(sycl::access::fence_space::local_space) for better performance if there is no access to global memory.\n    */\n    item_ct1.barrier()"
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          9443
+    Length:          4
+    ReplacementText: 'sycl::range<3>'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          9455
+    Length:          93
+    ReplacementText: '1, (width + BLOCKWIDTH - 1) / BLOCKWIDTH, (height + BLOCKHEIGHT3 - 1) / BLOCKHEIGHT3'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          9553
+    Length:          4
+    ReplacementText: 'sycl::range<3>'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          9566
+    Length:          10
+    ReplacementText: 1, 1, BLOCKWIDTH
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          9953
+    Length:          11
+    ReplacementText: "/*\nDPCT1110:3: The total declared local variable size in device function VecQuant3MatMulKernel exceeds 128 bytes and may cause high register pressure. Consult with your hardware vendor to find the total register size available and adjust the code, or use smaller sub-group size to avoid high register pressure.\n*/\n"
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          10312
+    Length:          0
+    ReplacementText: ",\n\tconst sycl::nd_item<3> &item_ct1,\n\tscalar_t *blockvec"
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          10341
+    Length:          10
+    ReplacementText: 'item_ct1.get_group(2)'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          10376
+    Length:          10
+    ReplacementText: 'item_ct1.get_group(1)'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          10389
+    Length:          11
+    ReplacementText: 'item_ct1.get_local_id(2)'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          10405
+    Length:          41
+    ReplacementText: ''
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          12559
+    Length:          11
+    ReplacementText: 'item_ct1.get_local_id(2)'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          12595
+    Length:          10
+    ReplacementText: 'item_ct1.get_group(2)'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          12621
+    Length:          11
+    ReplacementText: 'item_ct1.get_local_id(2)'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          12635
+    Length:          0
+    ReplacementText: "    /*\n    DPCT1118:4: SYCL group functions and algorithms must be encountered in converged control flow. You may need to adjust the code.\n    */\n"
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          12639
+    Length:          15
+    ReplacementText: "/*\n    DPCT1065:14: Consider replacing sycl::nd_item::barrier() with sycl::nd_item::barrier(sycl::access::fence_space::local_space) for better performance if there is no access to global memory.\n    */\n    item_ct1.barrier()"
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          12774
+    Length:          0
+    ReplacementText: "    /*\n    DPCT1118:5: SYCL group functions and algorithms must be encountered in converged control flow. You may need to adjust the code.\n    */\n"
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          12778
+    Length:          15
+    ReplacementText: "/*\n    DPCT1065:15: Consider replacing sycl::nd_item::barrier() with sycl::nd_item::barrier(sycl::access::fence_space::local_space) for better performance if there is no access to global memory.\n    */\n    item_ct1.barrier()"
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          13116
+    Length:          4
+    ReplacementText: 'sycl::range<3>'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          13128
+    Length:          93
+    ReplacementText: '1, (width + BLOCKWIDTH - 1) / BLOCKWIDTH, (height + BLOCKHEIGHT4 - 1) / BLOCKHEIGHT4'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          13226
+    Length:          4
+    ReplacementText: 'sycl::range<3>'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          13239
+    Length:          10
+    ReplacementText: 1, 1, BLOCKWIDTH
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          13626
+    Length:          11
+    ReplacementText: "/*\nDPCT1110:6: The total declared local variable size in device function VecQuant4MatMulKernel exceeds 128 bytes and may cause high register pressure. Consult with your hardware vendor to find the total register size available and adjust the code, or use smaller sub-group size to avoid high register pressure.\n*/\n"
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          13985
+    Length:          0
+    ReplacementText: ",\n\tconst sycl::nd_item<3> &item_ct1,\n\tscalar_t *blockvec"
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          14014
+    Length:          10
+    ReplacementText: 'item_ct1.get_group(2)'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          14049
+    Length:          10
+    ReplacementText: 'item_ct1.get_group(1)'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          14062
+    Length:          11
+    ReplacementText: 'item_ct1.get_local_id(2)'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          14078
+    Length:          41
+    ReplacementText: ''
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          14738
+    Length:          11
+    ReplacementText: 'item_ct1.get_local_id(2)'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          14774
+    Length:          10
+    ReplacementText: 'item_ct1.get_group(2)'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          14800
+    Length:          11
+    ReplacementText: 'item_ct1.get_local_id(2)'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          14814
+    Length:          0
+    ReplacementText: "    /*\n    DPCT1118:7: SYCL group functions and algorithms must be encountered in converged control flow. You may need to adjust the code.\n    */\n"
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          14818
+    Length:          15
+    ReplacementText: "/*\n    DPCT1065:16: Consider replacing sycl::nd_item::barrier() with sycl::nd_item::barrier(sycl::access::fence_space::local_space) for better performance if there is no access to global memory.\n    */\n    item_ct1.barrier()"
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          14953
+    Length:          0
+    ReplacementText: "    /*\n    DPCT1118:8: SYCL group functions and algorithms must be encountered in converged control flow. You may need to adjust the code.\n    */\n"
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          14957
+    Length:          15
+    ReplacementText: "/*\n    DPCT1065:17: Consider replacing sycl::nd_item::barrier() with sycl::nd_item::barrier(sycl::access::fence_space::local_space) for better performance if there is no access to global memory.\n    */\n    item_ct1.barrier()"
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          15295
+    Length:          4
+    ReplacementText: 'sycl::range<3>'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          15307
+    Length:          93
+    ReplacementText: '1, (width + BLOCKWIDTH - 1) / BLOCKWIDTH, (height + BLOCKHEIGHT8 - 1) / BLOCKHEIGHT8'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          15405
+    Length:          4
+    ReplacementText: 'sycl::range<3>'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          15418
+    Length:          10
+    ReplacementText: 1, 1, BLOCKWIDTH
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          15805
+    Length:          11
+    ReplacementText: "/*\nDPCT1110:9: The total declared local variable size in device function VecQuant8MatMulKernel exceeds 128 bytes and may cause high register pressure. Consult with your hardware vendor to find the total register size available and adjust the code, or use smaller sub-group size to avoid high register pressure.\n*/\n"
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          16164
+    Length:          0
+    ReplacementText: ",\n\tconst sycl::nd_item<3> &item_ct1,\n\tscalar_t *blockvec"
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          16193
+    Length:          10
+    ReplacementText: 'item_ct1.get_group(2)'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          16228
+    Length:          10
+    ReplacementText: 'item_ct1.get_group(1)'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          16241
+    Length:          11
+    ReplacementText: 'item_ct1.get_local_id(2)'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          16257
+    Length:          41
+    ReplacementText: ''
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          16918
+    Length:          11
+    ReplacementText: 'item_ct1.get_local_id(2)'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          16954
+    Length:          10
+    ReplacementText: 'item_ct1.get_group(2)'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          16980
+    Length:          11
+    ReplacementText: 'item_ct1.get_local_id(2)'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          16994
+    Length:          0
+    ReplacementText: "    /*\n    DPCT1118:10: SYCL group functions and algorithms must be encountered in converged control flow. You may need to adjust the code.\n    */\n"
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          16998
+    Length:          15
+    ReplacementText: "/*\n    DPCT1065:18: Consider replacing sycl::nd_item::barrier() with sycl::nd_item::barrier(sycl::access::fence_space::local_space) for better performance if there is no access to global memory.\n    */\n    item_ct1.barrier()"
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          17133
+    Length:          0
+    ReplacementText: "    /*\n    DPCT1118:11: SYCL group functions and algorithms must be encountered in converged control flow. You may need to adjust the code.\n    */\n"
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          17137
+    Length:          15
+    ReplacementText: "/*\n    DPCT1065:19: Consider replacing sycl::nd_item::barrier() with sycl::nd_item::barrier(sycl::access::fence_space::local_space) for better performance if there is no access to global memory.\n    */\n    item_ct1.barrier()"
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          17474
+    Length:          4
+    ReplacementText: 'sycl::range<3>'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          17486
+    Length:          104
+    ReplacementText: 'batch, (width + BLOCKWIDTH - 1) / BLOCKWIDTH, (height + BLOCKHEIGHT2 - 1) / BLOCKHEIGHT2'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          17595
+    Length:          4
+    ReplacementText: 'sycl::range<3>'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          17608
+    Length:          10
+    ReplacementText: 1, 1, BLOCKWIDTH
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          17995
+    Length:          11
+    ReplacementText: ''
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          18338
+    Length:          0
+    ReplacementText: ",\n    const sycl::nd_item<3> &item_ct1,\n    scalar_t *blockvec"
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          18352
+    Length:          10
+    ReplacementText: 'item_ct1.get_group(0)'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          18389
+    Length:          10
+    ReplacementText: 'item_ct1.get_group(2)'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          18424
+    Length:          10
+    ReplacementText: 'item_ct1.get_group(1)'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          18437
+    Length:          11
+    ReplacementText: 'item_ct1.get_local_id(2)'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          18453
+    Length:          41
+    ReplacementText: ''
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          18506
+    Length:          11
+    ReplacementText: 'item_ct1.get_local_id(2)'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          18542
+    Length:          10
+    ReplacementText: 'item_ct1.get_group(2)'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          18568
+    Length:          11
+    ReplacementText: 'item_ct1.get_local_id(2)'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          18584
+    Length:          15
+    ReplacementText: "/*\n  DPCT1065:20: Consider replacing sycl::nd_item::barrier() with sycl::nd_item::barrier(sycl::access::fence_space::local_space) for better performance if there is no access to global memory.\n  */\n  item_ct1.barrier()"
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          20590
+    Length:          4
+    ReplacementText: 'sycl::range<3>'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          20602
+    Length:          104
+    ReplacementText: 'batch, (width + BLOCKWIDTH - 1) / BLOCKWIDTH, (height + BLOCKHEIGHT3 - 1) / BLOCKHEIGHT3'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          20711
+    Length:          4
+    ReplacementText: 'sycl::range<3>'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          20724
+    Length:          10
+    ReplacementText: 1, 1, BLOCKWIDTH
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          21111
+    Length:          11
+    ReplacementText: ''
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          21454
+    Length:          0
+    ReplacementText: ",\n    const sycl::nd_item<3> &item_ct1,\n    scalar_t *blockvec"
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          21468
+    Length:          10
+    ReplacementText: 'item_ct1.get_group(0)'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          21505
+    Length:          10
+    ReplacementText: 'item_ct1.get_group(2)'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          21540
+    Length:          10
+    ReplacementText: 'item_ct1.get_group(1)'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          21553
+    Length:          11
+    ReplacementText: 'item_ct1.get_local_id(2)'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          21569
+    Length:          41
+    ReplacementText: ''
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          21622
+    Length:          11
+    ReplacementText: 'item_ct1.get_local_id(2)'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          21658
+    Length:          10
+    ReplacementText: 'item_ct1.get_group(2)'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          21684
+    Length:          11
+    ReplacementText: 'item_ct1.get_local_id(2)'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          21700
+    Length:          15
+    ReplacementText: "/*\n  DPCT1065:21: Consider replacing sycl::nd_item::barrier() with sycl::nd_item::barrier(sycl::access::fence_space::local_space) for better performance if there is no access to global memory.\n  */\n  item_ct1.barrier()"
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          26047
+    Length:          4
+    ReplacementText: 'sycl::range<3>'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          26059
+    Length:          104
+    ReplacementText: 'batch, (width + BLOCKWIDTH - 1) / BLOCKWIDTH, (height + BLOCKHEIGHT4 - 1) / BLOCKHEIGHT4'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          26168
+    Length:          4
+    ReplacementText: 'sycl::range<3>'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          26181
+    Length:          10
+    ReplacementText: 1, 1, BLOCKWIDTH
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          26568
+    Length:          11
+    ReplacementText: ''
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          26915
+    Length:          0
+    ReplacementText: ",\n    const sycl::nd_item<3> &item_ct1,\n    scalar_t *blockvec"
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          26929
+    Length:          10
+    ReplacementText: 'item_ct1.get_group(0)'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          26966
+    Length:          10
+    ReplacementText: 'item_ct1.get_group(2)'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          27001
+    Length:          10
+    ReplacementText: 'item_ct1.get_group(1)'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          27014
+    Length:          11
+    ReplacementText: 'item_ct1.get_local_id(2)'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          27030
+    Length:          41
+    ReplacementText: ''
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          27083
+    Length:          11
+    ReplacementText: 'item_ct1.get_local_id(2)'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          27119
+    Length:          10
+    ReplacementText: 'item_ct1.get_group(2)'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          27145
+    Length:          11
+    ReplacementText: 'item_ct1.get_local_id(2)'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          27161
+    Length:          15
+    ReplacementText: "/*\n  DPCT1065:22: Consider replacing sycl::nd_item::barrier() with sycl::nd_item::barrier(sycl::access::fence_space::local_space) for better performance if there is no access to global memory.\n  */\n  item_ct1.barrier()"
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          28561
+    Length:          4
+    ReplacementText: 'sycl::range<3>'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          28573
+    Length:          104
+    ReplacementText: 'batch, (width + BLOCKWIDTH - 1) / BLOCKWIDTH, (height + BLOCKHEIGHT8 - 1) / BLOCKHEIGHT8'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          28682
+    Length:          4
+    ReplacementText: 'sycl::range<3>'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          28695
+    Length:          10
+    ReplacementText: 1, 1, BLOCKWIDTH
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          29082
+    Length:          11
+    ReplacementText: ''
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          29425
+    Length:          0
+    ReplacementText: ",\n    const sycl::nd_item<3> &item_ct1,\n    scalar_t *blockvec"
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          29439
+    Length:          10
+    ReplacementText: 'item_ct1.get_group(0)'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          29476
+    Length:          10
+    ReplacementText: 'item_ct1.get_group(2)'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          29511
+    Length:          10
+    ReplacementText: 'item_ct1.get_group(1)'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          29524
+    Length:          11
+    ReplacementText: 'item_ct1.get_local_id(2)'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          29540
+    Length:          41
+    ReplacementText: ''
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          29593
+    Length:          11
+    ReplacementText: 'item_ct1.get_local_id(2)'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          29629
+    Length:          10
+    ReplacementText: 'item_ct1.get_group(2)'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          29655
+    Length:          11
+    ReplacementText: 'item_ct1.get_local_id(2)'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          29671
+    Length:          15
+    ReplacementText: "/*\n  DPCT1065:23: Consider replacing sycl::nd_item::barrier() with sycl::nd_item::barrier(sycl::access::fence_space::local_space) for better performance if there is no access to global memory.\n  */\n  item_ct1.barrier()"
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          30771
+    Length:          4
+    ReplacementText: 'sycl::range<3>'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          30783
+    Length:          104
+    ReplacementText: 'batch, (width + BLOCKWIDTH - 1) / BLOCKWIDTH, (height + BLOCKHEIGHT2 - 1) / BLOCKHEIGHT2'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          30892
+    Length:          4
+    ReplacementText: 'sycl::range<3>'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          30905
+    Length:          10
+    ReplacementText: 1, 1, BLOCKWIDTH
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          30921
+    Length:          255
+    ReplacementText: "{\n    dpct::has_capability_or_fail(dpct::get_in_order_queue().get_device(), {sycl::aspect::fp16});\n    dpct::get_in_order_queue().submit(\n      [&](sycl::handler &cgh) {\n        /*\n        DPCT1101:27: 'blockwidth2' expression was replaced with a value. Modify the code to use the original expression, provided in comments, if it is correct.\n        */\n        sycl::local_accessor<sycl::half2, 1> blockvec_acc_ct1(sycl::range<1>(128/*blockwidth2*/), cgh);\n        sycl::local_accessor<sycl::half2, 2> deq2_acc_ct1(sycl::range<2>(16, 16), cgh);\n\n        sycl::half2 * vec_data_ptr_ct0 = (sycl::half2*) vec.data_ptr();\n        const int *__restrict mat_data_ptr_int_ct1 = mat.data_ptr<int>();\n        float *__restrict mul_data_ptr_float_ct2 = mul.data_ptr<float>();\n        const float *__restrict scales_data_ptr_float_ct3 = scales.data_ptr<float>();\n        const int *__restrict zeros_data_ptr_int_ct4 = zeros.data_ptr<int>();\n\n        cgh.parallel_for(\n          sycl::nd_range<3>(blocks * threads, threads), \n          [=](sycl::nd_item<3> item_ct1) {\n            VecQuant2MatMulKernelFaster_old(vec_data_ptr_ct0, mat_data_ptr_int_ct1, mul_data_ptr_float_ct2, scales_data_ptr_float_ct3, zeros_data_ptr_int_ct4, batch, vec_height, height, width, zero_width, groupsize, item_ct1, blockvec_acc_ct1.get_pointer(), deq2_acc_ct1);\n          });\n      });\n  }"
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: true
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          31176
+    Length:          1
+    ReplacementText: ''
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          31181
+    Length:          11
+    ReplacementText: ''
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          31241
+    Length:          5
+    ReplacementText: 'sycl::half2'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          31513
+    Length:          0
+    ReplacementText: ",\n    const sycl::nd_item<3> &item_ct1,\n    sycl::half2 *blockvec,\n    sycl::local_accessor<sycl::half2, 2> deq2"
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          31569
+    Length:          10
+    ReplacementText: 'item_ct1.get_group(0)'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          31606
+    Length:          10
+    ReplacementText: 'item_ct1.get_group(2)'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          31641
+    Length:          10
+    ReplacementText: 'item_ct1.get_group(1)'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          31654
+    Length:          11
+    ReplacementText: 'item_ct1.get_local_id(2)'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          31670
+    Length:          39
+    ReplacementText: ''
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          31716
+    Length:          11
+    ReplacementText: 'item_ct1.get_local_id(2)'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          31756
+    Length:          11
+    ReplacementText: 'item_ct1.get_local_id(2)'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          31792
+    Length:          10
+    ReplacementText: 'item_ct1.get_group(2)'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          31819
+    Length:          11
+    ReplacementText: 'item_ct1.get_local_id(2)'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          31836
+    Length:          30
+    ReplacementText: ''
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          31879
+    Length:          11
+    ReplacementText: 'item_ct1.get_local_id(2)'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          31909
+    Length:          11
+    ReplacementText: 'item_ct1.get_local_id(2)'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          31993
+    Length:          78
+    ReplacementText: 'sycl::half2(sycl::vec<int, 1>(val & 0x3).convert<sycl::half, sycl::rounding_mode::rte>()[0], sycl::vec<int, 1>(val >> 2).convert<sycl::half, sycl::rounding_mode::rte>()[0])'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          32205
+    Length:          5
+    ReplacementText: 'sycl::half2'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          32241
+    Length:          15
+    ReplacementText: "/*\n  DPCT1065:24: Consider replacing sycl::nd_item::barrier() with sycl::nd_item::barrier(sycl::access::fence_space::local_space) for better performance if there is no access to global memory.\n  */\n  item_ct1.barrier()"
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          32372
+    Length:          5
+    ReplacementText: 'sycl::half2'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          32386
+    Length:          25
+    ReplacementText: 'sycl::float2(scale_f).convert<sycl::half, sycl::rounding_mode::rte>()'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          32417
+    Length:          5
+    ReplacementText: 'sycl::half2'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          32430
+    Length:          105
+    ReplacementText: 'sycl::float2(-(scale_f * ((((as_unsigned(zeros[g * zero_width + z_w]) >> z_mod) & 0x3) + 1) & 0x0f))).convert<sycl::half, sycl::rounding_mode::rte>()'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          32622
+    Length:          82
+    ReplacementText: 'sycl::fma(sycl::fma(deq2[(tmp >>  0) & 0xf][off], scale, zero), blockvec[k + 0], res2)'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          32717
+    Length:          82
+    ReplacementText: 'sycl::fma(sycl::fma(deq2[(tmp >>  4) & 0xf][off], scale, zero), blockvec[k + 1], res2)'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          32812
+    Length:          82
+    ReplacementText: 'sycl::fma(sycl::fma(deq2[(tmp >>  8) & 0xf][off], scale, zero), blockvec[k + 2], res2)'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          32907
+    Length:          82
+    ReplacementText: 'sycl::fma(sycl::fma(deq2[(tmp >> 12) & 0xf][off], scale, zero), blockvec[k + 3], res2)'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          33002
+    Length:          82
+    ReplacementText: 'sycl::fma(sycl::fma(deq2[(tmp >> 16) & 0xf][off], scale, zero), blockvec[k + 4], res2)'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          33097
+    Length:          82
+    ReplacementText: 'sycl::fma(sycl::fma(deq2[(tmp >> 20) & 0xf][off], scale, zero), blockvec[k + 5], res2)'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          33192
+    Length:          82
+    ReplacementText: 'sycl::fma(sycl::fma(deq2[(tmp >> 24) & 0xf][off], scale, zero), blockvec[k + 6], res2)'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          33287
+    Length:          82
+    ReplacementText: 'sycl::fma(sycl::fma(deq2[(tmp >> 28) & 0xf][off], scale, zero), blockvec[k + 7], res2)'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          33407
+    Length:          17
+    ReplacementText: 'res2[0]'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          33427
+    Length:          18
+    ReplacementText: 'res2[1]'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          33454
+    Length:          35
+    ReplacementText: 'dpct::atomic_fetch_add<sycl::access::address_space::generic_space>(&mul[b * width + w], res)'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          33799
+    Length:          4
+    ReplacementText: 'sycl::range<3>'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          33811
+    Length:          104
+    ReplacementText: 'batch, (width + BLOCKWIDTH - 1) / BLOCKWIDTH, (height + BLOCKHEIGHT3 - 1) / BLOCKHEIGHT3'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          33920
+    Length:          4
+    ReplacementText: 'sycl::range<3>'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          33933
+    Length:          10
+    ReplacementText: 1, 1, BLOCKWIDTH
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          33949
+    Length:          255
+    ReplacementText: "{\n    dpct::has_capability_or_fail(dpct::get_in_order_queue().get_device(), {sycl::aspect::fp16});\n    dpct::get_in_order_queue().submit(\n      [&](sycl::handler &cgh) {\n        /*\n        DPCT1101:28: 'blockwidth2' expression was replaced with a value. Modify the code to use the original expression, provided in comments, if it is correct.\n        */\n        sycl::local_accessor<sycl::half2, 1> blockvec_acc_ct1(sycl::range<1>(128/*blockwidth2*/), cgh);\n        sycl::local_accessor<sycl::half2, 2> deq2_acc_ct1(sycl::range<2>(64, 32), cgh);\n\n        sycl::half2 * vec_data_ptr_ct0 = (sycl::half2*) vec.data_ptr();\n        const int *__restrict mat_data_ptr_int_ct1 = mat.data_ptr<int>();\n        float *__restrict mul_data_ptr_float_ct2 = mul.data_ptr<float>();\n        const float *__restrict scales_data_ptr_float_ct3 = scales.data_ptr<float>();\n        const int *__restrict zeros_data_ptr_int_ct4 = zeros.data_ptr<int>();\n\n        cgh.parallel_for(\n          sycl::nd_range<3>(blocks * threads, threads), \n          [=](sycl::nd_item<3> item_ct1) {\n            VecQuant3MatMulKernelFaster_old(vec_data_ptr_ct0, mat_data_ptr_int_ct1, mul_data_ptr_float_ct2, scales_data_ptr_float_ct3, zeros_data_ptr_int_ct4, batch, vec_height, height, width, zero_width, groupsize, item_ct1, blockvec_acc_ct1.get_pointer(), deq2_acc_ct1);\n          });\n      });\n  }"
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: true
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          34204
+    Length:          1
+    ReplacementText: ''
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          34209
+    Length:          11
+    ReplacementText: ''
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          34269
+    Length:          5
+    ReplacementText: 'sycl::half2'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          34541
+    Length:          0
+    ReplacementText: ",\n    const sycl::nd_item<3> &item_ct1,\n    sycl::half2 *blockvec,\n    sycl::local_accessor<sycl::half2, 2> deq2"
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          34597
+    Length:          10
+    ReplacementText: 'item_ct1.get_group(0)'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          34634
+    Length:          10
+    ReplacementText: 'item_ct1.get_group(2)'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          34669
+    Length:          10
+    ReplacementText: 'item_ct1.get_group(1)'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          34682
+    Length:          11
+    ReplacementText: 'item_ct1.get_local_id(2)'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          34698
+    Length:          39
+    ReplacementText: ''
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          34744
+    Length:          11
+    ReplacementText: 'item_ct1.get_local_id(2)'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          34784
+    Length:          11
+    ReplacementText: 'item_ct1.get_local_id(2)'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          34820
+    Length:          10
+    ReplacementText: 'item_ct1.get_group(2)'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          34847
+    Length:          11
+    ReplacementText: 'item_ct1.get_local_id(2)'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          34864
+    Length:          30
+    ReplacementText: ''
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          34907
+    Length:          11
+    ReplacementText: 'item_ct1.get_local_id(2)'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          34937
+    Length:          11
+    ReplacementText: 'item_ct1.get_local_id(2)'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          35021
+    Length:          78
+    ReplacementText: 'sycl::half2(sycl::vec<int, 1>(val & 0x7).convert<sycl::half, sycl::rounding_mode::rte>()[0], sycl::vec<int, 1>(val >> 3).convert<sycl::half, sycl::rounding_mode::rte>()[0])'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          35609
+    Length:          5
+    ReplacementText: 'sycl::half2'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          35709
+    Length:          15
+    ReplacementText: "/*\n  DPCT1065:25: Consider replacing sycl::nd_item::barrier() with sycl::nd_item::barrier(sycl::access::fence_space::local_space) for better performance if there is no access to global memory.\n  */\n  item_ct1.barrier()"
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          35840
+    Length:          5
+    ReplacementText: 'sycl::half2'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          35854
+    Length:          25
+    ReplacementText: 'sycl::float2(scale_f).convert<sycl::half, sycl::rounding_mode::rte>()'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          35885
+    Length:          5
+    ReplacementText: 'sycl::half2'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          36061
+    Length:          53
+    ReplacementText: 'sycl::float2(-(scale_f * (((z_tmp) + 1) & 0x0f))).convert<sycl::half, sycl::rounding_mode::rte>()'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          36286
+    Length:          53
+    ReplacementText: 'sycl::float2(-(scale_f * (((z_tmp) + 1) & 0x0f))).convert<sycl::half, sycl::rounding_mode::rte>()'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          36367
+    Length:          105
+    ReplacementText: 'sycl::float2(-(scale_f * ((((as_unsigned(zeros[g * zero_width + z_w]) >> z_bit) & 0x7) + 1) & 0x0f))).convert<sycl::half, sycl::rounding_mode::rte>()'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          36566
+    Length:          84
+    ReplacementText: 'sycl::fma(sycl::fma(deq2[(tmp1 >>  0) & 0x3f][off], scale, zero), blockvec[k + 0], res2)'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          36663
+    Length:          84
+    ReplacementText: 'sycl::fma(sycl::fma(deq2[(tmp1 >>  6) & 0x3f][off], scale, zero), blockvec[k + 1], res2)'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          36760
+    Length:          84
+    ReplacementText: 'sycl::fma(sycl::fma(deq2[(tmp1 >> 12) & 0x3f][off], scale, zero), blockvec[k + 2], res2)'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          36857
+    Length:          84
+    ReplacementText: 'sycl::fma(sycl::fma(deq2[(tmp1 >> 18) & 0x3f][off], scale, zero), blockvec[k + 3], res2)'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          36954
+    Length:          84
+    ReplacementText: 'sycl::fma(sycl::fma(deq2[(tmp1 >> 24) & 0x3f][off], scale, zero), blockvec[k + 4], res2)'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          37146
+    Length:          68
+    ReplacementText: 'sycl::fma(sycl::fma(deq2[tmp][off], scale, zero), blockvec[k + 5], res2)'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          37255
+    Length:          84
+    ReplacementText: 'sycl::fma(sycl::fma(deq2[(tmp2 >>  0) & 0x3f][off], scale, zero), blockvec[k + 0], res2)'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          37352
+    Length:          84
+    ReplacementText: 'sycl::fma(sycl::fma(deq2[(tmp2 >>  6) & 0x3f][off], scale, zero), blockvec[k + 1], res2)'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          37449
+    Length:          84
+    ReplacementText: 'sycl::fma(sycl::fma(deq2[(tmp2 >> 12) & 0x3f][off], scale, zero), blockvec[k + 2], res2)'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          37546
+    Length:          84
+    ReplacementText: 'sycl::fma(sycl::fma(deq2[(tmp2 >> 18) & 0x3f][off], scale, zero), blockvec[k + 3], res2)'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          37738
+    Length:          68
+    ReplacementText: 'sycl::fma(sycl::fma(deq2[tmp][off], scale, zero), blockvec[k + 4], res2)'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          37847
+    Length:          84
+    ReplacementText: 'sycl::fma(sycl::fma(deq2[(tmp1 >>  0) & 0x3f][off], scale, zero), blockvec[k + 0], res2)'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          37944
+    Length:          84
+    ReplacementText: 'sycl::fma(sycl::fma(deq2[(tmp1 >>  6) & 0x3f][off], scale, zero), blockvec[k + 1], res2)'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          38041
+    Length:          84
+    ReplacementText: 'sycl::fma(sycl::fma(deq2[(tmp1 >> 12) & 0x3f][off], scale, zero), blockvec[k + 2], res2)'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          38138
+    Length:          84
+    ReplacementText: 'sycl::fma(sycl::fma(deq2[(tmp1 >> 18) & 0x3f][off], scale, zero), blockvec[k + 3], res2)'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          38235
+    Length:          84
+    ReplacementText: 'sycl::fma(sycl::fma(deq2[(tmp1 >> 24) & 0x3f][off], scale, zero), blockvec[k + 4], res2)'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          38360
+    Length:          17
+    ReplacementText: 'res2[0]'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          38380
+    Length:          18
+    ReplacementText: 'res2[1]'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          38407
+    Length:          35
+    ReplacementText: 'dpct::atomic_fetch_add<sycl::access::address_space::generic_space>(&mul[b * width + w], res)'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          38752
+    Length:          4
+    ReplacementText: 'sycl::range<3>'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          38764
+    Length:          104
+    ReplacementText: 'batch, (width + BLOCKWIDTH - 1) / BLOCKWIDTH, (height + BLOCKHEIGHT4 - 1) / BLOCKHEIGHT4'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          38873
+    Length:          4
+    ReplacementText: 'sycl::range<3>'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          38886
+    Length:          10
+    ReplacementText: 1, 1, BLOCKWIDTH
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          38902
+    Length:          255
+    ReplacementText: "{\n    dpct::has_capability_or_fail(dpct::get_in_order_queue().get_device(), {sycl::aspect::fp16});\n    dpct::get_in_order_queue().submit(\n      [&](sycl::handler &cgh) {\n        /*\n        DPCT1101:29: 'blockwidth2' expression was replaced with a value. Modify the code to use the original expression, provided in comments, if it is correct.\n        */\n        sycl::local_accessor<sycl::half2, 1> blockvec_acc_ct1(sycl::range<1>(128/*blockwidth2*/), cgh);\n        sycl::local_accessor<sycl::half2, 2> deq2_acc_ct1(sycl::range<2>(256, 8), cgh);\n\n        sycl::half2 * vec_data_ptr_ct0 = (sycl::half2*) vec.data_ptr();\n        const int *__restrict mat_data_ptr_int_ct1 = mat.data_ptr<int>();\n        float *__restrict mul_data_ptr_float_ct2 = mul.data_ptr<float>();\n        const float *__restrict scales_data_ptr_float_ct3 = scales.data_ptr<float>();\n        const int *__restrict zeros_data_ptr_int_ct4 = zeros.data_ptr<int>();\n\n        cgh.parallel_for(\n          sycl::nd_range<3>(blocks * threads, threads), \n          [=](sycl::nd_item<3> item_ct1) {\n            VecQuant4MatMulKernelFaster_old(vec_data_ptr_ct0, mat_data_ptr_int_ct1, mul_data_ptr_float_ct2, scales_data_ptr_float_ct3, zeros_data_ptr_int_ct4, batch, vec_height, height, width, zero_width, groupsize, item_ct1, blockvec_acc_ct1.get_pointer(), deq2_acc_ct1);\n          });\n      });\n  }"
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: true
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          39157
+    Length:          1
+    ReplacementText: ''
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          39162
+    Length:          11
+    ReplacementText: ''
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          39222
+    Length:          5
+    ReplacementText: 'sycl::half2'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          39494
+    Length:          0
+    ReplacementText: ",\n    const sycl::nd_item<3> &item_ct1,\n    sycl::half2 *blockvec,\n    sycl::local_accessor<sycl::half2, 2> deq2"
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          39550
+    Length:          10
+    ReplacementText: 'item_ct1.get_group(0)'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          39587
+    Length:          10
+    ReplacementText: 'item_ct1.get_group(2)'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          39622
+    Length:          10
+    ReplacementText: 'item_ct1.get_group(1)'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          39635
+    Length:          11
+    ReplacementText: 'item_ct1.get_local_id(2)'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          39651
+    Length:          39
+    ReplacementText: ''
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          39697
+    Length:          11
+    ReplacementText: 'item_ct1.get_local_id(2)'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          39737
+    Length:          11
+    ReplacementText: 'item_ct1.get_local_id(2)'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          39773
+    Length:          10
+    ReplacementText: 'item_ct1.get_group(2)'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          39800
+    Length:          11
+    ReplacementText: 'item_ct1.get_local_id(2)'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          39817
+    Length:          30
+    ReplacementText: ''
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          39860
+    Length:          11
+    ReplacementText: 'item_ct1.get_local_id(2)'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          39889
+    Length:          11
+    ReplacementText: 'item_ct1.get_local_id(2)'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          39972
+    Length:          78
+    ReplacementText: 'sycl::half2(sycl::vec<int, 1>(val & 0xF).convert<sycl::half, sycl::rounding_mode::rte>()[0], sycl::vec<int, 1>(val >> 4).convert<sycl::half, sycl::rounding_mode::rte>()[0])'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          40181
+    Length:          5
+    ReplacementText: 'sycl::half2'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          40217
+    Length:          15
+    ReplacementText: "/*\n  DPCT1065:26: Consider replacing sycl::nd_item::barrier() with sycl::nd_item::barrier(sycl::access::fence_space::local_space) for better performance if there is no access to global memory.\n  */\n  item_ct1.barrier()"
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          40349
+    Length:          5
+    ReplacementText: 'sycl::half2'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          40363
+    Length:          25
+    ReplacementText: 'sycl::float2(scale_f).convert<sycl::half, sycl::rounding_mode::rte>()'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          40394
+    Length:          5
+    ReplacementText: 'sycl::half2'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          40407
+    Length:          105
+    ReplacementText: 'sycl::float2(-(scale_f * ((((as_unsigned(zeros[g * zero_width + z_w]) >> z_mod) & 0xF) + 1) & 0x0f))).convert<sycl::half, sycl::rounding_mode::rte>()'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          40687
+    Length:          83
+    ReplacementText: 'sycl::fma(sycl::fma(deq2[(tmp >>  0) & 0xff][off], scale, zero), blockvec[k + 0], res2)'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          40783
+    Length:          83
+    ReplacementText: 'sycl::fma(sycl::fma(deq2[(tmp >>  8) & 0xff][off], scale, zero), blockvec[k + 1], res2)'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          40879
+    Length:          83
+    ReplacementText: 'sycl::fma(sycl::fma(deq2[(tmp >> 16) & 0xff][off], scale, zero), blockvec[k + 2], res2)'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          40975
+    Length:          83
+    ReplacementText: 'sycl::fma(sycl::fma(deq2[(tmp >> 24) & 0xff][off], scale, zero), blockvec[k + 3], res2)'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          41097
+    Length:          17
+    ReplacementText: 'res2[0]'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          41117
+    Length:          18
+    ReplacementText: 'res2[1]'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+  - FilePath:        '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Offset:          41145
+    Length:          35
+    ReplacementText: 'dpct::atomic_fetch_add<sycl::access::address_space::generic_space>(&mul[b * width + w], res)'
+    ConstantFlag:    ''
+    ConstantOffset:  0
+    InitStr:         ''
+    NewHostVarName:  ''
+    BlockLevelFormatFlag: false
+MainSourceFilesDigest:
+  - MainSourceFile:  '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu'
+    Digest:          3e4e8809b639a94934d590b1bcc7a868
+DpctVersion:     2024.0.0
+MainHelperFileName: ''
+USMLevel:        ''
+FeatureMap:      {}
+CompileTargets:  {}
+OptionMap:
+  AnalysisScopePath:
+    Value:           '/home/majumder/gptq/AutoGPTQ/autogptq_extension/cuda_256'
+    Specified:       false
+  AsyncHandler:
+    Value:           'false'
+    Specified:       false
+  CommentsEnabled:
+    Value:           'false'
+    Specified:       false
+  CompilationsDir:
+    Value:           ''
+    Specified:       false
+  CtadEnabled:
+    Value:           'false'
+    Specified:       false
+  EnablepProfiling:
+    Value:           'false'
+    Specified:       false
+  ExperimentalFlag:
+    Value:           '0'
+    Specified:       false
+  ExplicitClNamespace:
+    Value:           'false'
+    Specified:       false
+  ExplicitNamespace:
+    Value:           '20'
+    Specified:       false
+  ExtensionDDFlag:
+    Value:           '0'
+    Specified:       false
+  ExtensionDEFlag:
+    Value:           '4294967295'
+    Specified:       false
+  HelperFuncPreferenceFlag:
+    Value:           '0'
+    Specified:       false
+  NDRangeDim:
+    Value:           '3'
+    Specified:       false
+  NoDRYPattern:
+    Value:           'false'
+    Specified:       false
+  NoUseGenericSpace:
+    Value:           ''
+    Specified:       true
+  OptimizeMigration:
+    Value:           'false'
+    Specified:       false
+  ProcessAll:
+    Value:           'true'
+    Specified:       true
+  RuleFile:
+    Value:           ''
+    Specified:       false
+  SyclNamedLambda:
+    Value:           'false'
+    Specified:       false
+  UsmLevel:
+    Value:           '1'
+    Specified:       false
+...
