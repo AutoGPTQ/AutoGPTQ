@@ -41,6 +41,7 @@ class QUANT_METHOD:
 QUANT_METHOD_FORMAT_MAPPING = {
     QUANT_METHOD.GPTQ: {
         CHECKPOINT_FORMAT.GPTQ,
+        CHECKPOINT_FORMAT.GPTQ_V2,
         CHECKPOINT_FORMAT.MARLIN,
     },
     QUANT_METHOD.AWQ: {
@@ -101,7 +102,7 @@ class BaseQuantizeConfig(PushToHubMixin):
     @classmethod
     # normalize quant config for compat and also performs validation
     def from_quant_config(cls, quantize_cfg, checkpoint_format: str = None):
-        valid_formats = {CHECKPOINT_FORMAT.GPTQ, CHECKPOINT_FORMAT.MARLIN, CHECKPOINT_FORMAT.AWQ_GEMM}
+        valid_formats = {CHECKPOINT_FORMAT.GPTQ, CHECKPOINT_FORMAT.GPTQ_V2, CHECKPOINT_FORMAT.MARLIN, CHECKPOINT_FORMAT.AWQ_GEMM}
 
         checkpoint_format_auto_inferred = False
         # compat: checkpoint_format can be passed in via from_quantized() if field missing from json
@@ -116,7 +117,7 @@ class BaseQuantizeConfig(PushToHubMixin):
 
         field_names = [field.name for field in fields(cls)]
 
-        normalized = {QUANT_METHOD_FIELD: QUANT_METHOD.GPTQ, CHECKPOINT_FORMAT_FIELD: checkpoint_format if checkpoint_format else CHECKPOINT_FORMAT.GPTQ}
+        normalized = {QUANT_METHOD_FIELD: QUANT_METHOD.GPTQ, CHECKPOINT_FORMAT_FIELD: checkpoint_format if checkpoint_format else CHECKPOINT_FORMAT.GPTQ_V2}
         for key, val in quantize_cfg.items():
             key = key.lower()
 
@@ -127,7 +128,7 @@ class BaseQuantizeConfig(PushToHubMixin):
             if key == CHECKPOINT_FORMAT_FIELD:
                 val = val.lower()
 
-                if val in {CHECKPOINT_FORMAT.GPTQ, CHECKPOINT_FORMAT.MARLIN, CHECKPOINT_FORMAT.AWQ_GEMM}:
+                if val in {CHECKPOINT_FORMAT.GPTQ, CHECKPOINT_FORMAT.GPTQ_V2, CHECKPOINT_FORMAT.MARLIN, CHECKPOINT_FORMAT.AWQ_GEMM}:
                     normalized[key] = val
                 else:
                     raise ValueError(f"Unknown quantization format: {val}.")
