@@ -105,6 +105,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         injected_fused_attention: bool = False,
         injected_fused_mlp: bool = False,
         trainable: bool = False,
+        qlinear_kernel: str = None
     ):
         super().__init__()
 
@@ -120,7 +121,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         self.trainable = trainable
 
         # compat: internal state to assist gptq(v1) to gptq(v2) conversion
-        self._qlinear_kernel: nn.Module = None
+        self.qlinear_kernel: nn.Module = qlinear_kernel
 
     @property
     def quantized(self):
@@ -378,7 +379,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             layer_inputs, layer_outputs = layer_outputs, []  # TODO: is it really OK to cache only the first positional argument?
             torch.cuda.empty_cache()
 
-        self._qlinear_kernel = pack_model(
+        self.qlinear_kernel = pack_model(
             model=self.model,
             quantizers=quantizers,
             bits=self.quantize_config.bits,
@@ -529,7 +530,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                 self.model,
                 v2_format=False,
                 quantize_config=self.quantize_config,
-                qlinear_kernel=self._qlinear_kernel
+                qlinear_kernel=self.qlinear_kernel
             )
 
         self.model.to(CPU)
@@ -1198,7 +1199,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             )
             model.load_state_dict(checkpoint)
 
-        self._qlinear_kernel = dynamically_import_QuantLinear(
+        qlinear_kernel = dynamically_import_QuantLinear(
             use_triton=use_triton,
             use_tritonv2=use_tritonv2,
             desc_act=quantize_config.desc_act,
@@ -1216,7 +1217,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                 model,
                 v2_format=True,
                 quantize_config=quantize_config,
-                qlinear_kernel=self._qlinear_kernel,
+                qlinear_kernel=qlinear_kernel,
             )
 
             quantize_config.checkpoint_format = CHECKPOINT_FORMAT.GPTQ_V2
@@ -1296,6 +1297,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             injected_fused_attention=inject_fused_attention,
             injected_fused_mlp=inject_fused_mlp and (use_triton or use_tritonv2),
             trainable=trainable,
+            qlinear_kernel=qlinear_kernel,
         )
 
     def warmup_triton(self, enabled: bool = True):
