@@ -149,7 +149,7 @@ def make_quant(
 def convert_gptq_v1_to_v2_format(
     model,
     quantize_config: BaseQuantizeConfig,
-    module,
+    module: nn.Module,
 ):
     use_qigen = module.QUANT_TYPE == "qigen"
 
