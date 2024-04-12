@@ -69,7 +69,7 @@ class BaseQuantizeConfig(PushToHubMixin):
     sym: bool = field(default=True)
     true_sequential: bool = field(default=True)
     quant_method: str = field(default=QUANT_METHOD.GPTQ)
-    checkpoint_format: str = field(default=CHECKPOINT_FORMAT.GPTQ)
+    checkpoint_format: str = field(default=CHECKPOINT_FORMAT.GPTQ_V2)
     model_name_or_path: Optional[str] = field(default=None)
     model_file_base_name: Optional[str] = field(default=None)
 

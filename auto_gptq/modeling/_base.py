@@ -1172,7 +1172,6 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             )
             model.load_state_dict(checkpoint)
 
-        # FIXME
         module = dynamically_import_QuantLinear(
             use_triton=use_triton,
             use_tritonv2=use_tritonv2,
@@ -1185,7 +1184,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             use_marlin=use_marlin,
         )
 
-        # FIXME
+        # compat: dynamically convert checkpoint gptq(v1) to gptq_v2 format with sym=False fix
         if quantize_config.checkpoint_format == CHECKPOINT_FORMAT.GPTQ:
             model = convert_gptq_v1_to_v2_format(
                 model,
