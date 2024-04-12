@@ -119,6 +119,9 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         self.injected_fused_mlp = injected_fused_mlp
         self.trainable = trainable
 
+        # compat: internal state to assist gptq(v1) to gptq(v2) conversion
+        self._qlinear_kernel: nn.Module = None
+
     @property
     def quantized(self):
         return self._quantized
@@ -375,7 +378,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             layer_inputs, layer_outputs = layer_outputs, []  # TODO: is it really OK to cache only the first positional argument?
             torch.cuda.empty_cache()
 
-        self.kerenl_backend_type = pack_model(
+        self._qlinear_kernel = pack_model(
             model=self.model,
             quantizers=quantizers,
             bits=self.quantize_config.bits,
@@ -510,6 +513,25 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         if not self.quantized:
             raise EnvironmentError("can only save quantized model, please execute .quantize first.")
 
+        if self.quantize_config.checkpoint_format == CHECKPOINT_FORMAT.GPTQ_V2:
+            logger.warning(
+                f"New checkpoint_format = {CHECKPOINT_FORMAT.GPTQ_V2} is enabled, the saved model is not supported by older versions of AutoGPTQ(<= 0.7.1).")
+
+        revert_model = None
+        # compat: allow save to v1 format but warn deprecation
+        if self.quantize_config.checkpoint_format == CHECKPOINT_FORMAT.GPTQ:
+            revert_model = self.model
+            # deprecation
+            logger.warning(
+                f"Deprecation: Old checkpoint_format = {CHECKPOINT_FORMAT.GPTQ} is enabled. Please use new {CHECKPOINT_FORMAT.GPTQ_V2} checkpoint format.")
+
+            self.model = convert_gptq_v1_to_v2_format(
+                self.model,
+                v2_format=False,
+                quantize_config=self.quantize_config,
+                qlinear_kernel=self._qlinear_kernel
+            )
+
         self.model.to(CPU)
 
         model_base_name = (
@@ -574,6 +596,10 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         self.quantize_config.save_pretrained(save_dir)
         self.quantize_config.model_name_or_path = save_dir
         self.quantize_config.model_file_base_name = model_base_name
+
+        # revert model
+        if revert_model is not None:
+            self.model = revert_model
 
     def save_pretrained(
         self,
@@ -1172,7 +1198,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             )
             model.load_state_dict(checkpoint)
 
-        module = dynamically_import_QuantLinear(
+        self._qlinear_kernel = dynamically_import_QuantLinear(
             use_triton=use_triton,
             use_tritonv2=use_tritonv2,
             desc_act=quantize_config.desc_act,
@@ -1188,8 +1214,9 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         if quantize_config.checkpoint_format == CHECKPOINT_FORMAT.GPTQ:
             model = convert_gptq_v1_to_v2_format(
                 model,
+                v2_format=True,
                 quantize_config=quantize_config,
-                module=module,
+                module=self._qlinear_kernel,
             )
 
             quantize_config.checkpoint_format = CHECKPOINT_FORMAT.GPTQ_V2

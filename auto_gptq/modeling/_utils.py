@@ -148,45 +148,46 @@ def make_quant(
 
 def convert_gptq_v1_to_v2_format(
     model,
+    v2_format: bool,
     quantize_config: BaseQuantizeConfig,
-    module: nn.Module,
+    qlinear_kernel: nn.Module,
 ):
-    use_qigen = module.QUANT_TYPE == "qigen"
+    use_qigen = qlinear_kernel.QUANT_TYPE == "qigen"
 
     for name, submodule in model.named_modules():
-        if isinstance(submodule, module):
-            # if v2_format:
-            if use_qigen:
-                submodule.zeros.data += 1
-            else:
-                if quantize_config.bits == 2:
-                    submodule.qzeros.data += 0b01010101010101010101010101010101
-                elif quantize_config.bits == 3:
-                    submodule.qzeros.data[:,range(0,submodule.qzeros.data.shape[1],3)] += 0b00100100100100100100100100100100
-                    submodule.qzeros.data[:,range(1,submodule.qzeros.data.shape[1],3)] += 0b10010010010010010010010010010010
-                    submodule.qzeros.data[:,range(2,submodule.qzeros.data.shape[1],3)] += 0b01001001001001001001001001001001
-                elif quantize_config.bits == 4:
-                    submodule.qzeros.data += 0b00010001000100010001000100010001
-                elif quantize_config.bits == 8:
-                    submodule.qzeros.data += 0b00000001000000010000000100000001
+        if isinstance(submodule, qlinear_kernel):
+            if v2_format:
+                if use_qigen:
+                    submodule.zeros.data += 1
                 else:
-                    raise NotImplementedError("Only 2,3,4,8 bits are supported.")
-            # else:
-            #     if use_qigen:
-            #         submodule.zeros.data -= 1
-            #     else:
-            #         if quantize_config.bits == 2:
-            #             submodule.qzeros.data -= 0b01010101010101010101010101010101
-            #         elif quantize_config.bits == 3:
-            #             submodule.qzeros.data[:,range(0,submodule.qzeros.data.shape[1],3)] -= 0b00100100100100100100100100100100
-            #             submodule.qzeros.data[:,range(1,submodule.qzeros.data.shape[1],3)] -= 0b10010010010010010010010010010010
-            #             submodule.qzeros.data[:,range(2,submodule.qzeros.data.shape[1],3)] -= 0b01001001001001001001001001001001
-            #         elif quantize_config.bits == 4:
-            #             submodule.qzeros.data -= 0b00010001000100010001000100010001
-            #         elif quantize_config.bits == 8:
-            #             submodule.qzeros.data -= 0b00000001000000010000000100000001
-            #         else:
-            #             raise NotImplementedError("Only 2,3,4,8 bits are supported.")
+                    if quantize_config.bits == 2:
+                        submodule.qzeros.data += 0b01010101010101010101010101010101
+                    elif quantize_config.bits == 3:
+                        submodule.qzeros.data[:,range(0,submodule.qzeros.data.shape[1],3)] += 0b00100100100100100100100100100100
+                        submodule.qzeros.data[:,range(1,submodule.qzeros.data.shape[1],3)] += 0b10010010010010010010010010010010
+                        submodule.qzeros.data[:,range(2,submodule.qzeros.data.shape[1],3)] += 0b01001001001001001001001001001001
+                    elif quantize_config.bits == 4:
+                        submodule.qzeros.data += 0b00010001000100010001000100010001
+                    elif quantize_config.bits == 8:
+                        submodule.qzeros.data += 0b00000001000000010000000100000001
+                    else:
+                        raise NotImplementedError("Only 2,3,4,8 bits are supported.")
+            else:
+                if use_qigen:
+                    submodule.zeros.data -= 1
+                else:
+                    if quantize_config.bits == 2:
+                        submodule.qzeros.data -= 0b01010101010101010101010101010101
+                    elif quantize_config.bits == 3:
+                        submodule.qzeros.data[:,range(0,submodule.qzeros.data.shape[1],3)] -= 0b00100100100100100100100100100100
+                        submodule.qzeros.data[:,range(1,submodule.qzeros.data.shape[1],3)] -= 0b10010010010010010010010010010010
+                        submodule.qzeros.data[:,range(2,submodule.qzeros.data.shape[1],3)] -= 0b01001001001001001001001001001001
+                    elif quantize_config.bits == 4:
+                        submodule.qzeros.data -= 0b00010001000100010001000100010001
+                    elif quantize_config.bits == 8:
+                        submodule.qzeros.data -= 0b00000001000000010000000100000001
+                    else:
+                        raise NotImplementedError("Only 2,3,4,8 bits are supported.")
 
     return model
 
