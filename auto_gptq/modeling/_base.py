@@ -1216,7 +1216,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                 model,
                 v2_format=True,
                 quantize_config=quantize_config,
-                module=self._qlinear_kernel,
+                qlinear_kernel=self._qlinear_kernel,
             )
 
             quantize_config.checkpoint_format = CHECKPOINT_FORMAT.GPTQ_V2
