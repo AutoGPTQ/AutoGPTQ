@@ -188,7 +188,7 @@ def convert_gptq_v1_to_v2_format(
             #         else:
             #             raise NotImplementedError("Only 2,3,4,8 bits are supported.")
 
-    return module
+    return model
 
 
 def preprocess_checkpoint_qigen(
