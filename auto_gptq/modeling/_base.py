@@ -64,6 +64,7 @@ from ._utils import (
     preprocess_checkpoint_qigen,
     simple_dispatch_model,
     unpack_awq,
+    convert_gptq_v1_to_v2_format,
 )
 
 
@@ -1192,7 +1193,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                 module=module,
             )
 
-            quantize_config.checkpoint_format = CHECKPOINT_FORMAT.GPTQ_v2
+            quantize_config.checkpoint_format = CHECKPOINT_FORMAT.GPTQ_V2
 
         # == step4: set seqlen == #
         model_config = model.config.to_dict()
@@ -1269,7 +1270,6 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             injected_fused_attention=inject_fused_attention,
             injected_fused_mlp=inject_fused_mlp and (use_triton or use_tritonv2),
             trainable=trainable,
-            kerenl_backend_type=kerenl_backend_type,
         )
 
     def warmup_triton(self, enabled: bool = True):
