@@ -817,5 +817,5 @@ __all__ = [
     "check_and_get_model_type",
     "simple_dispatch_model",
     "make_sure_no_tensor_in_meta_device",
-    "convert_to_gptq_v2_format",
+    "convert_gptq_v1_to_v2_format",
 ]
