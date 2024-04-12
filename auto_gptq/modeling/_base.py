@@ -374,7 +374,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             layer_inputs, layer_outputs = layer_outputs, []  # TODO: is it really OK to cache only the first positional argument?
             torch.cuda.empty_cache()
 
-        pack_model(
+        self.kerenl_backend_type = pack_model(
             model=self.model,
             quantizers=quantizers,
             bits=self.quantize_config.bits,
@@ -1171,6 +1171,29 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             )
             model.load_state_dict(checkpoint)
 
+        # FIXME
+        module = dynamically_import_QuantLinear(
+            use_triton=use_triton,
+            use_tritonv2=use_tritonv2,
+            desc_act=quantize_config.desc_act,
+            group_size=quantize_config.group_size,
+            bits=quantize_config.bits,
+            disable_exllama=disable_exllama,
+            disable_exllamav2=disable_exllamav2,
+            use_qigen=use_qigen,
+            use_marlin=use_marlin,
+        )
+
+        # FIXME
+        if quantize_config.checkpoint_format == CHECKPOINT_FORMAT.GPTQ:
+            model = convert_gptq_v1_to_v2_format(
+                model,
+                quantize_config=quantize_config,
+                module=module,
+            )
+
+            quantize_config.checkpoint_format = CHECKPOINT_FORMAT.GPTQ_v2
+
         # == step4: set seqlen == #
         model_config = model.config.to_dict()
         seq_len_keys = ["max_position_embeddings", "seq_length", "n_positions"]
@@ -1246,6 +1269,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             injected_fused_attention=inject_fused_attention,
             injected_fused_mlp=inject_fused_mlp and (use_triton or use_tritonv2),
             trainable=trainable,
+            kerenl_backend_type=kerenl_backend_type,
         )
 
     def warmup_triton(self, enabled: bool = True):

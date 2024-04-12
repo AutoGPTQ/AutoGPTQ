@@ -26,6 +26,8 @@ QUANT_CONFIG_FILENAME = "quantize_config.json"
 # checkpoint formats
 class CHECKPOINT_FORMAT:
     GPTQ = "gptq"
+    # v2 format fixed sym = False quantization
+    GPTQ_V2 = "gptq_v2"
     MARLIN = "marlin"
     AWQ_GEMM = "gemm"
 

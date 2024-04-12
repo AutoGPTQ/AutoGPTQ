@@ -201,6 +201,7 @@ class GPTQ:
         self.Losses = None
         self.Trace = None
         torch.cuda.empty_cache()
+        time.sleep(1)
 
 
 __all__ = ["GPTQ"]

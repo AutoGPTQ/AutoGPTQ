@@ -20,7 +20,6 @@ if MARLIN_AVAILABLE:
 
 logger = getLogger(__name__)
 
-
 def prepare_model_for_marlin_load(
     model,
     quantize_config: BaseQuantizeConfig,
