@@ -16,7 +16,7 @@ from transformers.utils.hub import cached_file
 from ..utils.import_utils import dynamically_import_QuantLinear
 from ..utils.modeling_utils import recurse_setattr
 from ._const import CPU, CUDA_0, EXLLAMA_DEFAULT_MAX_INPUT_LENGTH, SUPPORTED_MODELS
-
+from ..quantization import BaseQuantizeConfig
 
 logger = getLogger(__name__)
 handler = logging.StreamHandler()
@@ -145,16 +145,16 @@ def make_quant(
                 )
             new_layer.device = ori_layer_device
             recurse_setattr(module, name, new_layer.to(ori_layer_device))
-            
+
 def convert_gptq_v1_to_v2_format(
     model,
     quantize_config: BaseQuantizeConfig,
-    module: QuantLinear,
+    module,
 ):
     use_qigen = module.QUANT_TYPE == "qigen"
 
     for name, submodule in model.named_modules():
-        if isinstance(submodule, QuantLinear):
+        if isinstance(submodule, module):
             # if v2_format:
             if use_qigen:
                 submodule.zeros.data += 1
