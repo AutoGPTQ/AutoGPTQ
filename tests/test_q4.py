@@ -1,5 +1,9 @@
-import unittest
+import os
 
+max_threads = str(1)
+os.environ['OPENBLAS_NUM_THREADS'] = max_threads
+
+import unittest
 import torch
 from parameterized import parameterized
 
@@ -1067,6 +1071,7 @@ class TestsQ4Exllama(unittest.TestCase):
 
         linear_class = dynamically_import_QuantLinear(
             use_triton=False,
+            use_tritonv2=False,
             desc_act=False,
             group_size=group_size,
             bits=4,
@@ -1762,6 +1767,7 @@ class TestsQ4CUDA(unittest.TestCase):
 
         linear_class = dynamically_import_QuantLinear(
             use_triton=False,
+            use_tritonv2=False,
             desc_act=False,
             group_size=group_size,
             bits=4,
@@ -1908,7 +1914,7 @@ class TestsQ4ExllamaV2(unittest.TestCase):
         n = 1024
         device = torch.device("cuda:0")
 
-        linear_class = dynamically_import_QuantLinear(use_triton=False, desc_act=False, group_size=group_size, bits=4)
+        linear_class = dynamically_import_QuantLinear(use_triton=False, use_tritonv2=False, desc_act=False, group_size=group_size, bits=4)
 
         linear = linear_class(
             bits=4,

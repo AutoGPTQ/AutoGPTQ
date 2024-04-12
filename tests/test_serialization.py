@@ -10,7 +10,7 @@ from auto_gptq.quantization.config import QUANT_METHOD, BaseQuantizeConfig
 
 
 class TestSerialization(unittest.TestCase):
-    MODEL_ID = "habanoz/TinyLlama-1.1B-Chat-v0.3-GPTQ"
+    MODEL_ID = "LnL-AI/TinyLlama-1.1B-Chat-v1.0-GPTQ-4bit"
 
     def setUp(self):
         dummy_config = BaseQuantizeConfig(
@@ -32,7 +32,7 @@ class TestSerialization(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmpdir:
             model.save_pretrained(tmpdir)
 
-            self.assertTrue(os.path.isfile(os.path.join(tmpdir, "model.safetensors")))
+            self.assertTrue(os.path.isfile(os.path.join(tmpdir, "gptq_model-4bit-128g.safetensors")))
             model_cache_path, is_cached = model.quantize_config.get_cache_file_path()
             self.assertFalse(os.path.isfile(os.path.join(tmpdir, model_cache_path)))
 
@@ -68,3 +68,7 @@ class TestSerialization(unittest.TestCase):
 
         # Since we use a CUDA kernel to repack weights, the first load time is already small.
         self.assertTrue(second_load_time < first_load_time)
+
+    def test_gptq_v1_to_v2_runtime_convert(self):
+        model = AutoGPTQForCausalLM.from_quantized(self.MODEL_ID, device="cuda:0")
+        self.assertTrue(model.quantize_config.checkpoint_format == CHECKPOINT_FORMAT.GPTQ_V2)

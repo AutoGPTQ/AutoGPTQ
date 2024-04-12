@@ -32,7 +32,6 @@ from ..quantization.config import (
     QUANT_METHOD_FIELD,
     QUANTIZE_BLACK_LIST,
 )
-from ..utils.accelerate_utils import load_checkpoint_in_model
 from ..utils.data_utils import collate_data
 from ..utils.import_utils import (
     AUTOGPTQ_CUDA_AVAILABLE,
@@ -192,22 +191,17 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         if self.quantize_config.quant_method in QUANTIZE_BLACK_LIST:
             raise ValueError(f"Unsupported quantization operation for quant method: {self.quantize_config.quant_method}")
 
+        # TODO: need to isolate pack code that is causing this regression
         # alert users to limit threads so packing performance does not regress by up to ~100x
-        thread_warning = """If you have not already done so, please inject the following code at the very top of your 
-quantization script so the packing stage is optimized for speed. Using too many cores may reduce packing performance.
-----
-import os
-import math
-max_threads = str(min(8, os.cpu_count()))
-os.environ['OMP_NUM_THREADS'] = max_threads
-os.environ['OPENBLAS_NUM_THREADS'] = max_threads
-os.environ['MKL_NUM_THREADS'] = max_threads
-os.environ['VECLIB_MAXIMUM_THREADS'] = max_threads
-os.environ['NUMEXPR_NUM_THREADS'] = max_threads
-os.environ['NUMEXPR_MAX_THREADS'] = max_threads
-----
-"""
-        logger.warning(thread_warning)
+        if "OPENBLAS_NUM_THREADS" not in os.environ or int(os.environ["OPENBLAS_NUM_THREADS"]) > 8:
+            thread_warning = """If you have not already done so, please inject the following code at the very top of your 
+    quantization script so the packing stage is optimized for speed. Using too many cores may reduce packing performance.
+    ----
+    import os
+    os.environ['OPENBLAS_NUM_THREADS'] = str(1)
+    ----
+    """
+            logger.warning(thread_warning)
 
         if use_triton and not TRITON_AVAILABLE:
             logger.warning("triton is not installed, reset use_triton to False")
@@ -357,12 +351,19 @@ os.environ['NUMEXPR_MAX_THREADS'] = max_threads
 
                 for name in subset:
                     logger.info(f"Quantizing {name} in layer {i + 1}/{len(layers)}...")
-                    scale, zero, g_idx = gptq[name].fasterquant(
-                        percdamp=self.quantize_config.damp_percent,
-                        group_size=self.quantize_config.group_size,
-                        actorder=self.quantize_config.desc_act,
-                        static_groups=self.quantize_config.static_groups,
-                    )
+                    try:
+                        scale, zero, g_idx = gptq[name].fasterquant(
+                            percdamp=self.quantize_config.damp_percent,
+                            group_size=self.quantize_config.group_size,
+                            actorder=self.quantize_config.desc_act,
+                            static_groups=self.quantize_config.static_groups,
+                        )
+                    except torch._C._LinAlgError as e:
+                        if  "not positive-definite" in str(e).lower():
+                            logger.warning("Please increase damp or nsamples for calibration data to avoid the following quant error. "
+                                  "Ref: https://github.com/AutoGPTQ/AutoGPTQ/issues/572#issuecomment-2006686913")
+                        raise e
+
                     quantizers[f"{self.layers_block_name}.{i}.{name}"] = (
                         gptq[name].quantizer.to(CPU if force_layer_back_to_cpu else cur_layer_device),
                         move_to_device(scale, CPU if force_layer_back_to_cpu else cur_layer_device),
@@ -522,7 +523,6 @@ os.environ['NUMEXPR_MAX_THREADS'] = max_threads
     def save_quantized(
         self,
         save_dir: str,
-        use_safetensors: bool = True,
         safetensors_metadata: Optional[Dict[str, str]] = None,
     ):
         """save quantized model and configs to local disk"""
@@ -533,7 +533,7 @@ os.environ['NUMEXPR_MAX_THREADS'] = max_threads
 
         if self.quantize_config.checkpoint_format == CHECKPOINT_FORMAT.GPTQ_V2:
             logger.warning(
-                f"New checkpoint_format = {CHECKPOINT_FORMAT.GPTQ_V2} is enabled, the saved model is not supported by older versions of AutoGPTQ(<= 0.7.1).")
+                f"Using 'checkpoint_format = {CHECKPOINT_FORMAT.GPTQ_V2}': the saved model is only supported by AutoGPTQ version >= 0.8.0.")
 
         revert_model = None
         # compat: allow save to v1 format but warn deprecation
@@ -541,7 +541,7 @@ os.environ['NUMEXPR_MAX_THREADS'] = max_threads
             revert_model = self.model
             # deprecation
             logger.warning(
-                f"Deprecation: Old checkpoint_format = {CHECKPOINT_FORMAT.GPTQ} is enabled. Please use new {CHECKPOINT_FORMAT.GPTQ_V2} checkpoint format.")
+                f"Deprecation: old 'checkpoint_format = {CHECKPOINT_FORMAT.GPTQ}' is enabled. Please use new 'checkpoint_format = {CHECKPOINT_FORMAT.GPTQ_V2}'.")
 
             self.model = convert_gptq_v1_to_v2_format(
                 self.model,
@@ -556,58 +556,56 @@ os.environ['NUMEXPR_MAX_THREADS'] = max_threads
             self.quantize_config.model_file_base_name
             or f"gptq_model-{self.quantize_config.bits}bit-{self.quantize_config.group_size}g"
         )
-        if use_safetensors:
-            model_save_name = model_base_name + ".safetensors"
-            state_dict = self.model.state_dict()
-            state_dict = {k: v.clone().contiguous() for k, v in state_dict.items()}
-            if safetensors_metadata is None:
-                safetensors_metadata = {}
-            elif not isinstance(safetensors_metadata, dict):
-                raise TypeError("safetensors_metadata must be a dictionary.")
-            else:
-                logger.debug(f"Received safetensors_metadata: {safetensors_metadata}")
-                new_safetensors_metadata = {}
-                converted_keys = False
-                for key, value in safetensors_metadata.items():
-                    if not isinstance(key, str) or not isinstance(value, str):
-                        converted_keys = True
-                        try:
-                            new_key = str(key)
-                            new_value = str(value)
-                        except Exception as e:
-                            raise TypeError(
-                                f"safetensors_metadata: both keys and values must be strings and an error occured when trying to convert them: {e}"
-                            )
-                        if new_key in new_safetensors_metadata:
-                            logger.warning(
-                                f"After converting safetensors_metadata keys to strings, the key '{new_key}' is duplicated. Ensure that all your metadata keys are strings to avoid overwriting."
-                            )
-                        new_safetensors_metadata[new_key] = new_value
-                safetensors_metadata = new_safetensors_metadata
-                if converted_keys:
-                    logger.debug(
-                        f"One or more safetensors_metadata keys or values had to be converted to str(). Final safetensors_metadata: {safetensors_metadata}"
-                    )
 
-            # Format is required to enable Accelerate to load the metadata
-            # otherwise it raises an OSError
-            safetensors_metadata["format"] = "pt"
-
-            # Store the quantization configuration as safetensors metadata
-            from auto_gptq import __version__
-
-            safetensors_metadata["auto_gptq_version"] = str(__version__)
-            safetensors_metadata["gptq_bits"] = str(self.quantize_config.bits)
-            safetensors_metadata["gptq_group_size"] = str(self.quantize_config.group_size)
-            safetensors_metadata["gptq_desc_act"] = str(self.quantize_config.desc_act)
-            safetensors_metadata["gptq_damp_percent"] = str(self.quantize_config.damp_percent)
-            safetensors_metadata["gptq_" + CHECKPOINT_FORMAT_FIELD] = self.quantize_config.checkpoint_format
-            safetensors_metadata["gptq_" + QUANT_METHOD_FIELD] = self.quantize_config.quant_method
-
-            safe_save(state_dict, join(save_dir, model_save_name), safetensors_metadata)
+        model_save_name = model_base_name + ".safetensors"
+        state_dict = self.model.state_dict()
+        state_dict = {k: v.clone().contiguous() for k, v in state_dict.items()}
+        if safetensors_metadata is None:
+            safetensors_metadata = {}
+        elif not isinstance(safetensors_metadata, dict):
+            raise TypeError("safetensors_metadata must be a dictionary.")
         else:
-            model_save_name = model_base_name + ".bin"
-            torch.save(self.model.state_dict(), join(save_dir, model_save_name))
+            logger.debug(f"Received safetensors_metadata: {safetensors_metadata}")
+            new_safetensors_metadata = {}
+            converted_keys = False
+            for key, value in safetensors_metadata.items():
+                if not isinstance(key, str) or not isinstance(value, str):
+                    converted_keys = True
+                    try:
+                        new_key = str(key)
+                        new_value = str(value)
+                    except Exception as e:
+                        raise TypeError(
+                            f"safetensors_metadata: both keys and values must be strings and an error occured when trying to convert them: {e}"
+                        )
+                    if new_key in new_safetensors_metadata:
+                        logger.warning(
+                            f"After converting safetensors_metadata keys to strings, the key '{new_key}' is duplicated. Ensure that all your metadata keys are strings to avoid overwriting."
+                        )
+                    new_safetensors_metadata[new_key] = new_value
+            safetensors_metadata = new_safetensors_metadata
+            if converted_keys:
+                logger.debug(
+                    f"One or more safetensors_metadata keys or values had to be converted to str(). Final safetensors_metadata: {safetensors_metadata}"
+                )
+
+        # Format is required to enable Accelerate to load the metadata
+        # otherwise it raises an OSError
+        safetensors_metadata["format"] = "pt"
+
+        # Store the quantization configuration as safetensors metadata
+        from auto_gptq import __version__
+
+        safetensors_metadata["auto_gptq_version"] = str(__version__)
+        safetensors_metadata["gptq_bits"] = str(self.quantize_config.bits)
+        safetensors_metadata["gptq_group_size"] = str(self.quantize_config.group_size)
+        safetensors_metadata["gptq_desc_act"] = str(self.quantize_config.desc_act)
+        safetensors_metadata["gptq_damp_percent"] = str(self.quantize_config.damp_percent)
+        safetensors_metadata["gptq_" + CHECKPOINT_FORMAT_FIELD] = self.quantize_config.checkpoint_format
+        safetensors_metadata["gptq_" + QUANT_METHOD_FIELD] = self.quantize_config.quant_method
+
+        safe_save(state_dict, join(save_dir, model_save_name), safetensors_metadata)
+
 
         self.model.config.quantization_config = self.quantize_config.to_dict()
         self.model.config.save_pretrained(save_dir)
@@ -622,13 +620,12 @@ os.environ['NUMEXPR_MAX_THREADS'] = max_threads
     def save_pretrained(
         self,
         save_dir: str,
-        use_safetensors: bool = True,
         safetensors_metadata: Optional[Dict[str, str]] = None,
         **kwargs,
     ):
         """alias of save_quantized"""
         logger.warning("you are using save_pretrained, which will re-direct to save_quantized.")
-        self.save_quantized(save_dir, use_safetensors, safetensors_metadata)
+        self.save_quantized(save_dir, safetensors_metadata)
 
     @classmethod
     def from_pretrained(
@@ -1158,7 +1155,7 @@ os.environ['NUMEXPR_MAX_THREADS'] = max_threads
                     inject_fused_attention = False
                     inject_fused_mlp = False
 
-            load_checkpoint_in_model(
+            accelerate.utils.modeling.load_checkpoint_in_model(
                 model,
                 dtype=torch_dtype,  # This is very hacky but works due to https://github.com/huggingface/accelerate/blob/bd72a5f1a80d5146554458823f8aeda0a9db5297/src/accelerate/utils/modeling.py#L292
                 checkpoint=model_save_name,
@@ -1228,7 +1225,7 @@ os.environ['NUMEXPR_MAX_THREADS'] = max_threads
             use_marlin=use_marlin,
         )
 
-        # compat: dynamically convert checkpoint gptq(v1) to gptq_v2 format with sym=False fix
+        # compat: runtime convert checkpoint gptq(v1) to gptq_v2 format
         if quantize_config.checkpoint_format == CHECKPOINT_FORMAT.GPTQ:
             model = convert_gptq_v1_to_v2_format(
                 model,

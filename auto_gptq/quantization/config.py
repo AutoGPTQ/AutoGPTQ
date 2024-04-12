@@ -117,7 +117,11 @@ class BaseQuantizeConfig(PushToHubMixin):
 
         field_names = [field.name for field in fields(cls)]
 
-        normalized = {QUANT_METHOD_FIELD: QUANT_METHOD.GPTQ, CHECKPOINT_FORMAT_FIELD: checkpoint_format if checkpoint_format else CHECKPOINT_FORMAT.GPTQ_V2}
+        normalized = {
+            QUANT_METHOD_FIELD: QUANT_METHOD.GPTQ,
+            # compat: default to gptq(v1) when loading models
+            CHECKPOINT_FORMAT_FIELD: checkpoint_format if checkpoint_format else CHECKPOINT_FORMAT.GPTQ
+        }
         for key, val in quantize_cfg.items():
             key = key.lower()
 

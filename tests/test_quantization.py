@@ -1,13 +1,8 @@
 import os
 import math
 
-max_threads = str(min(8, os.cpu_count()))
-os.environ['OMP_NUM_THREADS'] = max_threads
+max_threads = str(1)
 os.environ['OPENBLAS_NUM_THREADS'] = max_threads
-os.environ['MKL_NUM_THREADS'] = max_threads
-os.environ['VECLIB_MAXIMUM_THREADS'] = max_threads
-os.environ['NUMEXPR_NUM_THREADS'] = max_threads
-os.environ['NUMEXPR_MAX_THREADS'] = max_threads
 
 import tempfile
 import unittest
@@ -23,7 +18,7 @@ from auto_gptq.quantization import CHECKPOINT_FORMAT, QUANT_CONFIG_FILENAME, Bas
 class TestQuantization(unittest.TestCase):
     @parameterized.expand([(False,), (True,)])
     def test_quantize(self, use_marlin: bool):
-        pretrained_model_dir = "saibo/llama-1B"
+        pretrained_model_dir = "TinyLlama/TinyLlama-1.1B-intermediate-step-1431k-3T"
 
         tokenizer = AutoTokenizer.from_pretrained(pretrained_model_dir, use_fast=True)
         examples = [
@@ -61,6 +56,7 @@ class TestQuantization(unittest.TestCase):
             compat_quantize_config = {
                 "bits": 4,
                 "group_size": 128,
+                "sym": True,
                 "desc_act": False,
                 "is_marlin_format": use_marlin,
             }
@@ -76,6 +72,7 @@ class TestQuantization(unittest.TestCase):
             compat_quantize_config = {
                 "bits": 4,
                 "group_size": 128,
+                "sym": True,
                 "desc_act": False,
             }
             model = AutoGPTQForCausalLM.from_quantized(tmpdirname, device="cuda:0",
