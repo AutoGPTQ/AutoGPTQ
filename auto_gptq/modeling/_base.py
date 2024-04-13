@@ -5,6 +5,7 @@ from os.path import isdir, join
 from typing import Dict, List, Optional, Union
 
 import accelerate
+from tabulate import tabulate
 import torch
 import torch.nn as nn
 import transformers
@@ -299,6 +300,10 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         if not self.quantize_config.true_sequential:
             inside_layer_modules = [sum(inside_layer_modules, [])]
         quantizers = {}
+
+        # stores all per-layer quant stats such as avg loss and processing time
+        quant_log = []
+
         for i in range(len(layers)):
             logger.info(f"Start quantizing layer {i + 1}/{len(layers)}")
             layer = layers[i]
@@ -351,13 +356,18 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
 
                 for name in subset:
                     logger.info(f"Quantizing {name} in layer {i + 1}/{len(layers)}...")
+
                     try:
-                        scale, zero, g_idx = gptq[name].fasterquant(
+                        scale, zero, g_idx, duration, avg_loss = gptq[name].fasterquant(
                             percdamp=self.quantize_config.damp_percent,
                             group_size=self.quantize_config.group_size,
                             actorder=self.quantize_config.desc_act,
                             static_groups=self.quantize_config.static_groups,
                         )
+
+                        quant_log.append({"layer": i+1, "name": name, "avg_loss": avg_loss, "time": duration})
+                        logger.info("\n"+tabulate(quant_log[-1:], headers='keys', tablefmt='pipe', floatfmt=".6f"))
+
                     except torch._C._LinAlgError as e:
                         if  "not positive-definite" in str(e).lower():
                             logger.warning("Please increase damp or nsamples for calibration data to avoid the following quant error. "
@@ -397,6 +407,8 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             layer_inputs, layer_outputs = layer_outputs, []  # TODO: is it really OK to cache only the first positional argument?
             torch.cuda.empty_cache()
 
+        logger.info("Quant summary:\n" + tabulate(quant_log, headers='keys', tablefmt='pipe', floatfmt=".6f"))
+
         self.qlinear_kernel = pack_model(
             model=self.model,
             quantizers=quantizers,
@@ -417,6 +429,8 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         self._quantized = True
 
         torch.cuda.empty_cache()
+
+        return quant_log
 
     @property
     def device(self):
