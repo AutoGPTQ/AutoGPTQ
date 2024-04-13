@@ -2,10 +2,12 @@ import copy
 import logging
 import os
 from os.path import isdir, join
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Optional, Union, Any
 
 import accelerate
 from tabulate import tabulate
+from termcolor import colored
+
 import torch
 import torch.nn as nn
 import transformers
@@ -185,6 +187,8 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         use_cuda_fp16: bool = True,
         autotune_warmup_after_quantized: bool = False,
         cache_examples_on_gpu: bool = True,
+        # pass in saved logs from previous quantize() to generate diff in metrics
+        quant_log: List[Dict] = None,
     ):
         if self.quantized:
             raise EnvironmentError("can't execute quantize because the model is quantized.")
@@ -302,7 +306,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         quantizers = {}
 
         # stores all per-layer quant stats such as avg loss and processing time
-        quant_log = []
+        _quant_log = []
 
         for i in range(len(layers)):
             logger.info(f"Start quantizing layer {i + 1}/{len(layers)}")
@@ -365,8 +369,28 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                             static_groups=self.quantize_config.static_groups,
                         )
 
-                        quant_log.append({"layer": i+1, "name": name, "avg_loss": avg_loss, "time": duration})
-                        logger.info("\n"+tabulate(quant_log[-1:], headers='keys', tablefmt='pipe', floatfmt=".6f"))
+                        stat = {"layer": i + 1, "name": name, "avg_loss": avg_loss, "time": duration}
+
+                        # generate metric diff
+                        if quant_log is not None:
+                            matched_row = next((
+                                row for row in quant_log if row.get("layer") == i+1 and row.get("name") == name
+                            ), None)
+
+                            if matched_row is not None:
+                                matched_avg_loss = matched_row.get("avg_loss")
+                                matched_time = matched_row.get("time")
+
+                                if matched_avg_loss is not None:
+                                    diff = stat["avg_loss"] - matched_avg_loss
+                                    stat["diff_avg_loss"] = colored(diff, 'red' if diff > 0 else 'green')
+
+                                if matched_time is not None:
+                                    diff =  stat["time"] - matched_time
+                                    stat["diff_time"] = colored(diff, 'red' if diff > 0 else 'green')
+
+                        _quant_log.append(stat)
+                        logger.info("\n" + tabulate(_quant_log[-1:], headers="keys", tablefmt='grid', floatfmt=".6f"))
 
                     except torch._C._LinAlgError as e:
                         if  "not positive-definite" in str(e).lower():
@@ -407,7 +431,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             layer_inputs, layer_outputs = layer_outputs, []  # TODO: is it really OK to cache only the first positional argument?
             torch.cuda.empty_cache()
 
-        logger.info("Quant summary:\n" + tabulate(quant_log, headers='keys', tablefmt='pipe', floatfmt=".6f"))
+        logger.info("Quant summary:\n" + tabulate(_quant_log, headers="keys", tablefmt='grid', floatfmt=".6f"))
 
         self.qlinear_kernel = pack_model(
             model=self.model,
@@ -430,7 +454,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
 
         torch.cuda.empty_cache()
 
-        return quant_log
+        return _quant_log
 
     @property
     def device(self):
