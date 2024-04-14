@@ -106,7 +106,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         injected_fused_attention: bool = False,
         injected_fused_mlp: bool = False,
         trainable: bool = False,
-        qlinear_kernel: str = None
+        qlinear_kernel: nn.Module = None
     ):
         super().__init__()
 
@@ -121,8 +121,8 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         self.injected_fused_mlp = injected_fused_mlp
         self.trainable = trainable
 
-        # compat: internal state to assist gptq(v1) to gptq(v2) conversion
-        self.qlinear_kernel: nn.Module = qlinear_kernel
+        # compat: state to assist in checkpoint_format gptq(v1) to gptq_v2 conversion
+        self.qlinear_kernel = qlinear_kernel
 
     @property
     def quantized(self):
