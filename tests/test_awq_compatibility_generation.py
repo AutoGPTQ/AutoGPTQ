@@ -207,6 +207,8 @@ class TestAwqCompatibility(unittest.TestCase):
         )
 
         awq_output = tokenizer.decode(awq_output[0])
+        print(f"AWQ output: {awq_output}")
+        print(f"AutoGPTQ output: {autogptq_output}")
 
         self.assertTrue(awq_output == autogptq_output)
 
@@ -249,5 +251,7 @@ class TestAwqCompatibility(unittest.TestCase):
         )
 
         awq_output = tokenizer.decode(awq_output[0])
+        print(f"AWQ output: {awq_output}")
+        print(f"AutoGPTQ output: {autogptq_output}")
 
         self.assertTrue(awq_output == autogptq_output)

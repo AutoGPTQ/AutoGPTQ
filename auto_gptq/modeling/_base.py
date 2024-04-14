@@ -1267,6 +1267,8 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
 
         # compat: runtime convert checkpoint gptq(v1) to gptq_v2 format
         if quantize_config.checkpoint_format == CHECKPOINT_FORMAT.GPTQ:
+            logger.info(f"Compat: runtime converting `checkpoint_format` from `{CHECKPOINT_FORMAT.GPTQ}` "
+                           f"to `{CHECKPOINT_FORMAT.GPTQ_V2}`")
             model = convert_gptq_v1_to_v2_format(
                 model,
                 v2_format=True,
