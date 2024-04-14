@@ -236,7 +236,7 @@ class BaseQuantizeConfig(PushToHubMixin):
         use_quant_method = quant_method if quant_method else self.quant_method
         use_checkpoint_format = checkpoint_format if checkpoint_format else self.checkpoint_format
 
-        cache_file_name = f"autogptq_model_{use_quant_method}_{use_checkpoint_format}.safetensors"
+        cache_file_name = f"autogptq_model_v2_{use_quant_method}_{use_checkpoint_format}.safetensors"
 
         if os.path.isdir(self.model_name_or_path):
             cache_file_name = os.path.join(self.model_name_or_path, cache_file_name)

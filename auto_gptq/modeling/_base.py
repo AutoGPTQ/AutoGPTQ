@@ -1172,12 +1172,12 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                     disable_exllama=disable_exllama,
                     disable_exllamav2=disable_exllamav2,
                     use_marlin=False,
-                    use_tritonv2=use_tritonv2,  # Get the "original" QuantLienar class
+                    use_tritonv2=use_tritonv2,  # Get the "original" QuantLinear class
                 )
 
                 # Prepare model for marlin load.
-                #   If stub is marlin serialzed         --> load from directly
-                #   If stub has cached marlin version   --> load from the cached versin
+                #   If stub is marlin serialized         --> load from directly
+                #   If stub has cached marlin version   --> load from the cached version
                 #   Otherwise                           --> convert to marlin, cache, load from cache
                 model, model_save_name = prepare_model_for_marlin_load(
                     model=model,
