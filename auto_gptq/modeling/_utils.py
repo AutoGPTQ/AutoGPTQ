@@ -13,10 +13,11 @@ from tqdm import tqdm
 from transformers import AutoConfig
 from transformers.utils.hub import cached_file
 
+from ..quantization import BaseQuantizeConfig
 from ..utils.import_utils import dynamically_import_QuantLinear
 from ..utils.modeling_utils import recurse_setattr
 from ._const import CPU, CUDA_0, EXLLAMA_DEFAULT_MAX_INPUT_LENGTH, SUPPORTED_MODELS
-from ..quantization import BaseQuantizeConfig
+
 
 logger = getLogger(__name__)
 handler = logging.StreamHandler()

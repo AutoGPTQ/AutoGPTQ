@@ -2,12 +2,9 @@ import copy
 import logging
 import os
 from os.path import isdir, join
-from typing import Dict, List, Optional, Union, Any
+from typing import Dict, List, Optional, Union
 
 import accelerate
-from tabulate import tabulate
-from termcolor import colored
-
 import torch
 import torch.nn as nn
 import transformers
@@ -15,6 +12,8 @@ from accelerate.hooks import remove_hook_from_module
 from safetensors import safe_open
 from safetensors.torch import load_file as safe_load
 from safetensors.torch import save_file as safe_save
+from tabulate import tabulate
+from termcolor import colored
 from tqdm import tqdm
 from transformers import AutoConfig, AutoModelForCausalLM, PreTrainedModel
 from transformers.modeling_utils import no_init_weights
@@ -53,6 +52,7 @@ from ..utils.marlin_utils import (
 from ._const import CPU, CUDA_0, SUPPORTED_MODELS
 from ._utils import (
     autogptq_post_init,
+    convert_gptq_v1_to_v2_format,
     find_layers,
     get_checkpoints,
     get_device,
@@ -66,7 +66,6 @@ from ._utils import (
     preprocess_checkpoint_qigen,
     simple_dispatch_model,
     unpack_awq,
-    convert_gptq_v1_to_v2_format,
 )
 
 
@@ -199,7 +198,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         # TODO: need to isolate pack code that is causing this regression
         # alert users to limit threads so packing performance does not regress by up to ~100x
         if "OPENBLAS_NUM_THREADS" not in os.environ or int(os.environ["OPENBLAS_NUM_THREADS"]) > 8:
-            thread_warning = """If you have not already done so, please inject the following code at the very top of your 
+            thread_warning = """If you have not already done so, please inject the following code at the very top of your
     quantization script so the packing stage is optimized for speed. Using too many cores may reduce packing performance.
     ----
     import os
