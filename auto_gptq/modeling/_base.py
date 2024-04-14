@@ -930,6 +930,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         if use_safetensors:
             extensions.append(".safetensors")
         else:
+            logger.warning("Deprecation: Loading of non-safetensor weights will be removed in the future. Please convert your weights to safetensor format. ")
             extensions += [".bin", ".pt"]
 
         model_name_or_path = str(model_name_or_path)
