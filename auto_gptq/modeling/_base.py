@@ -308,8 +308,10 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         # stores all per-layer quant stats such as avg loss and processing time
         _quant_log = []
 
-        for i in range(len(layers)):
-            logger.info(f"Start quantizing layer {i + 1}/{len(layers)}")
+        layer_count = len(layers)
+        layer_pb = tqdm(range(layer_count))
+        for i in layer_pb:
+            layer_pb.set_description(f"Quantizing layer {i + 1} of {layer_count}")
             layer = layers[i]
             force_layer_back_to_cpu = False
             if get_device(layer) == CPU:
@@ -359,7 +361,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                     h.remove()
 
                 for name in subset:
-                    logger.info(f"Quantizing {name} in layer {i + 1}/{len(layers)}...")
+                    layer_pb.set_description(f"Quantizing {name} in layer {i + 1} of {layer_count}")
 
                     try:
                         scale, zero, g_idx, duration, avg_loss = gptq[name].fasterquant(
@@ -1108,7 +1110,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                         i = 0
                         for gptq_layer_name in pbar:
                             i += 1
-                            desc = f"Unpacking {gptq_layer_name} + '...'"
+                            desc = f"Unpacking {gptq_layer_name}"
                             desc = desc + " " * (max_layer_name_length - len(desc))
 
                             awq_qweight = f.get_tensor(gptq_layer_name + ".qweight")
@@ -1125,7 +1127,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                             )
 
                             # TODO: add FAST repacking, this is too slow.
-                            desc = f"Repacking {gptq_layer_name}..."
+                            desc = f"Repacking {gptq_layer_name}"
                             desc = desc + " " * (max_layer_name_length + 12 - len(desc))
                             pbar.set_description(desc)
                             gptq_qweight, gptq_qzeros = pack_from_tensors(
