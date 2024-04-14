@@ -67,7 +67,7 @@ class TestQuantization(unittest.TestCase):
             del model
             torch.cuda.empty_cache()
 
-            # test checkinpoint_format hint to from_quantized()
+            # test checkpoint_format hint to from_quantized()
             os.remove(f"{tmpdirname}/{QUANT_CONFIG_FILENAME}")
 
             compat_quantize_config = {
