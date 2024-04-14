@@ -76,7 +76,6 @@ def dequant_kernel_248(
     zeros = zeros & maxq
 
     # Dequantize
-    zeros = zeros + 1
     weights = weights - zeros
     weights = weights.to(tl.float32)
     weights = scales * weights
