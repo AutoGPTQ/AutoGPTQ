@@ -16,8 +16,8 @@ from auto_gptq.quantization import CHECKPOINT_FORMAT, QUANT_CONFIG_FILENAME, Bas
 
 
 class TestQuantization(unittest.TestCase):
-    @parameterized.expand([(False,), (True,)])
-    def test_quantize(self, use_marlin: bool):
+    @parameterized.expand([(False, True), (False, False), (True, True)])
+    def test_quantize(self, use_marlin: bool, sym: bool):
         pretrained_model_dir = "TinyLlama/TinyLlama-1.1B-intermediate-step-1431k-3T"
 
         tokenizer = AutoTokenizer.from_pretrained(pretrained_model_dir, use_fast=True)
@@ -34,6 +34,7 @@ class TestQuantization(unittest.TestCase):
             bits=4,
             group_size=128,
             desc_act=False,
+            sym=sym,
             checkpoint_format=CHECKPOINT_FORMAT.MARLIN if use_marlin else CHECKPOINT_FORMAT.GPTQ,
         )
 
@@ -56,7 +57,7 @@ class TestQuantization(unittest.TestCase):
             compat_quantize_config = {
                 "bits": 4,
                 "group_size": 128,
-                "sym": True,
+                "sym": sym,
                 "desc_act": False,
                 "is_marlin_format": use_marlin,
             }
@@ -72,7 +73,7 @@ class TestQuantization(unittest.TestCase):
             compat_quantize_config = {
                 "bits": 4,
                 "group_size": 128,
-                "sym": True,
+                "sym": sym,
                 "desc_act": False,
             }
             model = AutoGPTQForCausalLM.from_quantized(tmpdirname, device="cuda:0",
