@@ -1164,7 +1164,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                     )
 
                 # Load the quant linear type we need.
-                # TODO: load directy marlin with the right quantlinear class.
+                # TODO: load marlin directly with the right quantlinear class.
                 quant_linear_class = dynamically_import_QuantLinear(
                     use_triton=use_triton,
                     desc_act=quantize_config.desc_act,
