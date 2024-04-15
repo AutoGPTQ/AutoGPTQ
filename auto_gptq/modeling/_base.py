@@ -12,8 +12,6 @@ from accelerate.hooks import remove_hook_from_module
 from safetensors import safe_open
 from safetensors.torch import load_file as safe_load
 from safetensors.torch import save_file as safe_save
-from tabulate import tabulate
-from termcolor import colored
 from tqdm import tqdm
 from transformers import AutoConfig, AutoModelForCausalLM, PreTrainedModel
 from transformers.modeling_utils import no_init_weights
@@ -49,10 +47,12 @@ from ..utils.marlin_utils import (
     _validate_marlin_device_support,
     prepare_model_for_marlin_load,
 )
+from ..version import __version__
 from ._const import CPU, CUDA_0, SUPPORTED_MODELS
 from ._utils import (
     autogptq_post_init,
     convert_gptq_v1_to_v2_format,
+    convert_gptq_v2_to_v1_format,
     find_layers,
     get_checkpoints,
     get_device,
@@ -186,8 +186,6 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         use_cuda_fp16: bool = True,
         autotune_warmup_after_quantized: bool = False,
         cache_examples_on_gpu: bool = True,
-        # pass in saved logs from previous quantize() to generate diff in metrics
-        quant_log: List[Dict] = None,
     ):
         if self.quantized:
             raise EnvironmentError("can't execute quantize because the model is quantized.")
@@ -305,7 +303,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         quantizers = {}
 
         # stores all per-layer quant stats such as avg loss and processing time
-        _quant_log = []
+        quant_log = []
 
         layer_count = len(layers)
         layer_pb = tqdm(range(layer_count))
@@ -370,28 +368,10 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                             static_groups=self.quantize_config.static_groups,
                         )
 
-                        stat = {"layer": i + 1, "module": name, "avg_loss": avg_loss, "time": duration}
+                        stat = {"layer": i, "module": name, "avg_loss": avg_loss, "time": duration}
 
-                        # generate metric diff
-                        if quant_log is not None:
-                            matched_row = next((
-                                row for row in quant_log if row.get("layer") == i+1 and row.get("module") == name
-                            ), None)
-
-                            if matched_row is not None:
-                                matched_avg_loss = matched_row.get("avg_loss")
-                                matched_time = matched_row.get("time")
-
-                                if matched_avg_loss is not None:
-                                    diff = stat["avg_loss"] - matched_avg_loss
-                                    stat["diff_avg_loss"] = colored(diff, 'red' if diff > 0 else 'green')
-
-                                if matched_time is not None:
-                                    diff =  stat["time"] - matched_time
-                                    stat["diff_time"] = colored(diff, 'red' if diff > 0 else 'green')
-
-                        _quant_log.append(stat)
-                        logger.info("\n" + tabulate(_quant_log[-1:], headers="keys", tablefmt='grid', floatfmt=".6f"))
+                        quant_log.append(stat)
+                        logger.info(stat)
 
                     except torch._C._LinAlgError as e:
                         if  "not positive-definite" in str(e).lower():
@@ -432,7 +412,9 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             layer_inputs, layer_outputs = layer_outputs, []  # TODO: is it really OK to cache only the first positional argument?
             torch.cuda.empty_cache()
 
-        logger.info("Quant summary:\n" + tabulate(_quant_log, headers="keys", tablefmt='grid', floatfmt=".6f"))
+        logger.info("Quantization summary:\n" + quant_log)
+        for module_log in quant_log:
+            logger.info(module_log)
 
         self.qlinear_kernel = pack_model(
             model=self.model,
@@ -455,7 +437,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
 
         torch.cuda.empty_cache()
 
-        return _quant_log
+        return quant_log
 
     @property
     def device(self):
@@ -563,108 +545,127 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         self,
         save_dir: str,
         safetensors_metadata: Optional[Dict[str, str]] = None,
+        checkpoint_format: Optional[str] = None,
+        use_safetensors: bool = True,
     ):
         """save quantized model and configs to local disk"""
         os.makedirs(save_dir, exist_ok=True)
 
+        # The config, quantize_config and model may be edited in place in save_quantized.
+        config = copy.deepcopy(self.model.config)
+        quantize_config = copy.deepcopy(self.quantize_config)
+        model = self.model
+
         if not self.quantized:
             raise EnvironmentError("can only save quantized model, please execute .quantize first.")
 
-        if self.quantize_config.checkpoint_format == CHECKPOINT_FORMAT.GPTQ_V2:
+        if checkpoint_format == CHECKPOINT_FORMAT.GPTQ_V2 or (checkpoint_format is None and quantize_config.checkpoint_format ==CHECKPOINT_FORMAT.GPTQ_V2):
             logger.warning(
-                f"Using 'checkpoint_format = {CHECKPOINT_FORMAT.GPTQ_V2}': the saved model is only supported by AutoGPTQ version >= 0.8.0.")
-
-        revert_model = None
-        # compat: allow save to v1 format but warn deprecation
-        if self.quantize_config.checkpoint_format == CHECKPOINT_FORMAT.GPTQ:
-            revert_model = self.model
-            # deprecation
-            logger.warning(
-                f"Deprecation: old 'checkpoint_format = {CHECKPOINT_FORMAT.GPTQ}' is enabled. Please use new 'checkpoint_format = {CHECKPOINT_FORMAT.GPTQ_V2}'.")
-
-            self.model = convert_gptq_v1_to_v2_format(
-                self.model,
-                v2_format=False,
-                quantize_config=self.quantize_config,
-                qlinear_kernel=self.qlinear_kernel
+                f"Using 'checkpoint_format = {CHECKPOINT_FORMAT.GPTQ_V2}': the serialized model is only supported by AutoGPTQ version >= 0.8.0."
             )
 
-        self.model.to(CPU)
+        if checkpoint_format is not None and quantize_config.checkpoint_format != checkpoint_format:
+            # Model qzeros may be edited in place.
+            # TODO: avoid inplace modification of the weights
+            model = copy.deepcopy(self.model)
 
-        model_base_name = (
-            self.quantize_config.model_file_base_name
-            or f"gptq_model-{self.quantize_config.bits}bit-{self.quantize_config.group_size}g"
-        )
+            if checkpoint_format == CHECKPOINT_FORMAT.GPTQ_V2:
+                if quantize_config.checkpoint_format != CHECKPOINT_FORMAT.GPTQ:
+                    raise NotImplementedError(f"Asked to serialiez a model with `checkpoint_format={checkpoint_format}` but the model format is {quantize_config.checkpoint_format}. This is not supported. Please open an issue at https://github.com/AutoGPTQ/AutoGPTQ/issues.")
 
-        model_save_name = model_base_name + ".safetensors"
-        state_dict = self.model.state_dict()
-        state_dict = {k: v.clone().contiguous() for k, v in state_dict.items()}
-        if safetensors_metadata is None:
-            safetensors_metadata = {}
-        elif not isinstance(safetensors_metadata, dict):
-            raise TypeError("safetensors_metadata must be a dictionary.")
-        else:
-            logger.debug(f"Received safetensors_metadata: {safetensors_metadata}")
-            new_safetensors_metadata = {}
-            converted_keys = False
-            for key, value in safetensors_metadata.items():
-                if not isinstance(key, str) or not isinstance(value, str):
-                    converted_keys = True
-                    try:
-                        new_key = str(key)
-                        new_value = str(value)
-                    except Exception as e:
-                        raise TypeError(
-                            f"safetensors_metadata: both keys and values must be strings and an error occured when trying to convert them: {e}"
-                        )
-                    if new_key in new_safetensors_metadata:
-                        logger.warning(
-                            f"After converting safetensors_metadata keys to strings, the key '{new_key}' is duplicated. Ensure that all your metadata keys are strings to avoid overwriting."
-                        )
-                    new_safetensors_metadata[new_key] = new_value
-            safetensors_metadata = new_safetensors_metadata
-            if converted_keys:
-                logger.debug(
-                    f"One or more safetensors_metadata keys or values had to be converted to str(). Final safetensors_metadata: {safetensors_metadata}"
+                model = convert_gptq_v1_to_v2_format(
+                    model,
+                    quantize_config=quantize_config,
+                    qlinear_kernel=self.qlinear_kernel,
                 )
 
-        # Format is required to enable Accelerate to load the metadata
-        # otherwise it raises an OSError
-        safetensors_metadata["format"] = "pt"
+                quantize_config.checkpoint_format = CHECKPOINT_FORMAT.GPTQ_V2
+            elif checkpoint_format == CHECKPOINT_FORMAT.GPTQ:
+                if quantize_config.checkpoint_format != CHECKPOINT_FORMAT.GPTQ_V2:
+                    raise NotImplementedError(f"Asked to serialiez a model with `checkpoint_format={checkpoint_format}` but the model format is {quantize_config.checkpoint_format}. This is not supported. Please open an issue at https://github.com/AutoGPTQ/AutoGPTQ/issues.")
 
-        # Store the quantization configuration as safetensors metadata
-        from auto_gptq import __version__
+                model = convert_gptq_v2_to_v1_format(
+                    model,
+                    quantize_config=quantize_config,
+                    qlinear_kernel=self.qlinear_kernel
+                )
 
-        safetensors_metadata["auto_gptq_version"] = str(__version__)
-        safetensors_metadata["gptq_bits"] = str(self.quantize_config.bits)
-        safetensors_metadata["gptq_group_size"] = str(self.quantize_config.group_size)
-        safetensors_metadata["gptq_desc_act"] = str(self.quantize_config.desc_act)
-        safetensors_metadata["gptq_damp_percent"] = str(self.quantize_config.damp_percent)
-        safetensors_metadata["gptq_" + CHECKPOINT_FORMAT_FIELD] = self.quantize_config.checkpoint_format
-        safetensors_metadata["gptq_" + QUANT_METHOD_FIELD] = self.quantize_config.quant_method
+                quantize_config.checkpoint_format = CHECKPOINT_FORMAT.GPTQ
 
-        safe_save(state_dict, join(save_dir, model_save_name), safetensors_metadata)
+        model.to(CPU)
 
+        if quantize_config.model_file_base_name is None:
+            if use_safetensors:
+                model_base_name = "model"
+            else:
+                model_base_name = "pytorch_model"
+        else:
+            model_base_name = quantize_config.model_file_base_name
 
-        self.model.config.quantization_config = self.quantize_config.to_dict()
-        self.model.config.save_pretrained(save_dir)
-        self.quantize_config.save_pretrained(save_dir)
-        self.quantize_config.model_name_or_path = save_dir
-        self.quantize_config.model_file_base_name = model_base_name
+        if use_safetensors:
+            model_save_name = model_base_name + ".safetensors"
+            state_dict = model.state_dict()
+            state_dict = {k: v.clone().contiguous() for k, v in state_dict.items()}
+            if safetensors_metadata is None:
+                safetensors_metadata = {}
+            elif not isinstance(safetensors_metadata, dict):
+                raise TypeError("safetensors_metadata must be a dictionary.")
+            else:
+                logger.debug(f"Received safetensors_metadata: {safetensors_metadata}")
+                new_safetensors_metadata = {}
+                converted_keys = False
+                for key, value in safetensors_metadata.items():
+                    if not isinstance(key, str) or not isinstance(value, str):
+                        converted_keys = True
+                        try:
+                            new_key = str(key)
+                            new_value = str(value)
+                        except Exception as e:
+                            raise TypeError(
+                                f"safetensors_metadata: both keys and values must be strings and an error occured when trying to convert them: {e}"
+                            )
+                        if new_key in new_safetensors_metadata:
+                            logger.warning(
+                                f"After converting safetensors_metadata keys to strings, the key '{new_key}' is duplicated. Ensure that all your metadata keys are strings to avoid overwriting."
+                            )
+                        new_safetensors_metadata[new_key] = new_value
+                safetensors_metadata = new_safetensors_metadata
+                if converted_keys:
+                    logger.debug(
+                        f"One or more safetensors_metadata keys or values had to be converted to str(). Final safetensors_metadata: {safetensors_metadata}"
+                    )
 
-        # revert model
-        if revert_model is not None:
-            self.model = revert_model
+            # Format is required to enable Accelerate to load the metadata
+            # otherwise it raises an OSError
+            safetensors_metadata["format"] = "pt"
+
+            safetensors_metadata["auto_gptq_version"] = str(__version__)
+            safetensors_metadata["gptq_bits"] = str(quantize_config.bits)
+            safetensors_metadata["gptq_group_size"] = str(quantize_config.group_size)
+            safetensors_metadata["gptq_desc_act"] = str(quantize_config.desc_act)
+            safetensors_metadata["gptq_damp_percent"] = str(quantize_config.damp_percent)
+            safetensors_metadata["gptq_" + CHECKPOINT_FORMAT_FIELD] = quantize_config.checkpoint_format
+            safetensors_metadata["gptq_" + QUANT_METHOD_FIELD] = quantize_config.quant_method
+
+            safe_save(state_dict, join(save_dir, model_save_name), safetensors_metadata)
+        else:
+            model_save_name = model_base_name + ".bin"
+            torch.save(model.state_dict(), join(save_dir, model_save_name))
+
+        config.quantization_config = quantize_config.to_dict()
+        config.save_pretrained(save_dir)
+
+        quantize_config.model_name_or_path = save_dir
+        quantize_config.model_file_base_name = model_base_name
+        quantize_config.save_pretrained(save_dir)
 
     def save_pretrained(
         self,
         save_dir: str,
-        safetensors_metadata: Optional[Dict[str, str]] = None,
         **kwargs,
     ):
-        """alias of save_quantized"""
-        logger.warning("you are using save_pretrained, which will re-direct to save_quantized.")
-        self.save_quantized(save_dir, safetensors_metadata)
+        logger.warning("You are using save_pretrained, which will re-direct to save_quantized.")
+        self.save_quantized(save_dir=save_dir, **kwargs)
 
     @classmethod
     def from_pretrained(
@@ -929,7 +930,6 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         if use_safetensors:
             extensions.append(".safetensors")
         else:
-            logger.warning("Deprecation: Loading of non-safetensor weights will be removed in the future. Please convert your weights to safetensor format. ")
             extensions += [".bin", ".pt"]
 
         model_name_or_path = str(model_name_or_path)
@@ -1267,11 +1267,9 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
 
         # compat: runtime convert checkpoint gptq(v1) to gptq_v2 format
         if quantize_config.checkpoint_format == CHECKPOINT_FORMAT.GPTQ:
-            logger.info(f"Compat: runtime converting `checkpoint_format` from `{CHECKPOINT_FORMAT.GPTQ}` "
-                           f"to `{CHECKPOINT_FORMAT.GPTQ_V2}`")
+            logger.info(f"Compatibility: converting `checkpoint_format` from `{CHECKPOINT_FORMAT.GPTQ}` to `{CHECKPOINT_FORMAT.GPTQ_V2}`.")
             model = convert_gptq_v1_to_v2_format(
                 model,
-                v2_format=True,
                 quantize_config=quantize_config,
                 qlinear_kernel=qlinear_kernel,
             )

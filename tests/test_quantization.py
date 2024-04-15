@@ -2,17 +2,17 @@ import os
 
 
 max_threads = str(1)
-os.environ['OPENBLAS_NUM_THREADS'] = max_threads
+os.environ["OPENBLAS_NUM_THREADS"] = max_threads
 
-import tempfile
-import unittest
+import tempfile  # noqa: E402
+import unittest  # noqa: E402
 
-import torch.cuda
-from parameterized import parameterized
-from transformers import AutoTokenizer
+import torch.cuda  # noqa: E402
+from parameterized import parameterized  # noqa: E402
+from transformers import AutoTokenizer  # noqa: E402
 
-from auto_gptq import AutoGPTQForCausalLM
-from auto_gptq.quantization import CHECKPOINT_FORMAT, QUANT_CONFIG_FILENAME, BaseQuantizeConfig
+from auto_gptq import AutoGPTQForCausalLM  # noqa: E402
+from auto_gptq.quantization import CHECKPOINT_FORMAT, QUANT_CONFIG_FILENAME, BaseQuantizeConfig  # noqa: E402
 
 
 class TestQuantization(unittest.TestCase):
@@ -25,9 +25,7 @@ class TestQuantization(unittest.TestCase):
             tokenizer(
                 "auto-gptq is an easy-to-use model quantization library with user-friendly apis, based on GPTQ algorithm."
             ),
-            tokenizer(
-                "Today I am in Paris and it is a wonderful day."
-            ),
+            tokenizer("Today I am in Paris and it is a wonderful day."),
         ]
 
         quantize_config = BaseQuantizeConfig(
@@ -61,8 +59,10 @@ class TestQuantization(unittest.TestCase):
                 "desc_act": False,
                 "is_marlin_format": use_marlin,
             }
-            model = AutoGPTQForCausalLM.from_quantized(tmpdirname, device="cuda:0", quantize_config=compat_quantize_config)
-            assert(isinstance(model.quantize_config, BaseQuantizeConfig))
+            model = AutoGPTQForCausalLM.from_quantized(
+                tmpdirname, device="cuda:0", quantize_config=compat_quantize_config
+            )
+            assert isinstance(model.quantize_config, BaseQuantizeConfig)
 
             del model
             torch.cuda.empty_cache()
@@ -76,7 +76,10 @@ class TestQuantization(unittest.TestCase):
                 "sym": sym,
                 "desc_act": False,
             }
-            model = AutoGPTQForCausalLM.from_quantized(tmpdirname, device="cuda:0",
-                    quantize_config=compat_quantize_config,
-                    checkpoint_format=CHECKPOINT_FORMAT.MARLIN if use_marlin else None)
-            assert (isinstance(model.quantize_config, BaseQuantizeConfig))
+            model = AutoGPTQForCausalLM.from_quantized(
+                tmpdirname,
+                device="cuda:0",
+                quantize_config=compat_quantize_config,
+                checkpoint_format=CHECKPOINT_FORMAT.MARLIN if use_marlin else None,
+            )
+            assert isinstance(model.quantize_config, BaseQuantizeConfig)

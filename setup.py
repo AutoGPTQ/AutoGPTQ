@@ -128,8 +128,6 @@ requirements = [
     "safetensors>=0.3.1",
     "transformers>=4.31.0",
     "peft>=0.5.0",
-    "tabulate",
-    "termcolor",
     "tqdm",
 ]
 

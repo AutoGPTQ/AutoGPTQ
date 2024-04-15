@@ -17,6 +17,7 @@ NUM_TRAIN_STEPS = 10
 
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
+
 def benchmark_forward(
     fn,
     *inputs,
@@ -47,6 +48,7 @@ def benchmark_forward(
         print(m)
     return t, m
 
+
 def get_model_and_tokenizer(
     model_id=MODEL_ID,
     inject_fused_attention=False,
@@ -72,6 +74,7 @@ def get_model_and_tokenizer(
 
     model.warmup_triton()
     return model, tokenizer
+
 
 class TestTriton(unittest.TestCase):
     def test_triton_qlinear(self):

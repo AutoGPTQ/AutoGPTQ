@@ -16,7 +16,8 @@ class TestSerialization(unittest.TestCase):
         dummy_config = BaseQuantizeConfig(
             model_name_or_path=self.MODEL_ID,
             quant_method=QUANT_METHOD.GPTQ,
-            checkpoint_format=CHECKPOINT_FORMAT.MARLIN)
+            checkpoint_format=CHECKPOINT_FORMAT.MARLIN,
+        )
 
         model_cache_path, is_cached = dummy_config.get_cache_file_path()
 
@@ -33,8 +34,6 @@ class TestSerialization(unittest.TestCase):
             model.save_pretrained(tmpdir)
 
             self.assertTrue(os.path.isfile(os.path.join(tmpdir, "gptq_model-4bit-128g.safetensors")))
-            model_cache_path, is_cached = model.quantize_config.get_cache_file_path()
-            self.assertFalse(os.path.isfile(os.path.join(tmpdir, model_cache_path)))
 
             with open(os.path.join(tmpdir, QUANT_CONFIG_FILENAME), "r") as config_file:
                 config = json.load(config_file)
@@ -72,3 +71,14 @@ class TestSerialization(unittest.TestCase):
     def test_gptq_v1_to_v2_runtime_convert(self):
         model = AutoGPTQForCausalLM.from_quantized(self.MODEL_ID, device="cuda:0")
         self.assertTrue(model.quantize_config.checkpoint_format == CHECKPOINT_FORMAT.GPTQ_V2)
+
+    def test_gptq_v1_serialization(self):
+        model = AutoGPTQForCausalLM.from_quantized(self.MODEL_ID, device="cuda:0")
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            model.save_quantized(tmpdir, checkpoint_format="gptq")
+
+            with open(os.path.join(tmpdir, "quantize_config.json"), "r") as f:
+                quantize_config = json.load(f)
+
+            self.assertTrue(quantize_config["checkpoint_format"] == "gptq")
