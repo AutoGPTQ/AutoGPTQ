@@ -356,7 +356,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                             static_groups=self.quantize_config.static_groups,
                         )
 
-                        stat = {"layer": i, "module": name, "avg_loss": avg_loss, "time": duration}
+                        stat = {"layer": i + 1, "module": name, "avg_loss": avg_loss, "time": duration}
 
                         quant_log.append(stat)
                         logger.info(stat)

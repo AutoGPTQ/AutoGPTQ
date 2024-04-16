@@ -356,7 +356,7 @@ def pack_model(
 
     # TODO remove once pack() thread regression is found
     # Limit numpy thread usage in pack avoid slowdown: user_api=None to set limit to all supported libs
-    with tctl.threadpool_limits(limits=1, user_api=None):
+    with tctl.threadpool_limits(limits=4, user_api=None):
         pbar = tqdm(qlayers.keys(), leave=True)
         for name in pbar:
             pbar.set_description(f"Packing {name}")
