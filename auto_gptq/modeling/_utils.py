@@ -355,7 +355,7 @@ def pack_model(
 
     pbar = tqdm(qlayers.keys(), leave=True)
     for name in pbar:
-        pbar.set_description(f"Packing {name}...", refresh=True)
+        pbar.set_description(f"Packing {name}")
 
         quantizers[name], scale, zero, g_idx = quantizers[name]
         # so far can only pack layer on CPU
