@@ -583,6 +583,9 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         # TODO need to test this
         # internal is always gptq v2 but allow users to pass gptq (v1) via config
         if checkpoint_format is None and quantize_config.checkpoint_format == CHECKPOINT_FORMAT.GPTQ:
+            # Model qzeros may be edited in place.
+            # TODO: avoid inplace modification of the weights
+            model = copy.deepcopy(self.model)
             model = convert_gptq_v2_to_v1_format(
                 model,
                 quantize_config=quantize_config,
