@@ -559,7 +559,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
 
             if checkpoint_format == CHECKPOINT_FORMAT.GPTQ_V2:
                 if quantize_config.checkpoint_format != CHECKPOINT_FORMAT.GPTQ:
-                    raise NotImplementedError(f"Asked to serialiez a model with `checkpoint_format={checkpoint_format}` but the model format is {quantize_config.checkpoint_format}. This is not supported. Please open an issue at https://github.com/AutoGPTQ/AutoGPTQ/issues.")
+                    raise NotImplementedError(f"Asked to serialize a model with `checkpoint_format={checkpoint_format}` but the model format is {quantize_config.checkpoint_format}. This is not supported. Please open an issue at https://github.com/AutoGPTQ/AutoGPTQ/issues.")
 
                 model = convert_gptq_v1_to_v2_format(
                     model,
@@ -570,7 +570,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                 quantize_config.checkpoint_format = CHECKPOINT_FORMAT.GPTQ_V2
             elif checkpoint_format == CHECKPOINT_FORMAT.GPTQ:
                 if quantize_config.checkpoint_format != CHECKPOINT_FORMAT.GPTQ_V2:
-                    raise NotImplementedError(f"Asked to serialiez a model with `checkpoint_format={checkpoint_format}` but the model format is {quantize_config.checkpoint_format}. This is not supported. Please open an issue at https://github.com/AutoGPTQ/AutoGPTQ/issues.")
+                    raise NotImplementedError(f"Asked to serialize a model with `checkpoint_format={checkpoint_format}` but the model format is {quantize_config.checkpoint_format}. This is not supported. Please open an issue at https://github.com/AutoGPTQ/AutoGPTQ/issues.")
 
                 model = convert_gptq_v2_to_v1_format(
                     model,
@@ -580,7 +580,6 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
 
                 quantize_config.checkpoint_format = CHECKPOINT_FORMAT.GPTQ
 
-        # TODO need to test this
         # internal is always gptq v2 but allow users to pass gptq (v1) via config
         if checkpoint_format is None and quantize_config.checkpoint_format == CHECKPOINT_FORMAT.GPTQ:
             # Model qzeros may be edited in place.
