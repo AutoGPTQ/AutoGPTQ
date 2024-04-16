@@ -1,9 +1,4 @@
 import os
-
-
-max_threads = str(1)
-os.environ["OPENBLAS_NUM_THREADS"] = max_threads
-
 import tempfile  # noqa: E402
 import unittest  # noqa: E402
 

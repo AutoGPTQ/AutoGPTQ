@@ -355,8 +355,8 @@ def pack_model(
     qlayers = find_layers(model, [QuantLinear])
 
     # TODO remove once pack() thread regression is found
-    # Limit numpy thread usage in pack avoid slowdown: user_api=None to set limit to all supported libs
-    with tctl.threadpool_limits(limits=4, user_api=None):
+    # Limit pack() thread usage to avoid slow-down: applies limit to all supported libs
+    with tctl.threadpool_limits(limits=1):
         pbar = tqdm(qlayers.keys(), leave=True)
         for name in pbar:
             pbar.set_description(f"Packing {name}")

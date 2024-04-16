@@ -1,9 +1,3 @@
-import os
-
-
-max_threads = str(1)
-os.environ["OPENBLAS_NUM_THREADS"] = max_threads
-
 import unittest  # noqa: E402
 
 import torch  # noqa: E402
