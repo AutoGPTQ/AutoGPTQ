@@ -45,8 +45,9 @@ class TestSerialization(unittest.TestCase):
             end = time.time()
             second_load_time = end - start
 
+        # disable extremely flaky condition on noisy vm or system with non-cached io
         # Since we use a CUDA kernel to repack weights, the first load time is already small.
-        self.assertTrue(second_load_time < first_load_time)
+        # self.assertTrue(second_load_time < first_load_time)
 
     def test_marlin_hf_cache_serialization(self):
         start = time.time()
@@ -65,8 +66,9 @@ class TestSerialization(unittest.TestCase):
         end = time.time()
         second_load_time = end - start
 
+        # disable extremely flaky condition on noisy vm or system with non-cached io
         # Since we use a CUDA kernel to repack weights, the first load time is already small.
-        self.assertTrue(second_load_time < first_load_time)
+        # self.assertTrue(second_load_time < first_load_time)
 
     def test_gptq_v1_to_v2_runtime_convert(self):
         model = AutoGPTQForCausalLM.from_quantized(self.MODEL_ID, device="cuda:0")

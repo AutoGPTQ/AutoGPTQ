@@ -129,11 +129,12 @@ requirements = [
     "transformers>=4.31.0",
     "peft>=0.5.0",
     "tqdm",
+    "threadpoolctl",
 ]
 
 extras_require = {
     "triton": ["triton==2.0.0"],
-    "test": ["pytest", "parameterized"],
+    "test": ["pytest>=3.0.0", "parameterized"],
     "quality": ["ruff==0.1.5"],
 }
 

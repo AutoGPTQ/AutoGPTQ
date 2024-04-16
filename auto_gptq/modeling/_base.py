@@ -193,18 +193,6 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         if self.quantize_config.quant_method in QUANTIZE_BLACK_LIST:
             raise ValueError(f"Unsupported quantization operation for quant method: {self.quantize_config.quant_method}")
 
-        # TODO: need to isolate pack code that is causing this regression
-        # alert users to limit threads so packing performance does not regress by up to ~100x
-        if "OPENBLAS_NUM_THREADS" not in os.environ or int(os.environ["OPENBLAS_NUM_THREADS"]) > 8:
-            thread_warning = """If you have not already done so, please inject the following code at the very top of your
-    quantization script so the packing stage is optimized for speed. Using too many cores may reduce packing performance.
-    ----
-    import os
-    os.environ['OPENBLAS_NUM_THREADS'] = str(1)
-    ----
-    """
-            logger.warning(thread_warning)
-
         if use_triton and not TRITON_AVAILABLE:
             logger.warning("triton is not installed, reset use_triton to False")
             use_triton = False
@@ -412,7 +400,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             layer_inputs, layer_outputs = layer_outputs, []  # TODO: is it really OK to cache only the first positional argument?
             torch.cuda.empty_cache()
 
-        logger.info("Quantization summary:\n" + quant_log)
+        logger.info(f"Quantization summary:\n{quant_log}")
         for module_log in quant_log:
             logger.info(module_log)
 

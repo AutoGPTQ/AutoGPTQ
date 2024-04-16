@@ -5,6 +5,7 @@ from logging import getLogger
 from typing import List, Optional, Union
 
 import accelerate
+import threadpoolctl as tctl
 import numpy as np
 import torch
 import torch.nn as nn
@@ -353,25 +354,29 @@ def pack_model(
     )
     qlayers = find_layers(model, [QuantLinear])
 
-    pbar = tqdm(qlayers.keys(), leave=True)
-    for name in pbar:
-        pbar.set_description(f"Packing {name}")
+    # TODO remove once pack() thread regression is found
+    # Limit numpy thread usage in pack avoid slowdown: user_api=None to set limit to all supported libs
+    with tctl.threadpool_limits(limits=1, user_api=None):
+        pbar = tqdm(qlayers.keys(), leave=True)
+        for name in pbar:
+            pbar.set_description(f"Packing {name}")
 
-        quantizers[name], scale, zero, g_idx = quantizers[name]
-        # so far can only pack layer on CPU
-        layer_device = qlayers[name].device
-        qlayers[name].to(CPU)
-        layers[name], scale, zero, g_idx = (
-            layers[name].to(CPU),
-            scale.to(CPU),
-            zero.to(CPU),
-            g_idx.to(CPU),
-        )
-        if QuantLinear.QUANT_TYPE == "marlin":
-            qlayers[name].pack(layers[name], scale)
-        else:
-            qlayers[name].pack(layers[name], scale, zero, g_idx)
-        qlayers[name].to(layer_device)
+            quantizers[name], scale, zero, g_idx = quantizers[name]
+            # so far can only pack layer on CPU
+            layer_device = qlayers[name].device
+            qlayers[name].to(CPU)
+            layers[name], scale, zero, g_idx = (
+                layers[name].to(CPU),
+                scale.to(CPU),
+                zero.to(CPU),
+                g_idx.to(CPU),
+            )
+            if QuantLinear.QUANT_TYPE == "marlin":
+                qlayers[name].pack(layers[name], scale)
+            else:
+                qlayers[name].pack(layers[name], scale, zero, g_idx)
+            qlayers[name].to(layer_device)
+
     logger.info("Model packed.")
 
     if use_triton and warmup_triton:
@@ -532,7 +537,7 @@ def autogptq_post_init(model, use_act_order: bool, max_input_length: Optional[in
             if hasattr(submodule, "QUANT_TYPE") and submodule.QUANT_TYPE == "exllama":
                 submodule.post_init()
 
-    ## exllamav2
+    # exllamav2
     fixed_bytes = {}
     model_uses_exllamav2 = False
 
