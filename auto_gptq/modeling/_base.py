@@ -580,6 +580,15 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
 
                 quantize_config.checkpoint_format = CHECKPOINT_FORMAT.GPTQ
 
+        # TODO need to test this
+        # internal is always gptq v2 but allow users to pass gptq (v1) via config
+        if checkpoint_format is None and quantize_config.checkpoint_format == CHECKPOINT_FORMAT.GPTQ:
+            model = convert_gptq_v2_to_v1_format(
+                model,
+                quantize_config=quantize_config,
+                qlinear_kernel=self.qlinear_kernel
+            )
+
         model.to(CPU)
 
         if quantize_config.model_file_base_name is None:
