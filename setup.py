@@ -10,6 +10,11 @@ from setuptools import find_packages, setup
 os.environ["CC"] = "g++"
 os.environ["CXX"] = "g++"
 
+def _is_sycl_xpu():
+    import intel_extension_for_pytorch
+    os.environ["CC"] = "icx"
+    os.environ["CXX"] = "icpx"
+    
 common_setup_kwargs = {
     "version": "0.8.0.dev0",
     "name": "auto_gptq",
@@ -37,10 +42,11 @@ common_setup_kwargs = {
 
 
 PYPI_RELEASE = os.environ.get('PYPI_RELEASE', None)
-BUILD_CUDA_EXT = int(os.environ.get('BUILD_CUDA_EXT', '1')) == 1
+BUILD_CUDA_EXT = int(os.environ.get('BUILD_CUDA_EXT', '0')) == 1
 DISABLE_QIGEN = int(os.environ.get('DISABLE_QIGEN', '1')) == 1
 COMPILE_MARLIN = int(os.environ.get('COMPILE_MARLIN', '1')) == 1
 UNSUPPORTED_COMPUTE_CAPABILITIES = ['3.5', '3.7', '5.0', '5.2', '5.3']
+BUILD_SYCL_EXT = int(os.environ.get('BUILD_SYCL_EXT', '0')) == 1
 
 def detect_local_sm_architectures():
     """
@@ -116,6 +122,31 @@ if BUILD_CUDA_EXT:
         # For the PyPI release, the version is simply x.x.x to comply with PEP 440.
         if not PYPI_RELEASE:
             common_setup_kwargs['version'] += f"+cu{CUDA_VERSION}"
+
+if BUILD_SYCL_EXT:
+    try:
+        import torch
+        import intel_extension_for_pytorch
+        from torch.xpu.cpp_extension import DPCPPExtension, DpcppBuildExtension
+    except Exception as e:
+        print(f"Building PyTorch IPEX extension requires PyTorch being installed, please install PyTorch &IPEX first")
+        sys.exit(1)
+
+    print(f"Building PyTorch IPEX extension for autogptq_sycl")
+    SYCL_VERSION = os.environ.get('SYCL_VERSION', '0.0.1')
+    
+    #if SYCL_VERSION and not _is_sycl_xpu():
+    #    print(
+    #        f"Trying to compile auto-gptq for SYCL, but PyTorch  "
+    #        "is installed without IPEX support."
+    #    )
+    #    sys.exit(1)
+    if not PYPI_RELEASE:
+        common_setup_kwargs['version'] += f"+sycl{SYCL_VERSION}"
+    print(f"Registering sycl backend with version : {common_setup_kwargs['version']}")
+
+
+
 
 requirements = [
     "accelerate>=0.26.0",
@@ -243,12 +274,74 @@ if BUILD_CUDA_EXT:
         "ext_modules": extensions,
         "cmdclass": {'build_ext': cpp_extension.BuildExtension}
     }
-common_setup_kwargs.update(additional_setup_kwargs)
-setup(
-    packages=find_packages(),
-    install_requires=requirements,
-    extras_require=extras_require,
-    include_dirs=include_dirs,
-    python_requires=">=3.8.0",
-    **common_setup_kwargs
-)
+
+    common_setup_kwargs.update(additional_setup_kwargs)
+    setup(
+        packages=find_packages(),
+        install_requires=requirements,
+        extras_require=extras_require,
+        include_dirs=include_dirs,
+        python_requires=">=3.8.0",
+        **common_setup_kwargs
+    )
+
+if BUILD_SYCL_EXT:
+    import torch
+    import intel_extension_for_pytorch
+    from torch.xpu.cpp_extension import DPCPPExtension, DpcppBuildExtension
+
+    ROOT_DIR = os.path.dirname(__file__)
+    
+    with open(os.path.join(ROOT_DIR,"requirements_sycl.txt")) as f:
+        requirements_sycl = f.read().strip().split("\n")
+            
+    if platform.system() != "Windows" and platform.machine() != "aarch64" and not DISABLE_QIGEN:
+        print("Generating qigen kernels...")
+        cores_info = subprocess.run("cat /proc/cpuinfo | grep cores | head -1", shell=True, check=True, text=True, stdout=subprocess.PIPE).stdout.split(" ")
+        if (len(cores_info) == 3 and cores_info[1].startswith("cores")) or (len(cores_info) == 2):
+            p = int(cores_info[-1])
+        else:
+            p = os.cpu_count()
+        try:
+            subprocess.check_output(["python", "./autogptq_extension/qigen/generate.py", "--module", "--search", "--p", str(p)])
+        except subprocess.CalledProcessError:
+            raise Exception("Generating QiGen kernels failed with the error shown above.")
+
+    _is_sycl_xpu()
+    cxx_flags = [
+        '-fsycl', '-O3', '-std=c++20', '-w', '-fPIC', '-DMKL_ILP64',
+        '-Wno-narrowing', '-ferror-limit=300'
+        ]
+    extra_ldflags = [
+        '-fsycl', '-fPIC', '-Wl,-export-dynamic'
+        
+         ]
+    
+    include_headers=["autogptq_extension/sycl/sycl_utils.cpp", "autogptq_extension/sycl/sycl_utils.h", "autogptq_extension/sycl/sycl_dispatch.h"]
+    
+    source_files = [
+                "autogptq_extension/sycl/sycl_256/autogptq_sycl_256.cpp",
+                "autogptq_extension/sycl/sycl_256/autogptq_sycl_kernel_256.cpp"
+            ]
+    extensions = [
+        DPCPPExtension(name="autogptq_sycl",
+                       sources=source_files,
+                       include_dirs=include_headers,
+                       extra_compile_args={'cxx': cxx_flags},
+                       extra_link_args=extra_ldflags)
+    ]
+
+    
+    additional_setup_kwargs = {
+        "ext_modules": extensions,
+        "cmdclass": {'build_ext': DpcppBuildExtension}
+    }
+    common_setup_kwargs.update(additional_setup_kwargs)
+    setup(
+        packages=find_packages(),
+        install_requires=requirements_sycl,
+        extras_require=extras_require,
+        include_dirs=include_dirs,
+        python_requires=">=3.8.0",
+        **common_setup_kwargs
+    )
