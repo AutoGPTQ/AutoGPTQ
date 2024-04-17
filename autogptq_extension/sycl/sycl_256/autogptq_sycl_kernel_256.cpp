@@ -2,14 +2,14 @@
 #include <torch/python.h>
 #include <sycl/sycl.hpp>
 #include <dpct/dpct.hpp>
-#include "sycl_utils.h"
-
+#include "../sycl_utils.h"
+#include "../sycl_dispatch.h"
 
 typedef gptq::xpu::SyclTypeTrait<c10::Half> half;
-typedef dpct::atomic_compare_exchange_strong<sycl::access::address_space::generic_space> atomicCAS;
-typedef dpct::atomic_fetch_add<sycl::access::address_space::generic_space> atomicAdd;
-typedef sycl::ext::intel::math::hadd __hadd;
+//#define dpct::atomic_compare_exchange_strong<sycl::access::address_space::generic_space> atomicCAS_sycl;
+//using sycl_hadd = sycl::ext::intel::math::hadd ;
 
+// disable these atomic methods for SYCL for now.
 // atomicAdd for double-precision floating-point numbers on hardware with
 // compute capability < 6.0 from:
 // https://docs.nvidia.com/cuda/cuda-c-programming-guide/index.html#atomic-functions
@@ -36,9 +36,9 @@ typedef sycl::ext::intel::math::hadd __hadd;
 // }
 // #endif
 
-#if (defined(DPCT_COMPATIBILITY_TEMP) && DPCT_COMPATIBILITY_TEMP < 700) || defined(USE_ROCM)
+//#if (defined(DPCT_COMPATIBILITY_TEMP) && DPCT_COMPATIBILITY_TEMP < 700) || defined(USE_ROCM)
 // adapted from https://github.com/torch/cutorch/blob/master/lib/THC/THCAtomics.cuh
-
+/*
 inline void atomicAdd(half* address, half val) {
     unsigned int *address_as_ui = reinterpret_cast<unsigned int *>(reinterpret_cast<char *>(address) - (reinterpret_cast<size_t>(address) & 2));
     unsigned int old = *address_as_ui;
@@ -47,11 +47,11 @@ inline void atomicAdd(half* address, half val) {
     do {
         assumed = old;
         unsigned short hsum = reinterpret_cast<size_t>(address) & 2 ? (old >> 16) : (old & 0xffff);
-        hsum += val;
+        (half)hsum += val;
         old = reinterpret_cast<size_t>(address) & 2
                  ? (old & 0xffff) | (hsum << 16)
                  : (old & 0xffff0000) | hsum;
-        old = atomicCAS(&address_as_ui[0], assumed, old);
+        old = dpct::atomic_compare_exchange_strong<sycl::access::address_space::generic_space>(&address_as_ui[0], assumed, old);
 
     // Note: uses integer comparison to avoid hang in case of NaN (since NaN != NaN)
     } while (assumed != old);
@@ -63,17 +63,18 @@ inline void atomicAdd(sycl::half* address, half val) {
 
     do {
         assumed = old;
-        uint16_t hsum;
-        hsum.x = (size_t)address & 2 ? (old >> 16) : (old & 0xffff);
-        half tmpres = __hadd(hsum, val);
-        hsum = uint16_t(tmpres);
-        old = (size_t)address & 2 ? (old & 0xffff) | (hsum.x << 16) : (old & 0xffff0000) | hsum.x;
-        old = atomicCAS(&address_as_ui[0], assumed, old);
+        uint16_t hsum{0};
+        hsum = (size_t)address & 2 ? (old >> 16) : (old & 0xffff);
+        //half tmpres = sycl_hadd(hsum, val);
+        half tmpres = (half)hsum + val;
+        hsum = tmpres;
+        old = (size_t)address & 2 ? (old & 0xffff) | (hsum << 16) : (old & 0xffff0000) | hsum;
+        old = dpct::atomic_compare_exchange_strong<sycl::access::address_space::generic_space>(&address_as_ui[0], assumed, old);
     } while (assumed != old);
 }
 #endif
 
-
+*/
 template <typename scalar_t>
 void VecQuant2MatMulKernel(
     const  scalar_t* __restrict__ vec,
@@ -267,37 +268,8 @@ inline int as_int(int i) {
 }
 
 
-void vecquant2matmul_sycl(
-  torch::Tensor vec,
-  torch::Tensor mat,
-  torch::Tensor mul,
-  torch::Tensor scales,
-  torch::Tensor zeros,
-  torch::Tensor g_idx
-) {
-  int batch = vec.size(0);
-  int vec_height = vec.size(1);
-  int height = mat.size(0);
-  int width = mat.size(1);
-  int zero_width = zeros.size(1);
-
-  AT_DISPATCH_FLOATING_TYPES(
-    vec.type(), "call_vecquant2matmul_sycl", ([&] {
-      call_vecquant2matmul_sycl<scalar_t>(
-        vec.data<scalar_t>(), mat.data<int>(), mul.data<scalar_t>(),
-        scales.data<scalar_t>(), zeros.data<int>(), g_idx.data<int>(),
-        batch, vec_height, height, width, zero_width
-      );
-    })
-  );
-}
-
-
 template <typename scalar_t>
-/*
-DPCT1110:0: The total declared local variable size in device function VecQuant2MatMulKernel exceeds 128 bytes and may cause high register pressure. Consult with your hardware vendor to find the total register size available and adjust the code, or use smaller sub-group size to avoid high register pressure.
-*/
-void VecQuant2MatMulKernel(
+SYCL_EXTERNAL void VecQuant2MatMulKernel(
     const  scalar_t* __restrict__ vec,
     const       int* __restrict__ mat,
            scalar_t* __restrict__ mul,
@@ -352,7 +324,7 @@ void VecQuant2MatMulKernel(
 	for (k = 0; k <  BLOCKWIDTH; ++k){
 	  res += weight[k] * blockvec[k];
     }
-    atomicAdd(&mul[b * width + w], res);
+    dpct::atomic_fetch_add<sycl::access::address_space::generic_space>(&mul[b * width + w], res);
     
     item_ct1.barrier(sycl::access::fence_space::local_space);
   }
@@ -376,7 +348,7 @@ void call_vecquant2matmul_sycl(
 
 
    using sycl_t = gptq::xpu::SyclTypeTrait<scalar_t>::Type;
-   sycl::range<3> block(1, (width + BLOCKWIDTH - 1) / BLOCKWIDTH, (height + BLOCKHEIGHT2 - 1) / BLOCKHEIGHT2);
+   sycl::range<3> blocks(1, (width + BLOCKWIDTH - 1) / BLOCKWIDTH, (height + BLOCKHEIGHT2 - 1) / BLOCKHEIGHT2);
    sycl::range<3> threads(1, 1, BLOCKWIDTH); //grid
    auto& q_ct1 = gptq::xpu::gptqGetQueue();
    q_ct1.submit([&](sycl::handler& cgh) {
@@ -384,7 +356,7 @@ void call_vecquant2matmul_sycl(
       cgh.parallel_for(
           sycl::nd_range<3>(blocks * threads, threads),
           [=](sycl::nd_item<3> item_ct1) {
-            VecQuant2MatMulKernel<sycl_t>(
+            VecQuant2MatMulKernel<scalar_t>(
                 (const sycl_t* __restrict__)vec,
                 (const int* __restrict__)mat,
                 (sycl_t* __restrict__)mul,
@@ -403,8 +375,7 @@ void call_vecquant2matmul_sycl(
 
 }
 
-
-void vecquant3matmul_sycl(
+void vecquant2matmul_sycl(
   torch::Tensor vec,
   torch::Tensor mat,
   torch::Tensor mul,
@@ -419,8 +390,8 @@ void vecquant3matmul_sycl(
   int zero_width = zeros.size(1);
 
   AT_DISPATCH_FLOATING_TYPES(
-    vec.type(), "call_vecquant3matmul_sycl", ([&] {
-      call_vecquant3matmul_sycl<scalar_t>(
+    vec.type(), "call_vecquant2matmul_sycl", ([&] {
+      call_vecquant2matmul_sycl(
         vec.data<scalar_t>(), mat.data<int>(), mul.data<scalar_t>(),
         scales.data<scalar_t>(), zeros.data<int>(), g_idx.data<int>(),
         batch, vec_height, height, width, zero_width
@@ -429,10 +400,12 @@ void vecquant3matmul_sycl(
   );
 }
 
+
 template <typename scalar_t>
 /*
 DPCT1110:3: The total declared local variable size in device function VecQuant3MatMulKernel exceeds 128 bytes and may cause high register pressure. Consult with your hardware vendor to find the total register size available and adjust the code, or use smaller sub-group size to avoid high register pressure.
 */
+
 void VecQuant3MatMulKernel(
     const  scalar_t* __restrict__ vec,
     const       int* __restrict__ mat,
@@ -544,7 +517,7 @@ void VecQuant3MatMulKernel(
 	for (k = 0; k <  BLOCKWIDTH; ++k){
 	  res += weight[k] * blockvec[k];
     }
-    atomicAdd(&mul[b * width + w], res);
+    dpct::atomic_fetch_add<sycl::access::address_space::generic_space>(&mul[b * width + w], res);
 
     item_ct1.barrier(sycl::access::fence_space::local_space);
   }
@@ -595,7 +568,7 @@ void call_vecquant3matmul_sycl(
 
 }
 
-void vecquant4matmul_sycl(
+void vecquant3matmul_sycl(
   torch::Tensor vec,
   torch::Tensor mat,
   torch::Tensor mul,
@@ -610,8 +583,8 @@ void vecquant4matmul_sycl(
   int zero_width = zeros.size(1);
 
   AT_DISPATCH_FLOATING_TYPES(
-    vec.type(), "call_vecquant4matmul_sycl", ([&] {
-      call_vecquant4matmul_sycl<scalar_t>(
+    vec.type(), "call_vecquant3matmul_sycl", ([&] {
+      call_vecquant3matmul_sycl<scalar_t>(
         vec.data<scalar_t>(), mat.data<int>(), mul.data<scalar_t>(),
         scales.data<scalar_t>(), zeros.data<int>(), g_idx.data<int>(),
         batch, vec_height, height, width, zero_width
@@ -620,10 +593,9 @@ void vecquant4matmul_sycl(
   );
 }
 
+
 template <typename scalar_t>
-/*
-DPCT1110:6: The total declared local variable size in device function VecQuant4MatMulKernel exceeds 128 bytes and may cause high register pressure. Consult with your hardware vendor to find the total register size available and adjust the code, or use smaller sub-group size to avoid high register pressure.
-*/
+
 void VecQuant4MatMulKernel(
     const  scalar_t* __restrict__ vec,
     const       int* __restrict__ mat,
@@ -679,7 +651,7 @@ void VecQuant4MatMulKernel(
 	  res += weight[k] * blockvec[k];
     }
     
-    atomicAdd(&mul[b * width + w], res);
+    dpct::atomic_fetch_add<sycl::access::address_space::generic_space>(&mul[b * width + w], res);
     
     item_ct1.barrier(sycl::access::fence_space::local_space);
   }
@@ -730,7 +702,7 @@ void call_vecquant4matmul_sycl(
 
 }
 
-void vecquant8matmul_sycl(
+void vecquant4matmul_sycl(
   torch::Tensor vec,
   torch::Tensor mat,
   torch::Tensor mul,
@@ -745,8 +717,8 @@ void vecquant8matmul_sycl(
   int zero_width = zeros.size(1);
 
   AT_DISPATCH_FLOATING_TYPES(
-    vec.type(), "call_vecquant8matmul_sycl", ([&] {
-      call_vecquant8matmul_sycl<scalar_t>(
+    vec.type(), "call_vecquant4matmul_sycl", ([&] {
+      call_vecquant4matmul_sycl<scalar_t>(
         vec.data<scalar_t>(), mat.data<int>(), mul.data<scalar_t>(),
         scales.data<scalar_t>(), zeros.data<int>(), g_idx.data<int>(),
         batch, vec_height, height, width, zero_width
@@ -755,10 +727,9 @@ void vecquant8matmul_sycl(
   );
 }
 
+
 template <typename scalar_t>
-/*
-DPCT1110:9: The total declared local variable size in device function VecQuant8MatMulKernel exceeds 128 bytes and may cause high register pressure. Consult with your hardware vendor to find the total register size available and adjust the code, or use smaller sub-group size to avoid high register pressure.
-*/
+
 void VecQuant8MatMulKernel(
     const  scalar_t* __restrict__ vec,
     const       int* __restrict__ mat,
@@ -812,7 +783,7 @@ void VecQuant8MatMulKernel(
 	for (k = 0; k <  BLOCKWIDTH; ++k){
 	  res += weight[k] * blockvec[k];
     }
-    atomicAdd(&mul[b * width + w], res);
+    dpct::atomic_fetch_add<sycl::access::address_space::generic_space>(&mul[b * width + w], res);
     
     item_ct1.barrier(sycl::access::fence_space::local_space);
   }
@@ -862,14 +833,13 @@ void call_vecquant8matmul_sycl(
 
 }
 
-
-void vecquant2matmul_sycl_old(
+void vecquant8matmul_sycl(
   torch::Tensor vec,
   torch::Tensor mat,
   torch::Tensor mul,
   torch::Tensor scales,
   torch::Tensor zeros,
-  int groupsize
+  torch::Tensor g_idx
 ) {
   int batch = vec.size(0);
   int vec_height = vec.size(1);
@@ -878,15 +848,17 @@ void vecquant2matmul_sycl_old(
   int zero_width = zeros.size(1);
 
   AT_DISPATCH_FLOATING_TYPES(
-    vec.type(), "call_vecquant2matmul_sycl_old", ([&] {
-      call_vecquant2matmul_sycl_old<scalar_t>(
+    vec.type(), "call_vecquant8matmul_sycl", ([&] {
+      call_vecquant8matmul_sycl<scalar_t>(
         vec.data<scalar_t>(), mat.data<int>(), mul.data<scalar_t>(),
-        scales.data<scalar_t>(), zeros.data<int>(),
-        batch, vec_height, height, width, zero_width, groupsize
+        scales.data<scalar_t>(), zeros.data<int>(), g_idx.data<int>(),
+        batch, vec_height, height, width, zero_width
       );
     })
   );
 }
+
+
 
 template <typename scalar_t>
 void VecQuant2MatMulKernel_old(
@@ -951,7 +923,7 @@ void VecQuant2MatMulKernel_old(
     k += 16;
   }
 
-  atomicAdd(&mul[b * width + w], res);
+  dpct::atomic_fetch_add<sycl::access::address_space::generic_space>(&mul[b * width + w], res);
 }
 
 
@@ -962,7 +934,6 @@ void call_vecquant2matmul_sycl_old(
            scalar_t* __restrict__ mul,
     const  scalar_t* __restrict__ scales,
     const  		int* __restrict__ zeros,
-    const   	int* __restrict__ g_idx,
     int batch,
     int vec_height,
     int height,
@@ -987,7 +958,6 @@ void call_vecquant2matmul_sycl_old(
                 (sycl_t* __restrict__)mul,
                 (const sycl_t* __restrict__)scales,
                 (const int* __restrict__)zeros,
-                (const int* __restrict__)g_idx,
                 batch,
                 vec_height,
                 height,
@@ -1001,8 +971,7 @@ void call_vecquant2matmul_sycl_old(
 
 }
 
-
-void vecquant3matmul_sycl_old(
+void vecquant2matmul_sycl_old(
   torch::Tensor vec,
   torch::Tensor mat,
   torch::Tensor mul,
@@ -1017,8 +986,8 @@ void vecquant3matmul_sycl_old(
   int zero_width = zeros.size(1);
 
   AT_DISPATCH_FLOATING_TYPES(
-    vec.type(), "call_vecquant3matmul_sycl_old", ([&] {
-      call_vecquant3matmul_sycl_old<scalar_t>(
+    vec.type(), "call_vecquant2matmul_sycl_old", ([&] {
+      call_vecquant2matmul_sycl_old<scalar_t>(
         vec.data<scalar_t>(), mat.data<int>(), mul.data<scalar_t>(),
         scales.data<scalar_t>(), zeros.data<int>(),
         batch, vec_height, height, width, zero_width, groupsize
@@ -1026,6 +995,7 @@ void vecquant3matmul_sycl_old(
     })
   );
 }
+
 
 template <typename scalar_t>
 void VecQuant3MatMulKernel_old(
@@ -1154,7 +1124,7 @@ void VecQuant3MatMulKernel_old(
     k += 10;
   }
 
-  atomicAdd(&mul[b * width + w], res);
+  dpct::atomic_fetch_add<sycl::access::address_space::generic_space>(&mul[b * width + w], res);
 }
 
 
@@ -1165,7 +1135,6 @@ void call_vecquant3matmul_sycl_old(
            scalar_t* __restrict__ mul,
     const  scalar_t* __restrict__ scales,
     const  		int* __restrict__ zeros,
-    const   	int* __restrict__ g_idx,
     int batch,
     int vec_height,
     int height,
@@ -1190,7 +1159,6 @@ void call_vecquant3matmul_sycl_old(
                 (sycl_t* __restrict__)mul,
                 (const sycl_t* __restrict__)scales,
                 (const int* __restrict__)zeros,
-                (const int* __restrict__)g_idx,
                 batch,
                 vec_height,
                 height,
@@ -1204,9 +1172,7 @@ void call_vecquant3matmul_sycl_old(
 
 }
 
-
-
-void vecquant4matmul_sycl_old(
+void vecquant3matmul_sycl_old(
   torch::Tensor vec,
   torch::Tensor mat,
   torch::Tensor mul,
@@ -1220,10 +1186,9 @@ void vecquant4matmul_sycl_old(
   int width = mat.size(1);
   int zero_width = zeros.size(1);
 
-  
   AT_DISPATCH_FLOATING_TYPES(
-    vec.type(), "vecquant4matmul_sycl_old", ([&] {
-      call_vecquant4matmul_sycl_old<scalar_t>(
+    vec.type(), "call_vecquant3matmul_sycl_old", ([&] {
+      call_vecquant3matmul_sycl_old<scalar_t>(
         vec.data<scalar_t>(), mat.data<int>(), mul.data<scalar_t>(),
         scales.data<scalar_t>(), zeros.data<int>(),
         batch, vec_height, height, width, zero_width, groupsize
@@ -1231,6 +1196,8 @@ void vecquant4matmul_sycl_old(
     })
   );
 }
+
+
 
 template <typename scalar_t>
 void VecQuant4MatMulKernel_old(
@@ -1287,7 +1254,7 @@ void VecQuant4MatMulKernel_old(
     k += 8;
   }
 
-  atomicAdd(&mul[b * width + w], res);
+  dpct::atomic_fetch_add<sycl::access::address_space::generic_space>(&mul[b * width + w], res);
 }
 
 
@@ -1298,7 +1265,6 @@ void call_vecquant4matmul_sycl_old(
            scalar_t* __restrict__ mul,
     const  scalar_t* __restrict__ scales,
     const  		int* __restrict__ zeros,
-    const   	int* __restrict__ g_idx,
     int batch,
     int vec_height,
     int height,
@@ -1323,7 +1289,6 @@ void call_vecquant4matmul_sycl_old(
                 (sycl_t* __restrict__)mul,
                 (const sycl_t* __restrict__)scales,
                 (const int* __restrict__)zeros,
-                (const int* __restrict__)g_idx,
                 batch,
                 vec_height,
                 height,
@@ -1337,8 +1302,7 @@ void call_vecquant4matmul_sycl_old(
 
 }
 
-
-void vecquant8matmul_sycl_old(
+void vecquant4matmul_sycl_old(
   torch::Tensor vec,
   torch::Tensor mat,
   torch::Tensor mul,
@@ -1354,8 +1318,8 @@ void vecquant8matmul_sycl_old(
 
   
   AT_DISPATCH_FLOATING_TYPES(
-    vec.type(), "vecquant8matmul_sycl_old", ([&] {
-      call_vecquant8matmul_sycl_old<scalar_t>(
+    vec.type(), "vecquant4matmul_sycl_old", ([&] {
+      call_vecquant4matmul_sycl_old<scalar_t>(
         vec.data<scalar_t>(), mat.data<int>(), mul.data<scalar_t>(),
         scales.data<scalar_t>(), zeros.data<int>(),
         batch, vec_height, height, width, zero_width, groupsize
@@ -1363,6 +1327,7 @@ void vecquant8matmul_sycl_old(
     })
   );
 }
+
 
 template <typename scalar_t>
 void VecQuant8MatMulKernel_old(
@@ -1414,7 +1379,7 @@ void VecQuant8MatMulKernel_old(
     k += 4;
   }
 
-  atomicAdd(&mul[b * width + w], res);
+  dpct::atomic_fetch_add<sycl::access::address_space::generic_space>(&mul[b * width + w], res);
 }
 
 
@@ -1426,7 +1391,6 @@ void call_vecquant8matmul_sycl_old(
            scalar_t* __restrict__ mul,
     const  scalar_t* __restrict__ scales,
     const  		int* __restrict__ zeros,
-    const   	int* __restrict__ g_idx,
     int batch,
     int vec_height,
     int height,
@@ -1451,7 +1415,6 @@ void call_vecquant8matmul_sycl_old(
                 (sycl_t* __restrict__)mul,
                 (const sycl_t* __restrict__)scales,
                 (const int* __restrict__)zeros,
-                (const int* __restrict__)g_idx,
                 batch,
                 vec_height,
                 height,
@@ -1465,55 +1428,30 @@ void call_vecquant8matmul_sycl_old(
 
 }
 
-
-void vecquant2matmul_faster_cuda_old(
+void vecquant8matmul_sycl_old(
   torch::Tensor vec,
   torch::Tensor mat,
   torch::Tensor mul,
   torch::Tensor scales,
   torch::Tensor zeros,
-  int groupsize,
-  int vec_height
+  int groupsize
 ) {
   int batch = vec.size(0);
+  int vec_height = vec.size(1);
   int height = mat.size(0);
   int width = mat.size(1);
   int zero_width = zeros.size(1);
 
-  //SYCL translation
-  //{
-  //  dpct::has_capability_or_fail(dpct::get_in_order_queue().get_device(), {sycl::aspect::fp16});
-  //  dpct::get_in_order_queue().submit(
-  //    [&](sycl::handler &cgh) {
-        /*
-        DPCT1101:27: 'blockwidth2' expression was replaced with a value. Modify the code to use the original expression, provided in comments, if it is correct.
-        */
   
-  using sycl_t = gptq::xpu::SyclTypeTrait<scalar_t>::Type;
-  sycl::range<3> blocks(1, (width + BLOCKWIDTH - 1) / BLOCKWIDTH, (height + BLOCKHEIGHT2 - 1) / BLOCKHEIGHT2);
-  sycl::range<3> threads(1, 1, BLOCKWIDTH); //grid
-  auto& q_ct1 = gptq::xpu::gptqGetQueue();
-  q_ct1.submit([&](sycl::handler& cgh) {
-      sycl::local_accessor<sycl_t, 1> blockvec(sycl::range<1>(BLOCKWIDTH), cgh);
-      sycl::local_accessor<sycl::half2, 2> deq2(sycl::range<2>(16, 16), cgh);
-
-      sycl::half2 * vec_data_ptr_ct0 = (sycl::half2*) vec.data_ptr();
-      const int *__restrict mat_data_ptr_int_ct1 = mat.data_ptr<int>();
-      float *__restrict mul_data_ptr_float_ct2 = mul.data_ptr<float>();
-      const float *__restrict scales_data_ptr_float_ct3 = scales.data_ptr<float>();
-      const int *__restrict zeros_data_ptr_int_ct4 = zeros.data_ptr<int>();
-
-      cgh.parallel_for(
-          sycl::nd_range<3>(blocks * threads, threads),
-          [=](sycl::nd_item<3> item_ct1) {
-          VecQuant2MatMulKernelFaster_old(vec_data_ptr_ct0, 
-                mat_data_ptr_int_ct1, mul_data_ptr_float_ct2,
-                scales_data_ptr_float_ct3, zeros_data_ptr_int_ct4, 
-                batch, vec_height, height, width, zero_width, groupsize, 
-                item_ct1, blockvec.get_pointer(), deq2);
-          });
-      });
-  
+  AT_DISPATCH_FLOATING_TYPES(
+    vec.type(), "vecquant8matmul_sycl_old", ([&] {
+      call_vecquant8matmul_sycl_old<scalar_t>(
+        vec.data<scalar_t>(), mat.data<int>(), mul.data<scalar_t>(),
+        scales.data<scalar_t>(), zeros.data<int>(),
+        batch, vec_height, height, width, zero_width, groupsize
+      );
+    })
+  );
 }
 
 void VecQuant2MatMulKernelFaster_old(
@@ -1569,7 +1507,7 @@ void VecQuant2MatMulKernelFaster_old(
     sycl::half2 scale = sycl::float2(scale_f).convert<sycl::half, sycl::rounding_mode::rte>();
     sycl::half2 zero = sycl::float2(-(scale_f * ((((as_unsigned(zeros[g * zero_width + z_w]) >> z_mod) & 0x3) + 1) & 0x0f))).convert<sycl::half, sycl::rounding_mode::rte>();
 
-    std::memset(&res2, 0, sizeof(half2));
+    std::memset(&res2, 0, sizeof(sycl::half2));
     tmp = as_unsigned(mat[i]);
     res2 = sycl::fma(sycl::fma(deq2[(tmp >>  0) & 0xf][off], scale, zero), blockvec[k + 0], res2);
     res2 = sycl::fma(sycl::fma(deq2[(tmp >>  4) & 0xf][off], scale, zero), blockvec[k + 1], res2);
@@ -1584,10 +1522,11 @@ void VecQuant2MatMulKernelFaster_old(
     res += res2[0] + res2[1];
   }
 
-  atomicAdd(&mul[b * width + w], res);
+  dpct::atomic_fetch_add<sycl::access::address_space::generic_space>(&mul[b * width + w], res);
 }
 
-void vecquant3matmul_faster_cuda_old(
+template <typename scalar_t>
+void vecquant2matmul_faster_cuda_old(
   torch::Tensor vec,
   torch::Tensor mat,
   torch::Tensor mul,
@@ -1601,39 +1540,38 @@ void vecquant3matmul_faster_cuda_old(
   int width = mat.size(1);
   int zero_width = zeros.size(1);
 
-  //SYCL translation
-  /*{
-    dpct::has_capability_or_fail(dpct::get_in_order_queue().get_device(), {sycl::aspect::fp16});
-    dpct::get_in_order_queue().submit(
-      [&](sycl::handler &cgh) {
-        /*
-        DPCT1101:28: 'blockwidth2' expression was replaced with a value. Modify the code to use the original expression, provided in comments, if it is correct.
-        */
-   using sycl_t = gptq::xpu::SyclTypeTrait<scalar_t>::Type;
-   sycl::range<3> blocks(1, (width + BLOCKWIDTH - 1) / BLOCKWIDTH, (height + BLOCKHEIGHT2 - 1) / BLOCKHEIGHT2);
-   sycl::range<3> threads(1, 1, BLOCKWIDTH); //grid
-   auto& q_ct1 = gptq::xpu::gptqGetQueue();
-   q_ct1.submit([&](sycl::handler& cgh) {
-        sycl::local_accessor<sycl::half2, 1> blockvec(sycl::range<1>(BLOCKWIDTH), cgh);
-        sycl::local_accessor<sycl::half2, 2> deq2(sycl::range<2>(64, 32), cgh);
+  
+  
+  using sycl_t = gptq::xpu::SyclTypeTrait<scalar_t>::Type;
+  sycl::range<3> blocks(1, (width + BLOCKWIDTH - 1) / BLOCKWIDTH, (height + BLOCKHEIGHT2 - 1) / BLOCKHEIGHT2);
+  sycl::range<3> threads(1, 1, BLOCKWIDTH); //grid
+  auto& q_ct1 = gptq::xpu::gptqGetQueue();
+  q_ct1.submit([&](sycl::handler& cgh) {
+      sycl::local_accessor<sycl_t, 1> blockvec(sycl::range<1>(BLOCKWIDTH), cgh);
+      sycl::local_accessor<sycl::half2, 2> deq2(sycl::range<2>(16, 16), cgh);
 
-        sycl::half2 * vec_data_ptr_ct0 = (sycl::half2*) vec.data_ptr();
-        const int *__restrict mat_data_ptr_int_ct1 = mat.data_ptr<int>();
-        float *__restrict mul_data_ptr_float_ct2 = mul.data_ptr<float>();
-        const float *__restrict scales_data_ptr_float_ct3 = scales.data_ptr<float>();
-        const int *__restrict zeros_data_ptr_int_ct4 = zeros.data_ptr<int>();
+      sycl::half2 * vec_data_ptr_ct0 = (sycl::half2*) vec.data_ptr();
+      const int *__restrict mat_data_ptr_int_ct1 = mat.data_ptr<int>();
+      float *__restrict mul_data_ptr_float_ct2 = mul.data_ptr<float>();
+      const float *__restrict scales_data_ptr_float_ct3 = scales.data_ptr<float>();
+      const int *__restrict zeros_data_ptr_int_ct4 = zeros.data_ptr<int>();
 
-        cgh.parallel_for(
-          sycl::nd_range<3>(blocks * threads, threads), 
+      cgh.parallel_for(
+          sycl::nd_range<3>(blocks * threads, threads),
           [=](sycl::nd_item<3> item_ct1) {
-            VecQuant3MatMulKernelFaster_old(vec_data_ptr_ct0, mat_data_ptr_int_ct1, 
-            mul_data_ptr_float_ct2, scales_data_ptr_float_ct3, 
-            zeros_data_ptr_int_ct4, batch, vec_height, height, width, zero_width, 
-            groupsize, item_ct1, blockvec.get_pointer(), deq2);
+          VecQuant2MatMulKernelFaster_old(vec_data_ptr_ct0, 
+                mat_data_ptr_int_ct1, mul_data_ptr_float_ct2,
+                scales_data_ptr_float_ct3, zeros_data_ptr_int_ct4, 
+                batch, vec_height, height, width, zero_width, groupsize, 
+                item_ct1, blockvec.get_pointer(), deq2);
           });
       });
   
 }
+
+
+
+
 
 void VecQuant3MatMulKernelFaster_old(
     const  sycl::half2* __restrict__ vec,
@@ -1703,9 +1641,7 @@ void VecQuant3MatMulKernelFaster_old(
   unsigned int tmp;
   unsigned int z_tmp;
 
-  /*
-  DPCT1065:25: Consider replacing sycl::nd_item::barrier() with sycl::nd_item::barrier(sycl::access::fence_space::local_space) for better performance if there is no access to global memory.
-  */
+  
   item_ct1.barrier();
 
   while (k < blockwidth2) {
@@ -1723,7 +1659,7 @@ void VecQuant3MatMulKernelFaster_old(
       zero = sycl::float2(-(scale_f * ((((as_unsigned(zeros[g * zero_width + z_w]) >> z_bit) & 0x7) + 1) & 0x0f))).convert<sycl::half, sycl::rounding_mode::rte>();
     }
 
-    std::memset(&res2, 0, sizeof(half2));
+    std::memset(&res2, 0, sizeof(sycl::half2));
     tmp1 = as_unsigned(mat[i]);
     res2 = sycl::fma(sycl::fma(deq2[(tmp1 >>  0) & 0x3f][off], scale, zero), blockvec[k + 0], res2);
     res2 = sycl::fma(sycl::fma(deq2[(tmp1 >>  6) & 0x3f][off], scale, zero), blockvec[k + 1], res2);
@@ -1759,7 +1695,8 @@ void VecQuant3MatMulKernelFaster_old(
   dpct::atomic_fetch_add<sycl::access::address_space::generic_space>(&mul[b * width + w], res);
 }
 
-void vecquant4matmul_faster_cuda_old(
+template <typename scalar_t>
+void vecquant3matmul_faster_sycl_old(
   torch::Tensor vec,
   torch::Tensor mat,
   torch::Tensor mul,
@@ -1773,22 +1710,14 @@ void vecquant4matmul_faster_cuda_old(
   int width = mat.size(1);
   int zero_width = zeros.size(1);
 
-  //SYCL translation
-  /*
-  {
-    dpct::has_capability_or_fail(dpct::get_in_order_queue().get_device(), {sycl::aspect::fp16});
-    dpct::get_in_order_queue().submit(
-      [&](sycl::handler &cgh) {
-        /*
-        DPCT1101:29: 'blockwidth2' expression was replaced with a value. Modify the code to use the original expression, provided in comments, if it is correct.
-        */
+  
    using sycl_t = gptq::xpu::SyclTypeTrait<scalar_t>::Type;
    sycl::range<3> blocks(1, (width + BLOCKWIDTH - 1) / BLOCKWIDTH, (height + BLOCKHEIGHT2 - 1) / BLOCKHEIGHT2);
    sycl::range<3> threads(1, 1, BLOCKWIDTH); //grid
    auto& q_ct1 = gptq::xpu::gptqGetQueue();
    q_ct1.submit([&](sycl::handler& cgh) {
         sycl::local_accessor<sycl::half2, 1> blockvec(sycl::range<1>(BLOCKWIDTH), cgh);
-        sycl::local_accessor<sycl::half2, 2> deq2(sycl::range<2>(256, 8), cgh);
+        sycl::local_accessor<sycl::half2, 2> deq2(sycl::range<2>(64, 32), cgh);
 
         sycl::half2 * vec_data_ptr_ct0 = (sycl::half2*) vec.data_ptr();
         const int *__restrict mat_data_ptr_int_ct1 = mat.data_ptr<int>();
@@ -1799,14 +1728,15 @@ void vecquant4matmul_faster_cuda_old(
         cgh.parallel_for(
           sycl::nd_range<3>(blocks * threads, threads), 
           [=](sycl::nd_item<3> item_ct1) {
-            VecQuant4MatMulKernelFaster_old(vec_data_ptr_ct0, mat_data_ptr_int_ct1, 
-            mul_data_ptr_float_ct2, scales_data_ptr_float_ct3, zeros_data_ptr_int_ct4, 
-            batch, vec_height, height, width, zero_width, 
+            VecQuant3MatMulKernelFaster_old(vec_data_ptr_ct0, mat_data_ptr_int_ct1, 
+            mul_data_ptr_float_ct2, scales_data_ptr_float_ct3, 
+            zeros_data_ptr_int_ct4, batch, vec_height, height, width, zero_width, 
             groupsize, item_ct1, blockvec.get_pointer(), deq2);
           });
       });
   
 }
+
 
 void VecQuant4MatMulKernelFaster_old(
     const  sycl::half2* __restrict__ vec,
@@ -1866,7 +1796,7 @@ void VecQuant4MatMulKernelFaster_old(
 
     //res2 = __float2half2_rn((float)0.);
 
-    std::memset(&res2, 0, sizeof(half2));
+    std::memset(&res2, 0, sizeof(sycl::half2));
     tmp = as_unsigned(mat[i]);
     res2 = sycl::fma(sycl::fma(deq2[(tmp >>  0) & 0xff][off], scale, zero), blockvec[k + 0], res2);
     res2 = sycl::fma(sycl::fma(deq2[(tmp >>  8) & 0xff][off], scale, zero), blockvec[k + 1], res2);
@@ -1879,5 +1809,48 @@ void VecQuant4MatMulKernelFaster_old(
 
   }
 
-  atomicAdd(&mul[b * width + w], res);
+  dpct::atomic_fetch_add<sycl::access::address_space::generic_space>(&mul[b * width + w], res);
+}
+
+
+template <typename scalar_t>
+void vecquant4matmul_faster_sycl_old(
+  torch::Tensor vec,
+  torch::Tensor mat,
+  torch::Tensor mul,
+  torch::Tensor scales,
+  torch::Tensor zeros,
+  int groupsize,
+  int vec_height
+) {
+  int batch = vec.size(0);
+  int height = mat.size(0);
+  int width = mat.size(1);
+  int zero_width = zeros.size(1);
+
+  
+   using sycl_t = gptq::xpu::SyclTypeTrait<scalar_t>::Type;
+   sycl::range<3> blocks(1, (width + BLOCKWIDTH - 1) / BLOCKWIDTH, (height + BLOCKHEIGHT2 - 1) / BLOCKHEIGHT2);
+   sycl::range<3> threads(1, 1, BLOCKWIDTH); //grid
+   auto& q_ct1 = gptq::xpu::gptqGetQueue();
+   q_ct1.submit([&](sycl::handler& cgh) {
+        sycl::local_accessor<sycl::half2, 1> blockvec(sycl::range<1>(BLOCKWIDTH), cgh);
+        sycl::local_accessor<sycl::half2, 2> deq2(sycl::range<2>(256, 8), cgh);
+
+        sycl::half2 * vec_data_ptr_ct0 = (sycl::half2*) vec.data_ptr();
+        const int *__restrict mat_data_ptr_int_ct1 = mat.data_ptr<int>();
+        float *__restrict mul_data_ptr_float_ct2 = mul.data_ptr<float>();
+        const float *__restrict scales_data_ptr_float_ct3 = scales.data_ptr<float>();
+        const int *__restrict zeros_data_ptr_int_ct4 = zeros.data_ptr<int>();
+
+        cgh.parallel_for(
+          sycl::nd_range<3>(blocks * threads, threads), 
+          [=](sycl::nd_item<3> item_ct1) {
+            VecQuant4MatMulKernelFaster_old(vec_data_ptr_ct0, mat_data_ptr_int_ct1, 
+            mul_data_ptr_float_ct2, scales_data_ptr_float_ct3, zeros_data_ptr_int_ct4, 
+            batch, vec_height, height, width, zero_width, 
+            groupsize, item_ct1, blockvec.get_pointer(), deq2);
+          });
+      });
+  
 }
