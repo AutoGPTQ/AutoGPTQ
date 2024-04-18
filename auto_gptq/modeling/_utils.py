@@ -217,7 +217,10 @@ def convert_gptq_v2_to_v1_format(
                     mask2 = (flat_tensor < 0) & (subtract_result > flat_tensor)
 
                     # Apply the masks to update the tensor values
-                    flat_tensor[mask1 | mask2] -= subtract_value
+                    # flat_tensor[mask1 | mask2] -= subtract_value
+
+                    # do all despite underflow
+                    flat_tensor -= subtract_value
 
                     # Count the number of underflows
                     underflows = (~mask1 & ~mask2).sum().item()
