@@ -317,15 +317,26 @@ if BUILD_SYCL_EXT:
         
          ]
     
-    include_headers=["autogptq_extension/sycl/sycl_utils.cpp", "autogptq_extension/sycl/sycl_utils.h", "autogptq_extension/sycl/sycl_dispatch.h"]
+    include_headers=["autogptq_extension/sycl/sycl_utils.cpp", "autogptq_extension/sycl/sycl_utils.h"]
     
-    source_files = [
+    sycl_256_source_files = [
                 "autogptq_extension/sycl/sycl_256/autogptq_sycl_256.cpp",
-                "autogptq_extension/sycl/sycl_256/autogptq_sycl_kernel_256.cpp"
+                "autogptq_extension/sycl/sycl_256/autogptq_sycl_kernel_256.cpp",
+                
+            ]
+    sycl_64_source_files = [
+                "autogptq_extension/sycl/sycl_64/autogptq_sycl_64.cpp",
+                "autogptq_extension/sycl/sycl_64/autogptq_sycl_kernel_64.cpp",
+                
             ]
     extensions = [
-        DPCPPExtension(name="autogptq_sycl",
-                       sources=source_files,
+        DPCPPExtension(name="autogptq_sycl_256",
+                       sources=sycl_256_source_files,
+                       include_dirs=include_headers,
+                       extra_compile_args={'cxx': cxx_flags},
+                       extra_link_args=extra_ldflags),
+        DPCPPExtension(name="autogptq_sycl_64",
+                       sources=sycl_64_source_files,
                        include_dirs=include_headers,
                        extra_compile_args={'cxx': cxx_flags},
                        extra_link_args=extra_ldflags)

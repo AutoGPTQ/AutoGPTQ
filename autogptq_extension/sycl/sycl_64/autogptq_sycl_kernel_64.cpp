@@ -4,11 +4,6 @@
 #include <dpct/dpct.hpp>
 #include "../sycl_utils.h"
 
-typedef gptq::xpu::SyclTypeTrait<c10::Half> half;
-//#define dpct::atomic_compare_exchange_strong<sycl::access::address_space::generic_space> atomicCAS_sycl;
-//using sycl_hadd = sycl::ext::intel::math::hadd ;
-
-// disable these atomic methods for SYCL for now.
 // atomicAdd for double-precision floating-point numbers on hardware with
 // compute capability < 6.0 from:
 // https://docs.nvidia.com/cuda/cuda-c-programming-guide/index.html#atomic-functions
@@ -35,10 +30,10 @@ typedef gptq::xpu::SyclTypeTrait<c10::Half> half;
 // }
 // #endif
 
-//#if (defined(DPCT_COMPATIBILITY_TEMP) && DPCT_COMPATIBILITY_TEMP < 700) || defined(USE_ROCM)
-// adapted from https://github.com/torch/cutorch/blob/master/lib/THC/THCAtomics.cuh
 /*
-inline void atomicAdd(half* address, half val) {
+#if (defined(DPCT_COMPATIBILITY_TEMP) && DPCT_COMPATIBILITY_TEMP < 700) || defined(USE_ROCM)
+// adapted from https://github.com/torch/cutorch/blob/master/lib/THC/THCAtomics.cuh
+__device__ __forceinline__ void atomicAdd(c10::Half* address, c10::Half val) {
     unsigned int *address_as_ui = reinterpret_cast<unsigned int *>(reinterpret_cast<char *>(address) - (reinterpret_cast<size_t>(address) & 2));
     unsigned int old = *address_as_ui;
     unsigned int assumed;
@@ -46,34 +41,33 @@ inline void atomicAdd(half* address, half val) {
     do {
         assumed = old;
         unsigned short hsum = reinterpret_cast<size_t>(address) & 2 ? (old >> 16) : (old & 0xffff);
-        (half)hsum += val;
+        hsum += val;
         old = reinterpret_cast<size_t>(address) & 2
                  ? (old & 0xffff) | (hsum << 16)
                  : (old & 0xffff0000) | hsum;
-        old = dpct::atomic_compare_exchange_strong<sycl::access::address_space::generic_space>(&address_as_ui[0], assumed, old);
+        old = atomicCAS(address_as_ui, assumed, old);
 
     // Note: uses integer comparison to avoid hang in case of NaN (since NaN != NaN)
     } while (assumed != old);
 }
-inline void atomicAdd(sycl::half* address, half val) {
+__device__ __forceinline__ void atomicAdd(__half* address, c10::Half val) {
     unsigned int * address_as_ui = (unsigned int *) ((char *)address - ((size_t)address & 2));
     unsigned int old = *address_as_ui;
     unsigned int assumed;
 
     do {
         assumed = old;
-        uint16_t hsum{0};
-        hsum = (size_t)address & 2 ? (old >> 16) : (old & 0xffff);
-        //half tmpres = sycl_hadd(hsum, val);
-        half tmpres = (half)hsum + val;
-        hsum = tmpres;
-        old = (size_t)address & 2 ? (old & 0xffff) | (hsum << 16) : (old & 0xffff0000) | hsum;
-        old = dpct::atomic_compare_exchange_strong<sycl::access::address_space::generic_space>(&address_as_ui[0], assumed, old);
+        __half_raw hsum;
+        hsum.x = (size_t)address & 2 ? (old >> 16) : (old & 0xffff);
+        half tmpres = __hadd(hsum, val);
+        hsum = __half_raw(tmpres);
+        old = (size_t)address & 2 ? (old & 0xffff) | (hsum.x << 16) : (old & 0xffff0000) | hsum.x;
+        old = atomicCAS(address_as_ui, assumed, old);
     } while (assumed != old);
 }
 #endif
-
 */
+
 template <typename scalar_t>
 void VecQuant2MatMulKernel(
     const  scalar_t* __restrict__ vec,
@@ -252,11 +246,11 @@ void VecQuant4MatMulKernelFaster_old(
     sycl::local_accessor<sycl::half2, 2> deq2);
 
 
-const int BLOCKWIDTH  = 256;
-const int BLOCKHEIGHT2 =  16;
-const int BLOCKHEIGHT3 =  24;
-const int BLOCKHEIGHT4 =  32;
-const int BLOCKHEIGHT8 =  64;
+const int BLOCKWIDTH  = 64;
+const int BLOCKHEIGHT2 =  4;
+const int BLOCKHEIGHT3 =  6;
+const int BLOCKHEIGHT4 =  8;
+const int BLOCKHEIGHT8 =  16;
 
 inline unsigned int as_unsigned(int i) {
   return *reinterpret_cast<unsigned int*>(&i);
