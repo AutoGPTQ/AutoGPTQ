@@ -3,21 +3,23 @@
 #ifndef _hip_compat_cuh
 #define _hip_compat_cuh
 
-// Workaround for a bug in hipamd, backported from upstream.
+// Workaround for a bug in hipamd, backported from upstream, this is fixed in ROCm 5.6.
 __device__ __forceinline__ __half __compat_hrcp(__half x) {
     return __half_raw{
         static_cast<_Float16>(__builtin_amdgcn_rcph(static_cast<__half_raw>(x).data))};
 }
 
+// ROCm 6.0 compatible from: /opt/rocm-6.0.0/include/hip/amd_detail/amd_hip_fp16.h:1708
 __device__ __forceinline__ __half2 __compat_h2rcp(__half2 x) {
-    return _Float16_2{static_cast<_Float16>(__builtin_amdgcn_rcph(x.x)),
-        static_cast<_Float16>(__builtin_amdgcn_rcph(x.y))};
+    return _Float16_2{
+        _Float16_2{static_cast<_Float16>(1.0f), 
+            static_cast<_Float16>(1.0f)} / x.data};
 }
 
 #define hrcp __compat_hrcp
 #define h2rcp __compat_h2rcp
 
-// Workaround for hipify_python using rocblas instead of hipblas.
+// Automatic conversion of hipblasHgemm doesn't convert half to hipblasHalf.
 __host__ __forceinline__ hipblasStatus_t __compat_hipblasHgemm(hipblasHandle_t    handle,
                                                                hipblasOperation_t transA,
                                                                hipblasOperation_t transB,
@@ -39,7 +41,9 @@ __host__ __forceinline__ hipblasStatus_t __compat_hipblasHgemm(hipblasHandle_t  
                         reinterpret_cast<const hipblasHalf *>(beta),
                         reinterpret_cast<hipblasHalf *>(CP), ldc);
 }
+#define hipblasHgemm __compat_hipblasHgemm
 
+// Previous version of PyTorch were converting to rocBLAS instead of hipBLAS.
 #define rocblas_handle hipblasHandle_t
 #define rocblas_operation_none HIPBLAS_OP_N
 #define rocblas_get_stream hipblasGetStream

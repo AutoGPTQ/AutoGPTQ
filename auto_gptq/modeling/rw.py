@@ -1,4 +1,4 @@
-from ._base import *
+from ._base import BaseGPTQForCausalLM
 
 
 class RWGPTQForCausalLM(BaseGPTQForCausalLM):
@@ -9,7 +9,8 @@ class RWGPTQForCausalLM(BaseGPTQForCausalLM):
         ["self_attention.query_key_value"],
         ["self_attention.dense"],
         ["mlp.dense_h_to_4h"],
-        ["mlp.dense_4h_to_h"]
+        ["mlp.dense_4h_to_h"],
     ]
+
 
 __all__ = ["RWGPTQForCausalLM"]

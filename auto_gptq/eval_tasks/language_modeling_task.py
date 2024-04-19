@@ -15,7 +15,7 @@ class LanguageModelingTask(BaseTask):
         prompt_col_name: str,
         label_col_name: str,
         device: Optional[str] = None,
-        **kwargs
+        **kwargs,
     ):
         kwargs["merge_prompt_label"] = True
         super().__init__(
@@ -25,7 +25,7 @@ class LanguageModelingTask(BaseTask):
             prompt_col_name=prompt_col_name,
             label_col_name=label_col_name,
             device=device,
-            **kwargs
+            **kwargs,
         )
 
     def _predict(self, batch_data: Dict[str, Any], *args, **kwargs) -> List[float]:

@@ -87,7 +87,7 @@ __global__ void q4_matmul_kernel
             if constexpr (use_half2)
             {
                 half2 w_scale = w_scales_.item_half2half2(group, w_column);
-                uint32_t w_zero = w_zeros_.item(group, w_column) + 1;
+                uint32_t w_zero = (w_zeros_.item(group, w_column) + 1) & 0x0f;  // Avoid overflows.
 
                 if constexpr (use_x_map) acc = dot_product_8_x_map(acc, x_, x_row, k, w_, k, w_column, w_scale, w_zero, groupsize / 8, x_map);
                 else                     acc = dot_product_8      (acc, x_, x_row, k, w_, k, w_column, w_scale, w_zero, groupsize / 8);
@@ -95,7 +95,7 @@ __global__ void q4_matmul_kernel
             else
             {
                 half w_scale = w_scales_.item(group, w_column);
-                uint32_t w_zero = w_zeros_.item(group, w_column) + 1;
+                uint32_t w_zero = (w_zeros_.item(group, w_column) + 1) & 0x0f;  // Avoid overflows.
 
                 if constexpr (use_x_map) acc_h = dot_product_8_x_map_h(acc_h, x_, x_row, k, w_, k, w_column, w_scale, w_zero, groupsize / 8, x_map);
                 else                     acc_h = dot_product_8_h      (acc_h, x_, x_row, k, w_, k, w_column, w_scale, w_zero, groupsize / 8);
@@ -112,7 +112,7 @@ __global__ void q4_matmul_kernel
             {
                 int group = k / groupsize;
                 half2 w_scale = w_scales_.item_half2half2(group, w_column);
-                uint32_t w_zero = w_zeros_.item(group, w_column) + 1;
+                uint32_t w_zero = (w_zeros_.item(group, w_column) + 1) & 0x0f;  // Avoid overflows.
 
                 if constexpr (use_x_map) acc = dot_product_8_x_map(acc, x_, x_row, k, w_, k, w_column, w_scale, w_zero, 1, x_map);
                 else                     acc = dot_product_8      (acc, x_, x_row, k, w_, k, w_column, w_scale, w_zero, 1);
@@ -121,7 +121,7 @@ __global__ void q4_matmul_kernel
             {
                 int group = k / groupsize;
                 half w_scale = w_scales_.item(group, w_column);
-                uint32_t w_zero = w_zeros_.item(group, w_column) + 1;
+                uint32_t w_zero = (w_zeros_.item(group, w_column) + 1) & 0x0f;  // Avoid overflows.
 
                 if constexpr (use_x_map) acc_h = dot_product_8_x_map_h(acc_h, x_, x_row, k, w_, k, w_column, w_scale, w_zero, 1, x_map);
                 else                     acc_h = dot_product_8_h      (acc_h, x_, x_row, k, w_, k, w_column, w_scale, w_zero, 1);
@@ -240,7 +240,7 @@ void q4_matmul_recons_cuda
     const half* x_mapped = x;
     if (w->cuda_x_map)
     {
-        TORCH_CHECK(buffers->temp_state_size >= x_height * dim, "The temp_state buffer is too small in the exllama backend. Please call the exllama_set_max_input_length function to increase the buffer size. Example:\nfrom auto_gptq import exllama_set_max_input_length\nmodel = exllama_set_max_input_length(model, 4096)");
+        TORCH_CHECK(buffers->temp_state_size >= x_height * dim, "The temp_state buffer is too small in the exllama backend for GPTQ with act-order. Please call the exllama_set_max_input_length function to increase the buffer size for a sequence length >=", x_height, ":\nfrom auto_gptq import exllama_set_max_input_length\nmodel = exllama_set_max_input_length(model, max_input_length=", x_height, ")");
         column_remap_cuda(x, buffers->temp_state, x_height, dim, w->cuda_x_map);
         x_mapped = buffers->temp_state;
     }

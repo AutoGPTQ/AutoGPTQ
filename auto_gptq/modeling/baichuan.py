@@ -1,4 +1,4 @@
-from ._base import *
+from ._base import BaseGPTQForCausalLM
 
 
 class BaiChuanGPTQForCausalLM(BaseGPTQForCausalLM):
@@ -9,7 +9,7 @@ class BaiChuanGPTQForCausalLM(BaseGPTQForCausalLM):
         ["self_attn.W_pack"],
         ["self_attn.o_proj"],
         ["mlp.up_proj", "mlp.gate_proj"],
-        ["mlp.down_proj"]
+        ["mlp.down_proj"],
     ]
 
 

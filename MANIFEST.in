@@ -1,0 +1,5 @@
+global-include autogptq_extension/**/*.cuh
+global-include autogptq_extension/**/*.h
+global-include autogptq_extension/**/*.cpp
+global-include autogptq_extension/**/*.cu
+global-include autogptq_extension/**/*.py

@@ -1,15 +1,19 @@
-from ._base import *
+from ._base import BaseGPTQForCausalLM
 
 
 class BloomGPTQForCausalLM(BaseGPTQForCausalLM):
     layer_type = "BloomBlock"
     layers_block_name = "transformer.h"
-    outside_layer_modules = ["transformer.word_embeddings", "transformer.word_embeddings_layernorm", "transformer.ln_f"]
+    outside_layer_modules = [
+        "transformer.word_embeddings",
+        "transformer.word_embeddings_layernorm",
+        "transformer.ln_f",
+    ]
     inside_layer_modules = [
         ["self_attention.query_key_value"],
         ["self_attention.dense"],
         ["mlp.dense_h_to_4h"],
-        ["mlp.dense_4h_to_h"]
+        ["mlp.dense_4h_to_h"],
     ]
 
 
