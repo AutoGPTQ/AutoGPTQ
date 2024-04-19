@@ -25,7 +25,6 @@ SUPPORTED_MODELS = [
     "stablelm_epoch",
     "mpt",
     "cohere",
-    "dbrx",
 ]
 if compare_transformers_version("v4.28.0", op="ge"):
     SUPPORTED_MODELS.append("llama")
@@ -45,6 +44,8 @@ if compare_transformers_version("v4.38.0", op="ge"):
     SUPPORTED_MODELS.append("gemma")
 if compare_transformers_version("v4.39.0.dev0", op="ge"):
     SUPPORTED_MODELS.append("starcoder2")
+if compare_transformers_version("v4.40.0", op="ge"):
+    SUPPORTED_MODELS.append("dbrx")
 
 EXLLAMA_DEFAULT_MAX_INPUT_LENGTH = 2048
 
