@@ -1,7 +1,9 @@
 import copy
+import json
 import logging
 import os
-from os.path import isdir, join
+import re
+from os.path import isdir, isfile, join
 from typing import Dict, List, Optional, Union
 
 import accelerate
@@ -14,7 +16,7 @@ from safetensors.torch import load_file as safe_load
 from safetensors.torch import save_file as safe_save
 from tqdm import tqdm
 from transformers import AutoConfig, AutoModelForCausalLM, PreTrainedModel
-from transformers.modeling_utils import no_init_weights
+from transformers.modeling_utils import no_init_weights, shard_checkpoint
 from transformers.utils.generic import ContextManagers
 from transformers.utils.hub import (
     CommitOperationAdd,
@@ -188,7 +190,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             raise ValueError(f"Unsupported quantization operation for quant method: {self.quantize_config.quant_method}")
 
         # alert users to limit threads so packing performance does not regress by up to ~100x
-        thread_warning = """If you have not already done so, please inject the following code at the very top of your 
+        thread_warning = """If you have not already done so, please inject the following code at the very top of your
 quantization script so the packing stage is optimized for speed. Using too many cores may reduce packing performance.
 ----
 import os
@@ -591,20 +593,20 @@ os.environ['NUMEXPR_MAX_THREADS'] = max_threads
                         logger.debug(
                             f"One or more safetensors_metadata keys or values had to be converted to str(). Final safetensors_metadata: {safetensors_metadata}")
 
-            # Format is required to enable Accelerate to load the metadata
-            # otherwise it raises an OSError
-            safetensors_metadata["format"] = "pt"
+                # Format is required to enable Accelerate to load the metadata
+                # otherwise it raises an OSError
+                safetensors_metadata["format"] = "pt"
 
-            # Store the quantization configuration as safetensors metadata
-            from auto_gptq import __version__
+                # Store the quantization configuration as safetensors metadata
+                from auto_gptq import __version__
 
-            safetensors_metadata["auto_gptq_version"] = str(__version__)
-            safetensors_metadata["gptq_bits"] = str(self.quantize_config.bits)
-            safetensors_metadata["gptq_group_size"] = str(self.quantize_config.group_size)
-            safetensors_metadata["gptq_desc_act"] = str(self.quantize_config.desc_act)
-            safetensors_metadata["gptq_damp_percent"] = str(self.quantize_config.damp_percent)
-            safetensors_metadata["gptq_" + CHECKPOINT_FORMAT_FIELD] = self.quantize_config.checkpoint_format
-            safetensors_metadata["gptq_" + QUANT_METHOD_FIELD] = self.quantize_config.quant_method
+                safetensors_metadata["auto_gptq_version"] = str(__version__)
+                safetensors_metadata["gptq_bits"] = str(self.quantize_config.bits)
+                safetensors_metadata["gptq_group_size"] = str(self.quantize_config.group_size)
+                safetensors_metadata["gptq_desc_act"] = str(self.quantize_config.desc_act)
+                safetensors_metadata["gptq_damp_percent"] = str(self.quantize_config.damp_percent)
+                safetensors_metadata["gptq_" + CHECKPOINT_FORMAT_FIELD] = self.quantize_config.checkpoint_format
+                safetensors_metadata["gptq_" + QUANT_METHOD_FIELD] = self.quantize_config.quant_method
 
                 safe_save(shard, join(save_dir, shard_file), safetensors_metadata)
             else:
