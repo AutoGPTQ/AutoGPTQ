@@ -187,6 +187,23 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         if self.quantize_config.quant_method in QUANTIZE_BLACK_LIST:
             raise ValueError(f"Unsupported quantization operation for quant method: {self.quantize_config.quant_method}")
 
+        # alert users to limit threads so packing performance does not regress by up to ~100x
+        thread_warning = """If you have not already done so, please inject the following code at the very top of your 
+quantization script so the packing stage is optimized for speed. Using too many cores may reduce packing performance.
+----
+import os
+import math
+max_threads = str(min(8, os.cpu_count()))
+os.environ['OMP_NUM_THREADS'] = max_threads
+os.environ['OPENBLAS_NUM_THREADS'] = max_threads
+os.environ['MKL_NUM_THREADS'] = max_threads
+os.environ['VECLIB_MAXIMUM_THREADS'] = max_threads
+os.environ['NUMEXPR_NUM_THREADS'] = max_threads
+os.environ['NUMEXPR_MAX_THREADS'] = max_threads
+----
+"""
+        logger.warning(thread_warning)
+
         if use_triton and not TRITON_AVAILABLE:
             logger.warning("triton is not installed, reset use_triton to False")
             use_triton = False
