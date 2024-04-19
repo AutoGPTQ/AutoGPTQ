@@ -1,7 +1,9 @@
 import copy
+import json
 import logging
 import os
-from os.path import isdir, join
+import re
+from os.path import isdir, isfile, join
 from typing import Dict, List, Optional, Union
 
 import accelerate
@@ -14,7 +16,7 @@ from safetensors.torch import load_file as safe_load
 from safetensors.torch import save_file as safe_save
 from tqdm import tqdm
 from transformers import AutoConfig, AutoModelForCausalLM, PreTrainedModel
-from transformers.modeling_utils import no_init_weights
+from transformers.modeling_utils import no_init_weights, shard_checkpoint
 from transformers.utils.generic import ContextManagers
 from transformers.utils.hub import (
     CommitOperationAdd,
@@ -188,7 +190,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             raise ValueError(f"Unsupported quantization operation for quant method: {self.quantize_config.quant_method}")
 
         # alert users to limit threads so packing performance does not regress by up to ~100x
-        thread_warning = """If you have not already done so, please inject the following code at the very top of your 
+        thread_warning = """If you have not already done so, please inject the following code at the very top of your
 quantization script so the packing stage is optimized for speed. Using too many cores may reduce packing performance.
 ----
 import os
@@ -447,6 +449,8 @@ os.environ['NUMEXPR_MAX_THREADS'] = max_threads
         private: Optional[bool] = None,
         token: Optional[Union[bool, str]] = None,
         create_pr: Optional[bool] = False,
+        max_shard_size: str = "10GB",
+        model_base_name: Optional[str] = None
     ) -> str:
         """
         Upload the model to the Hugging Face Hub.
@@ -488,7 +492,7 @@ os.environ['NUMEXPR_MAX_THREADS'] = max_threads
 
         if save_dir is not None:
             logger.info(f"Saving model to {save_dir}")
-            self.save_quantized(save_dir, use_safetensors, safetensors_metadata)
+            self.save_quantized(save_dir, use_safetensors, safetensors_metadata, max_shard_size, model_base_name)
 
         repo_url = create_repo(
             repo_id=repo_id,
@@ -519,6 +523,8 @@ os.environ['NUMEXPR_MAX_THREADS'] = max_threads
         save_dir: str,
         use_safetensors: bool = True,
         safetensors_metadata: Optional[Dict[str, str]] = None,
+        max_shard_size: str = "10GB",
+        model_base_name: Optional[str] = None,
     ):
         """save quantized model and configs to local disk"""
         os.makedirs(save_dir, exist_ok=True)
@@ -526,64 +532,93 @@ os.environ['NUMEXPR_MAX_THREADS'] = max_threads
         if not self.quantized:
             raise EnvironmentError("can only save quantized model, please execute .quantize first.")
 
-        self.model.to(CPU)
+        if model_base_name is None:
+            model_base_name = (
+                self.quantize_config.model_file_base_name or
+                f"gptq_model-{self.quantize_config.bits}bit-{self.quantize_config.group_size}g"
+            )
 
-        model_base_name = (
-            self.quantize_config.model_file_base_name
-            or f"gptq_model-{self.quantize_config.bits}bit-{self.quantize_config.group_size}g"
-        )
+        state_dict = self.model.state_dict()
         if use_safetensors:
-            model_save_name = model_base_name + ".safetensors"
-            state_dict = self.model.state_dict()
             state_dict = {k: v.clone().contiguous() for k, v in state_dict.items()}
-            if safetensors_metadata is None:
-                safetensors_metadata = {}
-            elif not isinstance(safetensors_metadata, dict):
-                raise TypeError("safetensors_metadata must be a dictionary.")
-            else:
-                logger.debug(f"Received safetensors_metadata: {safetensors_metadata}")
-                new_safetensors_metadata = {}
-                converted_keys = False
-                for key, value in safetensors_metadata.items():
-                    if not isinstance(key, str) or not isinstance(value, str):
-                        converted_keys = True
-                        try:
-                            new_key = str(key)
-                            new_value = str(value)
-                        except Exception as e:
-                            raise TypeError(
-                                f"safetensors_metadata: both keys and values must be strings and an error occured when trying to convert them: {e}"
-                            )
-                        if new_key in new_safetensors_metadata:
-                            logger.warning(
-                                f"After converting safetensors_metadata keys to strings, the key '{new_key}' is duplicated. Ensure that all your metadata keys are strings to avoid overwriting."
-                            )
-                        new_safetensors_metadata[new_key] = new_value
-                safetensors_metadata = new_safetensors_metadata
-                if converted_keys:
-                    logger.debug(
-                        f"One or more safetensors_metadata keys or values had to be converted to str(). Final safetensors_metadata: {safetensors_metadata}"
-                    )
-
-            # Format is required to enable Accelerate to load the metadata
-            # otherwise it raises an OSError
-            safetensors_metadata["format"] = "pt"
-
-            # Store the quantization configuration as safetensors metadata
-            from auto_gptq import __version__
-
-            safetensors_metadata["auto_gptq_version"] = str(__version__)
-            safetensors_metadata["gptq_bits"] = str(self.quantize_config.bits)
-            safetensors_metadata["gptq_group_size"] = str(self.quantize_config.group_size)
-            safetensors_metadata["gptq_desc_act"] = str(self.quantize_config.desc_act)
-            safetensors_metadata["gptq_damp_percent"] = str(self.quantize_config.damp_percent)
-            safetensors_metadata["gptq_" + CHECKPOINT_FORMAT_FIELD] = self.quantize_config.checkpoint_format
-            safetensors_metadata["gptq_" + QUANT_METHOD_FIELD] = self.quantize_config.quant_method
-
-            safe_save(state_dict, join(save_dir, model_save_name), safetensors_metadata)
+            model_save_name = model_base_name + ".safetensors"
         else:
             model_save_name = model_base_name + ".bin"
-            torch.save(self.model.state_dict(), join(save_dir, model_save_name))
+
+        # Shard checkpoint
+        shards, index = shard_checkpoint(state_dict, max_shard_size=max_shard_size, weights_name=model_save_name)
+
+        # Clean the folder from a previous save
+        for filename in os.listdir(save_dir):
+            full_filename = join(save_dir, filename)
+
+            # make sure that file to be deleted matches format of sharded file, e.g. pytorch_model-00001-of-00005
+            filename_no_suffix = filename.replace(".bin", "").replace(".safetensors", "")
+            reg = re.compile(r"(.*?)-\d{5}-of-\d{5}")
+
+            if (
+                filename.startswith(model_base_name)
+                and isfile(full_filename)
+                and filename not in shards.keys()
+                and reg.fullmatch(filename_no_suffix) is not None
+            ):
+                os.remove(full_filename)
+
+        # Save the model
+        for shard_file, shard in shards.items():
+            if use_safetensors:
+                if safetensors_metadata is None:
+                    safetensors_metadata = {}
+                elif not isinstance(safetensors_metadata, dict):
+                    raise TypeError("safetensors_metadata must be a dictionary.")
+                else:
+                    logger.debug(f"Received safetensors_metadata: {safetensors_metadata}")
+                    new_safetensors_metadata = {}
+                    converted_keys = False
+                    for key, value in safetensors_metadata.items():
+                        if not isinstance(key, str) or not isinstance(value, str):
+                            converted_keys = True
+                            try:
+                                new_key = str(key)
+                                new_value = str(value)
+                            except Exception as e:
+                                raise TypeError(
+                                    f"safetensors_metadata: both keys and values must be strings and an error occured when trying to convert them: {e}")
+                            if new_key in new_safetensors_metadata:
+                                logger.warning(
+                                    f"After converting safetensors_metadata keys to strings, the key '{new_key}' is duplicated. Ensure that all your metadata keys are strings to avoid overwriting.")
+                            new_safetensors_metadata[new_key] = new_value
+                    safetensors_metadata = new_safetensors_metadata
+                    if converted_keys:
+                        logger.debug(
+                            f"One or more safetensors_metadata keys or values had to be converted to str(). Final safetensors_metadata: {safetensors_metadata}")
+
+                # Format is required to enable Accelerate to load the metadata
+                # otherwise it raises an OSError
+                safetensors_metadata["format"] = "pt"
+
+                # Store the quantization configuration as safetensors metadata
+                from auto_gptq import __version__
+
+                safetensors_metadata["auto_gptq_version"] = str(__version__)
+                safetensors_metadata["gptq_bits"] = str(self.quantize_config.bits)
+                safetensors_metadata["gptq_group_size"] = str(self.quantize_config.group_size)
+                safetensors_metadata["gptq_desc_act"] = str(self.quantize_config.desc_act)
+                safetensors_metadata["gptq_damp_percent"] = str(self.quantize_config.damp_percent)
+                safetensors_metadata["gptq_" + CHECKPOINT_FORMAT_FIELD] = self.quantize_config.checkpoint_format
+                safetensors_metadata["gptq_" + QUANT_METHOD_FIELD] = self.quantize_config.quant_method
+
+                safe_save(shard, join(save_dir, shard_file), safetensors_metadata)
+            else:
+                torch.save(shard, join(save_dir, shard_file))
+
+        if index is not None:
+            index_save_name = model_save_name + ".index.json"
+            index_save_path = join(save_dir, index_save_name)
+            # Save the index as well
+            with open(index_save_path, "w", encoding="utf-8") as f:
+                content = json.dumps(index, indent=2, sort_keys=True) + "\n"
+                f.write(content)
 
         self.model.config.quantization_config = self.quantize_config.to_dict()
         self.model.config.save_pretrained(save_dir)
@@ -600,7 +635,7 @@ os.environ['NUMEXPR_MAX_THREADS'] = max_threads
     ):
         """alias of save_quantized"""
         logger.warning("you are using save_pretrained, which will re-direct to save_quantized.")
-        self.save_quantized(save_dir, use_safetensors, safetensors_metadata)
+        self.save_quantized(save_dir, use_safetensors, safetensors_metadata, **kwargs)
 
     @classmethod
     def from_pretrained(
