@@ -158,6 +158,8 @@ def convert_gptq_v1_to_v2_format(
     for _, submodule in model.named_modules():
         # v1 checkpoint format used to do `qzeros = qzeros -= 1` before serialization, thus the
         # additions here do not overflow.
+        # v1 checkpoint format with sym=False saved via convert_gptq_v2_to_v1_format() will
+        # overflow ~<=13% based on testing
         if isinstance(submodule, qlinear_kernel):
             if use_qigen:
                 submodule.zeros.data += 1
@@ -187,7 +189,7 @@ def convert_gptq_v2_to_v1_format(
     count_values = 0
 
     for _, submodule in model.named_modules():
-        # TODO: This may well underflow.
+        # sym=False has underflow probability of ~<=13% during testing. No underflow possible for sym=True.
         if isinstance(submodule, qlinear_kernel):
             if use_qigen:
                 submodule.zeros.data -= 1
