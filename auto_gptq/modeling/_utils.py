@@ -148,6 +148,7 @@ def make_quant(
             new_layer.device = ori_layer_device
             recurse_setattr(module, name, new_layer.to(ori_layer_device))
 
+
 def convert_gptq_v1_to_v2_format(
     model,
     quantize_config: BaseQuantizeConfig,
@@ -178,15 +179,13 @@ def convert_gptq_v1_to_v2_format(
                     raise NotImplementedError("Only 2,3,4,8 bits are supported.")
     return model
 
+
 def convert_gptq_v2_to_v1_format(
     model,
     quantize_config: BaseQuantizeConfig,
     qlinear_kernel: nn.Module,
 ):
     use_qigen = qlinear_kernel.QUANT_TYPE == "qigen"
-
-    count_underflows = 0
-    count_values = 0
 
     for _, submodule in model.named_modules():
         # sym=False has underflow probability of ~<=13% during testing. No underflow possible for sym=True.
@@ -201,61 +200,14 @@ def convert_gptq_v2_to_v1_format(
                     submodule.qzeros.data[:,range(1,submodule.qzeros.data.shape[1],3)] -= 0b10010010010010010010010010010010
                     submodule.qzeros.data[:,range(2,submodule.qzeros.data.shape[1],3)] -= 0b01001001001001001001001001001001
                 elif quantize_config.bits == 4:
-
-                    # print(f"Module: {submodule}, qzeros tensor type: {submodule.qzeros.dtype}")
-                    # print(f"Module: {submodule}, qzeros data type: {type(submodule.qzeros.data).__name__}")
-                    #submodule.qzeros.data -= 0b00010001000100010001000100010001
-                    subtract_value = 0b00010001000100010001000100010001
-
-                    # ---- vectorized code ----
-                    # Flatten the tensor for easy iteration
-                    flat_tensor = submodule.qzeros.data.view(-1)
-
-                    # Calculate the subtract_result for all elements
-                    subtract_result = flat_tensor - subtract_value
-
-                    # Create masks for the non-underflow conditions
-                    mask1 = (flat_tensor >= 0) & (subtract_result < flat_tensor)
-                    mask2 = (flat_tensor < 0) & (subtract_result > flat_tensor)
-
-                    # Apply the masks to update the tensor values
-                    # flat_tensor[mask1 | mask2] -= subtract_value
-
-                    # do all despite underflow
-                    flat_tensor -= subtract_value
-
-                    # Count the number of underflows
-                    underflows = (~mask1 & ~mask2).sum().item()
-
-                    # Calculate the percentage of underflows
-                    underflow_percentage = (underflows / flat_tensor.numel()) * 100
-
-                    # Print the underflow message
-                    if underflows > 0:
-                        logger.warning(f"Underflow Detected: submodule: {submodule}, underflow count {underflows}, percentage {underflow_percentage}%")
-
-                    count_values += flat_tensor.numel()
-                    count_underflows += underflows
-
-                    # ---- non-vectorized code ----
-                    # for t in submodule.qzeros.data:
-                    #     for i in range(t.numel()):
-                    #         val = t[i]  # int32
-                    #         subtract_result = val - subtract_value
-                    #         # check for int32 underflow
-                    #         if (val >= 0 and subtract_result <= val) or (val < 0 and subtract_result >= val):
-                    #             t[i] = subtract_result
-                    #         else:
-                    #             underflow += 1
-                    #             print(f"Underflow detected. Value not subtracted. module: {submodule}, tensor index: {i}, value:{val}")
+                    submodule.qzeros.data -= 0b00010001000100010001000100010001
                 elif quantize_config.bits == 8:
                     submodule.qzeros.data -= 0b00000001000000010000000100000001
                 else:
                     raise NotImplementedError("Only 2,3,4,8 bits are supported.")
 
-    if count_underflows > 0:
-        logger.warning(f"Underflow Summary: underflow count {count_underflows}, {(count_underflows/count_values)* 100}%")
     return model
+
 
 def preprocess_checkpoint_qigen(
     module,
