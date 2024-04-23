@@ -137,10 +137,10 @@ def convert_to_marlin(model, model_quantlinear, quantization_config: BaseQuantiz
             Whether to repack the qweights from `model` into the Marlin's QuantLinear layers.
     """
     if repack:
-        message = "Repacking weights to be compatible with Marlin kernel..."
+        message = "Repacking weights to be compatible with Marlin kernel"
     else:
         # TODO: load directly Marlin QuantLinear.
-        message = "Overriding QuantLinear layers to use Marlin's QuantLinear..."
+        message = "Overriding QuantLinear layers to use Marlin's QuantLinear"
 
     for name, module in tqdm(model.named_modules(), desc=message, total=len(list(model.named_modules()))):
         if not isinstance(module, model_quantlinear):
