@@ -67,7 +67,6 @@ class TestQuantization(unittest.TestCase):
                 tmpdirname,
                 device="cuda:0",
                 use_marlin=use_marlin,
-                use_unsafe_math=True if not sym and checkpoint_format == CHECKPOINT_FORMAT.GPTQ else False,
             )
 
             logging.info(f"Loaded config: {model.quantize_config}")
@@ -92,8 +91,6 @@ class TestQuantization(unittest.TestCase):
                 tmpdirname,
                 device="cuda:0",
                 quantize_config=compat_quantize_config,
-                use_unsafe_math=True if not sym and checkpoint_format == CHECKPOINT_FORMAT.GPTQ
-                else False,
             )
             assert isinstance(model.quantize_config, BaseQuantizeConfig)
 
@@ -114,6 +111,5 @@ class TestQuantization(unittest.TestCase):
                 device="cuda:0",
                 quantize_config=compat_quantize_config,
                 checkpoint_format=checkpoint_format,
-                use_unsafe_math=True if not sym and checkpoint_format == CHECKPOINT_FORMAT.GPTQ else False,
             )
             assert isinstance(model.quantize_config, BaseQuantizeConfig)
