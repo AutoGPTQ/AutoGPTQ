@@ -76,7 +76,9 @@ class BaseQuantizeConfig(PushToHubMixin):
     sym: bool = field(default=True)
     true_sequential: bool = field(default=True)
     quant_method: str = field(default=QUANT_METHOD.GPTQ)
-    checkpoint_format: str = field(default=CHECKPOINT_FORMAT.GPTQ_V2)
+    # default to gptq v1 format for maximum compat with 3rd party inference libs with minimal loss vs v2
+    # if you inference with autogptq, save to gptq_v2 format for best result
+    checkpoint_format: str = field(default=CHECKPOINT_FORMAT.GPTQ)
     model_name_or_path: Optional[str] = field(default=None)
     model_file_base_name: Optional[str] = field(default=None)
     # properties that do not directly contributes to quantization or quant inference should be placed in meta

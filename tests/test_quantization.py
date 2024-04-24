@@ -48,7 +48,6 @@ class TestQuantization(unittest.TestCase):
         with (tempfile.TemporaryDirectory() as tmpdirname):
             model.save_pretrained(
                 tmpdirname,
-                use_unsafe_math=True if not sym and checkpoint_format == CHECKPOINT_FORMAT.GPTQ else False,
             )
 
             logging.info(f"Saved config mem: {model.quantize_config}")

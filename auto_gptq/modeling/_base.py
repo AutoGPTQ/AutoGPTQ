@@ -538,8 +538,6 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         safetensors_metadata: Optional[Dict[str, str]] = None,
         checkpoint_format: Optional[str] = None,
         use_safetensors: bool = True,
-        # sym=False saving to gptq (v1) has ~13% underflow possibility. unsafe_math may result in unstable model and is not allowed by default
-        use_unsafe_math: bool = False,
     ):
         """save quantized model and configs to local disk"""
         os.makedirs(save_dir, exist_ok=True)
@@ -579,10 +577,6 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                 if quantize_config.checkpoint_format != CHECKPOINT_FORMAT.GPTQ_V2:
                     raise NotImplementedError(f"Asked to serialize a model with `checkpoint_format={checkpoint_format}` but the model format is {quantize_config.checkpoint_format}. This is not supported. Please open an issue at https://github.com/AutoGPTQ/AutoGPTQ/issues.")
 
-                # sym=False will underflow to gptq(V1) format. do not allow underflow ops if use_unsafe_math is not enabled by advanced user
-                if not quantize_config.sym and not use_unsafe_math:
-                    raise ValueError(f"Serialization to model with sym=False into checkpoint_format={CHECKPOINT_FORMAT.GPTQ} requires unsafe math (underflow) operations to ~13% of the weights. If you understand the ramifications, you can continue by passing use_unsafe_math=True. Ref: https://github.com/AutoGPTQ/AutoGPTQ/pull/640#issuecomment-2062980004")
-
                 model = convert_gptq_v2_to_v1_format(
                     model,
                     quantize_config=quantize_config,
@@ -593,10 +587,6 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
 
         # internal is always gptq v2 but allow users to pass gptq (v1) via config
         if checkpoint_format is None and quantize_config.checkpoint_format == CHECKPOINT_FORMAT.GPTQ:
-            # sym=False will underflow to gptq(V1) format. do not allow underflow ops if use_unsafe_math is not enabled by advanced user
-            if not quantize_config.sym and not use_unsafe_math:
-                raise ValueError(f"Serialization to model with sym=False into checkpoint_format={CHECKPOINT_FORMAT.GPTQ} requires unsafe math (underflow) operations to ~13% of the weights. If you understand the ramifications, you can continue by passing use_unsafe_math=True. Ref: https://github.com/AutoGPTQ/AutoGPTQ/pull/640#issuecomment-2062980004")
-
             # Model qzeros may be edited in place.
             # TODO: avoid inplace modification of the weights
             model = copy.deepcopy(self.model)
