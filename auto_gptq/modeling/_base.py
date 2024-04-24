@@ -8,6 +8,7 @@ import accelerate
 import torch
 import torch.nn as nn
 import transformers
+import threadpoolctl as tctl
 from accelerate.hooks import remove_hook_from_module
 from safetensors import safe_open
 from safetensors.torch import load_file as safe_load
@@ -1123,39 +1124,40 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                         max_layer_name_length = len(max(gptq_layers, key=len))
                         pbar = tqdm(gptq_layers)
                         i = 0
-                        for gptq_layer_name in pbar:
-                            i += 1
-                            desc = f"Unpacking {gptq_layer_name}"
-                            desc = desc + " " * (max_layer_name_length - len(desc))
+                        with tctl.threadpool_limits(limits=1):
+                            for gptq_layer_name in pbar:
+                                i += 1
+                                desc = f"Unpacking {gptq_layer_name}"
+                                desc = desc + " " * (max_layer_name_length - len(desc))
 
-                            awq_qweight = f.get_tensor(gptq_layer_name + ".qweight")
-                            awq_qzeros = f.get_tensor(gptq_layer_name + ".qzeros")
-                            awq_scales = f.get_tensor(gptq_layer_name + ".scales")
+                                awq_qweight = f.get_tensor(gptq_layer_name + ".qweight")
+                                awq_qzeros = f.get_tensor(gptq_layer_name + ".qzeros")
+                                awq_scales = f.get_tensor(gptq_layer_name + ".scales")
 
-                            # TODO: add FAST unpacking.
-                            unpacked_qweight, unpacked_qzeros = unpack_awq(
-                                awq_qweight,
-                                awq_qzeros,
-                                awq_scales,
-                                bits=quantize_config.bits,
-                                group_size=quantize_config.group_size,
-                            )
+                                # TODO: add FAST unpacking.
+                                unpacked_qweight, unpacked_qzeros = unpack_awq(
+                                    awq_qweight,
+                                    awq_qzeros,
+                                    awq_scales,
+                                    bits=quantize_config.bits,
+                                    group_size=quantize_config.group_size,
+                                )
 
-                            # TODO: add FAST repacking, this is too slow.
-                            desc = f"Repacking {gptq_layer_name}"
-                            desc = desc + " " * (max_layer_name_length + 12 - len(desc))
-                            pbar.set_description(desc)
-                            gptq_qweight, gptq_qzeros = pack_from_tensors(
-                                unpacked_qweight,
-                                unpacked_qzeros,
-                                awq_scales,
-                                bits=quantize_config.bits,
-                                group_size=quantize_config.group_size,
-                            )
+                                # TODO: add FAST repacking, this is too slow.
+                                desc = f"Repacking {gptq_layer_name}"
+                                desc = desc + " " * (max_layer_name_length + 12 - len(desc))
+                                pbar.set_description(desc)
+                                gptq_qweight, gptq_qzeros = pack_from_tensors(
+                                    unpacked_qweight,
+                                    unpacked_qzeros,
+                                    awq_scales,
+                                    bits=quantize_config.bits,
+                                    group_size=quantize_config.group_size,
+                                )
 
-                            new_state_dict[gptq_layer_name + ".qweight"] = gptq_qweight
-                            new_state_dict[gptq_layer_name + ".qzeros"] = gptq_qzeros
-                            new_state_dict[gptq_layer_name + ".scales"] = awq_scales
+                                new_state_dict[gptq_layer_name + ".qweight"] = gptq_qweight
+                                new_state_dict[gptq_layer_name + ".qzeros"] = gptq_qzeros
+                                new_state_dict[gptq_layer_name + ".scales"] = awq_scales
 
                         safe_save(new_state_dict, model_cache_name)
                         model_save_name = model_cache_name
