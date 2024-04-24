@@ -806,8 +806,6 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         disable_exllamav2: bool = False,
         use_tritonv2: bool = False,
         checkpoint_format: Optional[str] = None,
-        # sym=False saving to gptq (v1) has ~13% underflow possibility. loading sym=Fase from gptq (v1) requires overflow math and is disable by default.
-        use_unsafe_math: bool = False,
         **kwargs,
     ):
         """load quantized model from local disk"""
@@ -1290,11 +1288,6 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                     f"Loading of a sym=False model with checkpoint_format={CHECKPOINT_FORMAT.GPTQ} is only supported if produced by autogptq version >= {MIN_VERSION_WITH_V2}")
 
             logger.info(f"Compatibility: converting `checkpoint_format` from `{CHECKPOINT_FORMAT.GPTQ}` to `{CHECKPOINT_FORMAT.GPTQ_V2}`.")
-
-            # sym=False from gptq(V1) format has overflow porbability ~13%. do not allow overflow ops if use_unsafe_math is not enabled by advanced user
-            if not quantize_config.sym and not use_unsafe_math:
-                raise ValueError(
-                    f"Loading a sym=False model with checkpoint_format={CHECKPOINT_FORMAT.GPTQ} requires unsafe math (overflow) operations to ~13% of the weights. If you understand the ramifications, you can continue by passing use_unsafe_math=True. Ref: https://github.com/AutoGPTQ/AutoGPTQ/pull/640#issuecomment-2062980004")
 
             model = convert_gptq_v1_to_v2_format(
                 model,
