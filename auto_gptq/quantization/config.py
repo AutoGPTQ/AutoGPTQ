@@ -136,7 +136,6 @@ class BaseQuantizeConfig(PushToHubMixin):
     # is quantized model produced by autogptq version with v2 checkpoint_format code
     def is_produced_by_v2(self) -> bool:
         producer, _version = self.meta_get_quantizer()
-        print(f"debug producer: {producer}, version: {_version}")
         return producer == META_PRODUCER_AUTOGPTQ and version.parse(_version) >= version.parse(MIN_VERSION_WITH_V2)
 
     def save_pretrained(self, save_dir: str, **kwargs):

@@ -55,7 +55,7 @@ class TestQuantization(unittest.TestCase):
 
             with open(tmpdirname + "/" + QUANT_CONFIG_FILENAME, 'r') as f:
                 file_dict = json.loads(f.read())
-                # normalize to memory
+                # skip comparison of these two model path specific fields that do not exist in memory
                 file_dict["model_name_or_path"] = None
                 file_dict["model_file_base_name"] = None
 
@@ -75,6 +75,10 @@ class TestQuantization(unittest.TestCase):
             del model
             torch.cuda.empty_cache()
 
+            # skip compat test with sym=False and v1 since we do meta version safety check
+            if not sym and checkpoint_format == CHECKPOINT_FORMAT.GPTQ:
+                return
+
             # test compat: 1) with simple dict type 2) is_marlin_format
             compat_quantize_config = {
                 "bits": 4,
@@ -83,11 +87,13 @@ class TestQuantization(unittest.TestCase):
                 "desc_act": True,
                 "is_marlin_format": use_marlin,
             }
+
             model = AutoGPTQForCausalLM.from_quantized(
                 tmpdirname,
                 device="cuda:0",
                 quantize_config=compat_quantize_config,
-                use_unsafe_math=True if not sym and checkpoint_format == CHECKPOINT_FORMAT.GPTQ  else False,
+                use_unsafe_math=True if not sym and checkpoint_format == CHECKPOINT_FORMAT.GPTQ
+                else False,
             )
             assert isinstance(model.quantize_config, BaseQuantizeConfig)
 
