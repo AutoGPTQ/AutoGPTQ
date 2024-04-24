@@ -1,3 +1,5 @@
+import json
+import logging
 import os
 import tempfile  # noqa: E402
 import unittest  # noqa: E402
@@ -6,9 +8,9 @@ import torch.cuda  # noqa: E402
 from parameterized import parameterized  # noqa: E402
 from transformers import AutoTokenizer  # noqa: E402
 
-from auto_gptq import AutoGPTQForCausalLM  # noqa: E402
+from auto_gptq import AutoGPTQForCausalLM, __version__  # noqa: E402
 from auto_gptq.quantization import CHECKPOINT_FORMAT, QUANT_CONFIG_FILENAME, BaseQuantizeConfig  # noqa: E402
-
+from auto_gptq.quantization.config import META_PRODUCER_AUTOGPTQ
 
 class TestQuantization(unittest.TestCase):
     @parameterized.expand([
@@ -43,11 +45,23 @@ class TestQuantization(unittest.TestCase):
 
         model.quantize(examples)
 
-        with tempfile.TemporaryDirectory() as tmpdirname:
+        with (tempfile.TemporaryDirectory() as tmpdirname):
             model.save_pretrained(
                 tmpdirname,
                 use_unsafe_math=True if not sym and checkpoint_format == CHECKPOINT_FORMAT.GPTQ else False,
             )
+
+            logging.info(f"Saved config mem: {model.quantize_config}")
+
+            with open(tmpdirname + "/" + QUANT_CONFIG_FILENAME, 'r') as f:
+                file_dict = json.loads(f.read())
+                # normalize to memory
+                file_dict["model_name_or_path"] = None
+                file_dict["model_file_base_name"] = None
+
+                # make sure the json dict saved to file matches config in memory
+                assert model.quantize_config.to_dict() == file_dict
+                logging.info(f"Saved config file: {file_dict}")
 
             model = AutoGPTQForCausalLM.from_quantized(
                 tmpdirname,
@@ -55,6 +69,9 @@ class TestQuantization(unittest.TestCase):
                 use_marlin=use_marlin,
                 use_unsafe_math=True if not sym and checkpoint_format == CHECKPOINT_FORMAT.GPTQ else False,
             )
+
+            logging.info(f"Loaded config: {model.quantize_config}")
+            assert model.quantize_config.meta_get_quantizer() == (META_PRODUCER_AUTOGPTQ, __version__)
             del model
             torch.cuda.empty_cache()
 

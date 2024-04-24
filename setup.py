@@ -11,7 +11,7 @@ os.environ["CC"] = "g++"
 os.environ["CXX"] = "g++"
 
 common_setup_kwargs = {
-    "version": "0.8.0.dev0",
+    "version": "0.8.0.dev1",
     "name": "auto_gptq",
     "author": "PanQiWei",
     "description": "An easy-to-use LLMs quantization package with user-friendly apis, based on GPTQ algorithm.",
@@ -130,6 +130,7 @@ requirements = [
     "peft>=0.5.0",
     "tqdm",
     "threadpoolctl",
+    "packaging",
 ]
 
 extras_require = {

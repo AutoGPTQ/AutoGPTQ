@@ -2,10 +2,9 @@ import json
 import logging
 import os
 from dataclasses import dataclass, field, fields
-from distutils.version import LooseVersion
+from packaging import version
 from os.path import isdir, join
 from typing import Optional, Any, Tuple, Dict
-from ..version import __version__
 
 import huggingface_hub
 from transformers.utils.hub import PushToHubMixin, cached_file
@@ -28,7 +27,7 @@ META_FIELD = "meta"
 META_PRODUCER_AUTOGPTQ = "autogptq"
 META_PRODUCER_FIELD = "quantizer"
 
-MIN_VERSION_WITH_V2 = "0.8.1"
+MIN_VERSION_WITH_V2 = "0.8.0-dev1"
 
 
 # checkpoint formats
@@ -129,13 +128,16 @@ class BaseQuantizeConfig(PushToHubMixin):
     # get quantizer tool(producer) and version from meta
     def meta_get_quantizer(self) -> Tuple[str, str]:
         val = self.meta_get(META_PRODUCER_FIELD)
-        parts = val.split(":") if val else [None, None]
-        return parts[0].lower(), parts[1].lower() if len(parts) > 1 else None
+        if val is None:
+            return None, None
+        parts = val.split(":")
+        return parts[0].lower(), parts[1].lower() if len(parts) >= 2 else None
 
     # is quantized model produced by autogptq version with v2 checkpoint_format code
     def is_produced_by_v2(self) -> bool:
-        producer, version = self.meta_get_quantizer()
-        return producer == META_PRODUCER_AUTOGPTQ and LooseVersion(version) >= LooseVersion(MIN_VERSION_WITH_V2)
+        producer, _version = self.meta_get_quantizer()
+        print(f"debug producer: {producer}, version: {_version}")
+        return producer == META_PRODUCER_AUTOGPTQ and version.parse(_version) >= version.parse(MIN_VERSION_WITH_V2)
 
     def save_pretrained(self, save_dir: str, **kwargs):
         with open(join(save_dir,  QUANT_CONFIG_FILENAME), "w", encoding="utf-8") as f:
@@ -304,4 +306,5 @@ class BaseQuantizeConfig(PushToHubMixin):
             "model_file_base_name": self.model_file_base_name,
             QUANT_METHOD_FIELD: self.quant_method,
             CHECKPOINT_FORMAT_FIELD: self.checkpoint_format,
+            META_FIELD: self.meta,
         }

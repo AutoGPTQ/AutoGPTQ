@@ -553,9 +553,9 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         if not self.quantized:
             raise EnvironmentError("can only save quantized model, please execute .quantize first.")
 
-        if checkpoint_format == CHECKPOINT_FORMAT.GPTQ_V2 or (checkpoint_format is None and quantize_config.checkpoint_format ==CHECKPOINT_FORMAT.GPTQ_V2):
+        if checkpoint_format == CHECKPOINT_FORMAT.GPTQ_V2 or (checkpoint_format is None and quantize_config.checkpoint_format == CHECKPOINT_FORMAT.GPTQ_V2):
             logger.warning(
-                f"Using 'checkpoint_format = {CHECKPOINT_FORMAT.GPTQ_V2}': the serialized model is only supported by AutoGPTQ version >= 0.8.0."
+                f"Using 'checkpoint_format = {CHECKPOINT_FORMAT.GPTQ_V2}': the serialized model is only supported by AutoGPTQ version >= {MIN_VERSION_WITH_V2}."
             )
 
         if checkpoint_format is not None and quantize_config.checkpoint_format != checkpoint_format:
