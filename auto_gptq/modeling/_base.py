@@ -1,4 +1,3 @@
-import copy
 import logging
 import os
 from os.path import isdir, join
@@ -33,7 +32,7 @@ from ..quantization.config import (
     QUANTIZE_BLACK_LIST,
 )
 from ..utils.accelerate_utils import load_checkpoint_in_model
-from ..utils.data_utils import collate_data
+from ..utils.data_utils import collate_data, prepare_examples_for_quantization
 from ..utils.import_utils import (
     AUTOGPTQ_CUDA_AVAILABLE,
     EXLLAMA_KERNELS_AVAILABLE,
@@ -126,51 +125,6 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
     def hf_device_map(self):
         return getattr(self.model, "hf_device_map", None)
 
-    def _prepare_examples_for_quantization(
-        self,
-        examples: List[Dict[str, Union[List[int], torch.LongTensor]]],
-        batch_size: int = 1,
-    ):
-        def _convert_tensor_to_list(tensor):
-            if isinstance(tensor, torch.Tensor):
-                if len(tensor.shape) == 1:
-                    tensor = tensor.unsqueeze(0)
-                tensor = tensor.long()
-                return tensor.cpu().numpy().tolist()
-            return [tensor]
-
-        new_examples = []
-        for example in examples:
-            input_ids = _convert_tensor_to_list(example["input_ids"])
-            attention_mask = _convert_tensor_to_list(example["attention_mask"])
-            if "labels" in example:
-                labels = _convert_tensor_to_list(example["labels"])
-            elif "label" in example:
-                labels = _convert_tensor_to_list(example["label"])
-            elif "label_ids" in example:
-                labels = _convert_tensor_to_list(example["label_ids"])
-            else:
-                labels = copy.deepcopy(input_ids)
-            new_examples.append(
-                {
-                    "input_ids": input_ids,
-                    "attention_mask": attention_mask,
-                    "labels": labels,
-                }
-            )
-        pad_token_id = self.config.pad_token_id
-        if not pad_token_id:
-            pad_token_id = self.config.eos_token_id
-
-        new_examples = [
-            collate_data(new_examples[start : start + batch_size], pad_token_id)
-            for start in range(0, len(new_examples), batch_size)
-        ]
-        for new_example in new_examples:
-            del new_example["labels"]
-
-        return new_examples
-
     @torch.inference_mode()
     def quantize(
         self,
@@ -223,7 +177,7 @@ os.environ['NUMEXPR_MAX_THREADS'] = max_threads
         layer_input_kwargs = []
         layer_outputs = []
 
-        examples = self._prepare_examples_for_quantization(examples, batch_size)
+        examples = prepare_examples_for_quantization(self.config, examples, batch_size)
 
         forward_pass_use_cache = self.model.config.use_cache
         self.model.config.use_cache = False
