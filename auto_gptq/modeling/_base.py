@@ -545,7 +545,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
 
         # write autogptq tooling fingerprint to config
         self.quantize_config.meta_set_versionable(
-            field=META_FIELD_QUANTIZER,
+            key=META_FIELD_QUANTIZER,
             value=META_QUANTIZER_AUTOGPTQ,
             version=__version__,
         )

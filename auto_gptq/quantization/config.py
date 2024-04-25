@@ -127,12 +127,12 @@ class BaseQuantizeConfig(PushToHubMixin):
         return self.meta.get(key)
 
     # verionable is a meta.property that pairs value with version i.e "value:1.0.0"
-    def meta_set_versionable(self, field: str, value: str, version: str):
-        self.meta_set(field, f"{value}:{version}")
+    def meta_set_versionable(self, key: str, value: str, version: str):
+        self.meta_set(key, f"{value}:{version}")
 
     # verionable is a meta.property that pairs value with version i.e "value:1.0.0"
-    def meta_get_versionable(self, field: str) -> Tuple[str, str]:
-        val = self.meta_get(field)
+    def meta_get_versionable(self, key: str) -> Tuple[str, str]:
+        val = self.meta_get(key)
         if val is None:
             return None, None
         parts = val.split(":")
