@@ -844,4 +844,5 @@ __all__ = [
     "simple_dispatch_model",
     "make_sure_no_tensor_in_meta_device",
     "convert_gptq_v1_to_v2_format",
+    "convert_gptq_v2_to_v1_format",
 ]
