@@ -10,7 +10,7 @@ from transformers import AutoTokenizer  # noqa: E402
 
 from auto_gptq import AutoGPTQForCausalLM, __version__  # noqa: E402
 from auto_gptq.quantization import CHECKPOINT_FORMAT, QUANT_CONFIG_FILENAME, BaseQuantizeConfig  # noqa: E402
-from auto_gptq.quantization.config import META_PRODUCER_AUTOGPTQ
+from auto_gptq.quantization.config import META_FIELD_QUANTIZER, META_QUANTIZER_AUTOGPTQ
 
 class TestQuantization(unittest.TestCase):
     @parameterized.expand([
@@ -69,7 +69,7 @@ class TestQuantization(unittest.TestCase):
             )
 
             logging.info(f"Loaded config: {model.quantize_config}")
-            assert model.quantize_config.meta_get_quantizer() == (META_PRODUCER_AUTOGPTQ, __version__)
+            assert model.quantize_config.meta_get_versionable(META_FIELD_QUANTIZER) == (META_QUANTIZER_AUTOGPTQ, __version__)
             del model
             torch.cuda.empty_cache()
 

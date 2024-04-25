@@ -23,12 +23,15 @@ CHECKPOINT_FORMAT_FIELD_COMPAT_MARLIN = "is_marlin_format"
 QUANT_METHOD_FIELD = "quant_method"
 QUANT_CONFIG_FILENAME = "quantize_config.json"
 
-META_FIELD = "meta"
-META_PRODUCER_AUTOGPTQ = "autogptq"
-META_PRODUCER_FIELD = "quantizer"
-
 MIN_VERSION_WITH_V2 = "0.8.0-dev1"
 
+META_FIELD = "meta"
+# quantizer is the tool that did the quantization
+META_FIELD_QUANTIZER = "quantizer"
+# packer is the tool that packed the weights post quantization
+META_FIELD_PACKER = "packer"
+
+META_QUANTIZER_AUTOGPTQ = "autogptq"
 
 # checkpoint formats
 class CHECKPOINT_FORMAT:
@@ -123,22 +126,32 @@ class BaseQuantizeConfig(PushToHubMixin):
     def meta_get(self, key: str) -> Any:
         return self.meta.get(key)
 
-    # write autogptq:version info into meta
-    def meta_set_quantizer(self, name: str, version: str):
-        self.meta_set(META_PRODUCER_FIELD, f"{name}:{version}")
+    # verionable is a meta.property that pairs value with version i.e "value:1.0.0"
+    def meta_set_versionable(self, field: str, value: str, version: str):
+        self.meta_set(field, f"{value}:{version}")
 
-    # get quantizer tool(producer) and version from meta
-    def meta_get_quantizer(self) -> Tuple[str, str]:
-        val = self.meta_get(META_PRODUCER_FIELD)
+    # verionable is a meta.property that pairs value with version i.e "value:1.0.0"
+    def meta_get_versionable(self, field: str) -> Tuple[str, str]:
+        val = self.meta_get(field)
         if val is None:
             return None, None
         parts = val.split(":")
         return parts[0].lower(), parts[1].lower() if len(parts) >= 2 else None
 
-    # is quantized model produced by autogptq version with v2 checkpoint_format code
-    def is_produced_by_v2(self) -> bool:
-        producer, _version = self.meta_get_quantizer()
-        return producer == META_PRODUCER_AUTOGPTQ and version.parse(_version) >= version.parse(MIN_VERSION_WITH_V2)
+    # is quantized model quantized or packed by autogptq version with v2 checkpoint_format code
+    def is_quantized_or_packed_by_v2(self) -> bool:
+        by_v2 = False
+        # check meta.quantizer
+        producer, _version = self.meta_get_versionable(META_FIELD_QUANTIZER)
+        by_v2 = producer == META_QUANTIZER_AUTOGPTQ and version.parse(_version) >= version.parse(MIN_VERSION_WITH_V2)
+
+        # fallback to meta.packer
+        if not by_v2:
+            producer, _version = self.meta_get_versionable(META_FIELD_PACKER)
+            by_v2 = producer == META_QUANTIZER_AUTOGPTQ and version.parse(_version) >= version.parse(
+                MIN_VERSION_WITH_V2)
+
+        return by_v2
 
     def save_pretrained(self, save_dir: str, **kwargs):
         with open(join(save_dir,  QUANT_CONFIG_FILENAME), "w", encoding="utf-8") as f:
