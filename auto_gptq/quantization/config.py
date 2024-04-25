@@ -65,6 +65,8 @@ class BaseQuantizeConfig(PushToHubMixin):
     static_groups: bool = field(default=False)
     sym: bool = field(default=True)
     true_sequential: bool = field(default=True)
+    # if lm_head is quantized
+    lm_head: bool = field(default=False)
     quant_method: str = field(default=QUANT_METHOD.GPTQ)
     checkpoint_format: str = field(default=CHECKPOINT_FORMAT.GPTQ)
     model_name_or_path: Optional[str] = field(default=None)
@@ -251,6 +253,7 @@ class BaseQuantizeConfig(PushToHubMixin):
             "static_groups": self.static_groups,
             "sym": self.sym,
             "true_sequential": self.true_sequential,
+            "lm_head": self.lm_head,
             "model_name_or_path": self.model_name_or_path,
             "model_file_base_name": self.model_file_base_name,
             QUANT_METHOD_FIELD: self.quant_method,
