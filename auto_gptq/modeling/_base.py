@@ -919,7 +919,7 @@ os.environ['NUMEXPR_MAX_THREADS'] = max_threads
                 )
 
                 layers = find_layers(model)
-                ignore_layers = cls.outside_layer_modules
+                ignore_layers = [cls.lm_head_name] + cls.outside_layer_modules
 
                 for name in list(layers.keys()):
                     # allow loading of quantized lm_head
