@@ -995,11 +995,13 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
 
                 layers = find_layers(model)
                 ignore_layers = cls.outside_layer_modules
-                # allow loading of quantized lm_head
-                if not quantize_config.lm_head:
-                    ignore_layers += [cls.lm_head_name]
 
+                print(f"ignored_layers: {ignore_layers}")
                 for name in list(layers.keys()):
+                    # allow loading of quantized lm_head
+                    if quantize_config.lm_head and name == cls.lm_head_name:
+                        continue
+
                     if any(name.startswith(ignore_layer) for ignore_layer in ignore_layers) or all(
                         not name.endswith(ignore_layer)
                         for sublist in cls.inside_layer_modules
