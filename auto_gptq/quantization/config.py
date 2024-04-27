@@ -140,18 +140,11 @@ class BaseQuantizeConfig(PushToHubMixin):
 
     # is quantized model quantized or packed by autogptq version with v2 checkpoint_format code
     def is_quantized_or_packed_by_v2(self) -> bool:
-        by_v2 = False
-        # check meta.quantizer
-        producer, _version = self.meta_get_versionable(META_FIELD_QUANTIZER)
-        by_v2 = producer == META_QUANTIZER_AUTOGPTQ and version.parse(_version) >= version.parse(MIN_VERSION_WITH_V2)
-
-        # fallback to meta.packer
-        if not by_v2:
-            producer, _version = self.meta_get_versionable(META_FIELD_PACKER)
-            by_v2 = producer == META_QUANTIZER_AUTOGPTQ and version.parse(_version) >= version.parse(
-                MIN_VERSION_WITH_V2)
-
-        return by_v2
+        for field in [META_FIELD_QUANTIZER, META_FIELD_PACKER]:
+            tool, _version = self.meta_get_versionable(field)
+            if tool == META_QUANTIZER_AUTOGPTQ and version.parse(_version) >= version.parse(MIN_VERSION_WITH_V2):
+                return True
+        return False
 
     def save_pretrained(self, save_dir: str, **kwargs):
         with open(join(save_dir,  QUANT_CONFIG_FILENAME), "w", encoding="utf-8") as f:
