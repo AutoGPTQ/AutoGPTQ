@@ -5,6 +5,7 @@ from logging import getLogger
 from typing import List, Optional, Union
 
 import accelerate
+import threadpoolctl as tctl
 import numpy as np
 import torch
 import torch.nn as nn
@@ -13,6 +14,7 @@ from tqdm import tqdm
 from transformers import AutoConfig
 from transformers.utils.hub import cached_file
 
+from ..quantization import BaseQuantizeConfig
 from ..utils.import_utils import dynamically_import_QuantLinear
 from ..utils.modeling_utils import recurse_setattr
 from ._const import CPU, CUDA_0, EXLLAMA_DEFAULT_MAX_INPUT_LENGTH, SUPPORTED_MODELS
@@ -145,6 +147,71 @@ def make_quant(
                 )
             new_layer.device = ori_layer_device
             recurse_setattr(module, name, new_layer.to(ori_layer_device))
+
+
+def convert_gptq_v1_to_v2_format(
+    model,
+    quantize_config: BaseQuantizeConfig,
+    qlinear_kernel: nn.Module,
+):
+    use_qigen = qlinear_kernel.QUANT_TYPE == "qigen"
+
+    # Limit thread usage to avoid auto-parallizataion regression
+    with tctl.threadpool_limits(limits=1):
+        for _, submodule in model.named_modules():
+            # v1 checkpoint format used to do `qzeros = qzeros -= 1` before serialization, thus the
+            # additions here do not overflow.
+            # v1 checkpoint format with sym=False saved via convert_gptq_v2_to_v1_format() will
+            # overflow ~<=13% based on testing
+            if isinstance(submodule, qlinear_kernel):
+                if use_qigen:
+                    submodule.zeros.data += 1
+                else:
+                    if quantize_config.bits == 2:
+                        submodule.qzeros.data += 0b01010101010101010101010101010101
+                    elif quantize_config.bits == 3:
+                        submodule.qzeros.data[:,range(0,submodule.qzeros.data.shape[1],3)] += 0b00100100100100100100100100100100
+                        submodule.qzeros.data[:,range(1,submodule.qzeros.data.shape[1],3)] += 0b10010010010010010010010010010010
+                        submodule.qzeros.data[:,range(2,submodule.qzeros.data.shape[1],3)] += 0b01001001001001001001001001001001
+                    elif quantize_config.bits == 4:
+                        submodule.qzeros.data += 0b00010001000100010001000100010001
+                    elif quantize_config.bits == 8:
+                        submodule.qzeros.data += 0b00000001000000010000000100000001
+                    else:
+                        raise NotImplementedError("Only 2,3,4,8 bits are supported.")
+
+    return model
+
+
+def convert_gptq_v2_to_v1_format(
+    model,
+    quantize_config: BaseQuantizeConfig,
+    qlinear_kernel: nn.Module,
+):
+    use_qigen = qlinear_kernel.QUANT_TYPE == "qigen"
+
+    # Limit thread usage to avoid auto-parallizataion regression
+    with tctl.threadpool_limits(limits=1):
+        for _, submodule in model.named_modules():
+            # sym=False has underflow probability of ~<=13% during testing. No underflow possible for sym=True.
+            if isinstance(submodule, qlinear_kernel):
+                if use_qigen:
+                    submodule.zeros.data -= 1
+                else:
+                    if quantize_config.bits == 2:
+                        submodule.qzeros.data -= 0b01010101010101010101010101010101
+                    elif quantize_config.bits == 3:
+                        submodule.qzeros.data[:,range(0,submodule.qzeros.data.shape[1],3)] -= 0b00100100100100100100100100100100
+                        submodule.qzeros.data[:,range(1,submodule.qzeros.data.shape[1],3)] -= 0b10010010010010010010010010010010
+                        submodule.qzeros.data[:,range(2,submodule.qzeros.data.shape[1],3)] -= 0b01001001001001001001001001001001
+                    elif quantize_config.bits == 4:
+                        submodule.qzeros.data -= 0b00010001000100010001000100010001
+                    elif quantize_config.bits == 8:
+                        submodule.qzeros.data -= 0b00000001000000010000000100000001
+                    else:
+                        raise NotImplementedError("Only 2,3,4,8 bits are supported.")
+
+    return model
 
 
 def preprocess_checkpoint_qigen(
@@ -297,25 +364,28 @@ def pack_model(
     )
     qlayers = find_layers(model, [QuantLinear])
 
-    pbar = tqdm(qlayers.keys(), leave=True)
-    for name in pbar:
-        pbar.set_description(f"Packing {name}...", refresh=True)
+    # Limit pack() thread usage to avoid auto-parallizataion regression
+    with tctl.threadpool_limits(limits=1):
+        pbar = tqdm(qlayers.keys(), leave=True)
+        for name in pbar:
+            pbar.set_description(f"Packing {name}")
 
-        quantizers[name], scale, zero, g_idx = quantizers[name]
-        # so far can only pack layer on CPU
-        layer_device = qlayers[name].device
-        qlayers[name].to(CPU)
-        layers[name], scale, zero, g_idx = (
-            layers[name].to(CPU),
-            scale.to(CPU),
-            zero.to(CPU),
-            g_idx.to(CPU),
-        )
-        if QuantLinear.QUANT_TYPE == "marlin":
-            qlayers[name].pack(layers[name], scale)
-        else:
-            qlayers[name].pack(layers[name], scale, zero, g_idx)
-        qlayers[name].to(layer_device)
+            quantizers[name], scale, zero, g_idx = quantizers[name]
+            # so far can only pack layer on CPU
+            layer_device = qlayers[name].device
+            qlayers[name].to(CPU)
+            layers[name], scale, zero, g_idx = (
+                layers[name].to(CPU),
+                scale.to(CPU),
+                zero.to(CPU),
+                g_idx.to(CPU),
+            )
+            if QuantLinear.QUANT_TYPE == "marlin":
+                qlayers[name].pack(layers[name], scale)
+            else:
+                qlayers[name].pack(layers[name], scale, zero, g_idx)
+            qlayers[name].to(layer_device)
+
     logger.info("Model packed.")
 
     if use_triton and warmup_triton:
@@ -323,6 +393,7 @@ def pack_model(
             "using autotune_warmup will move model to GPU, make sure you have enough VRAM to load the whole model."
         )
         QuantLinear.warmup(model.to(CUDA_0), seqlen=model.seqlen)
+    return QuantLinear
 
 
 def check_and_get_model_type(model_dir, trust_remote_code=False):
@@ -475,7 +546,7 @@ def autogptq_post_init(model, use_act_order: bool, max_input_length: Optional[in
             if hasattr(submodule, "QUANT_TYPE") and submodule.QUANT_TYPE == "exllama":
                 submodule.post_init()
 
-    ## exllamav2
+    # exllamav2
     fixed_bytes = {}
     model_uses_exllamav2 = False
 
@@ -574,8 +645,6 @@ def unpack_awq(
         torch.int16 if bits == 8 else torch.int8
     )
 
-    # zeros = zeros + 1
-
     torch.bitwise_and(zeros, (2**bits) - 1, out=zeros)
 
     zeros = zeros.reshape(-1, 1, zeros.shape[1] * zeros.shape[2])
@@ -671,7 +740,6 @@ def pack_from_tensors(
     qweight = qweight.astype(np.int32)
     qweight = torch.from_numpy(qweight)
 
-    unpacked_qzeros = unpacked_qzeros - 1
     torch.bitwise_and(unpacked_qzeros, (2**bits) - 1, out=unpacked_qzeros)
 
     unpacked_qzeros = unpacked_qzeros.numpy().astype(np.uint32)
@@ -775,4 +843,6 @@ __all__ = [
     "check_and_get_model_type",
     "simple_dispatch_model",
     "make_sure_no_tensor_in_meta_device",
+    "convert_gptq_v1_to_v2_format",
+    "convert_gptq_v2_to_v1_format",
 ]
