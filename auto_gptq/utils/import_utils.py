@@ -49,7 +49,6 @@ try:
     MARLIN_AVAILABLE = True
     MARLIN_EXCEPTION = None
 except Exception as e:
-    raise e
     MARLIN_AVAILABLE = False
     MARLIN_EXCEPTION = e
 
