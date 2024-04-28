@@ -5,7 +5,6 @@ from parameterized import parameterized
 
 from auto_gptq.nn_modules.qlinear.qlinear_exllama import QuantLinear
 from auto_gptq.nn_modules.qlinear.qlinear_marlin import QuantLinear as MarlinQuantLinear
-from auto_gptq.nn_modules.qlinear.qlinear_tritonv2 import QuantLinear as TritonV2QuantLinear
 from auto_gptq.utils.import_utils import dynamically_import_QuantLinear
 
 
@@ -2134,8 +2133,10 @@ class TestsQ4Triton(unittest.TestCase):
             disable_exllamav2=True,
             torch_dtype=torch.float16,
         )
+
+        print(f"modules: {model_q.named_modules()}")
         for _, submodule in model_q.named_modules():
-            if isinstance(submodule, TritonV2QuantLinear):
+            if hasattr(submodule, "QUANT_TYPE") and submodule.QUANT_TYPE == "tritonv2":
                 break
         else:
             raise ValueError("Did not find a tritonv2 linear layer")
@@ -2169,7 +2170,7 @@ class TestsQ4Triton(unittest.TestCase):
             model_id,
             revision=revision,
             device="cuda:0",
-            use_triton=False,
+            use_triton=True,
             inject_fused_attention=False,
             inject_fused_mlp=False,
             model_basename=model_basename,
@@ -2177,7 +2178,7 @@ class TestsQ4Triton(unittest.TestCase):
             disable_exllamav2=True,
         )
         for _, submodule in model_q.named_modules():
-            if isinstance(submodule, TritonV2QuantLinear):
+            if hasattr(submodule, "QUANT_TYPE") and submodule.QUANT_TYPE == "tritonv2":
                 break
         else:
             raise ValueError("Did not find a tritonv2 linear layer")
