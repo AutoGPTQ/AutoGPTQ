@@ -1,3 +1,4 @@
+import logging
 import os
 import unittest
 
@@ -17,15 +18,16 @@ NUM_TRAIN_STEPS = 10
 
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
+
 def benchmark_forward(
-    fn,
-    *inputs,
-    repeats="auto",
-    desc="",
-    verbose=True,
-    amp=False,
-    amp_dtype=torch.float16,
-    **kwinputs,
+        fn,
+        *inputs,
+        repeats="auto",
+        desc="",
+        verbose=True,
+        amp=False,
+        amp_dtype=torch.float16,
+        **kwinputs,
 ):
     if verbose:
         print(desc, "- Forward pass")
@@ -42,16 +44,17 @@ def benchmark_forward(
     if repeats == "auto":
         m = t.blocked_autorange()
     else:
-        m = t.timeit(repeats)
+        m = t.timeit(int(repeats))
     if verbose:
         print(m)
     return t, m
 
+
 def get_model_and_tokenizer(
-    model_id=MODEL_ID,
-    inject_fused_attention=False,
-    inject_fused_mlp=False,
-    **model_kwargs,
+        model_id=MODEL_ID,
+        inject_fused_attention=False,
+        inject_fused_mlp=False,
+        **model_kwargs,
 ):
     tokenizer = AutoTokenizer.from_pretrained(
         MODEL_ID,
@@ -73,6 +76,7 @@ def get_model_and_tokenizer(
     model.warmup_triton()
     return model, tokenizer
 
+
 class TestTriton(unittest.TestCase):
     def test_triton_qlinear(self):
         ref_model, _ = get_model_and_tokenizer(
@@ -81,24 +85,13 @@ class TestTriton(unittest.TestCase):
             inject_fused_attention=False,
             inject_fused_mlp=False,
         )
-        test_model, _ = get_model_and_tokenizer(
-            model_id=MODEL_ID,
-            use_tritonv2=True,
-            inject_fused_attention=False,
-            inject_fused_mlp=False,
-        )
+
         hidden_size = ref_model.model.model.embed_tokens.weight.shape[1]
         test_data = torch.randn((1, 2048, hidden_size), dtype=torch.float16).cuda()
 
         qlinear_ref = ref_model.model.model.layers[0].self_attn.q_proj
-        qlinear_test = test_model.model.model.layers[0].self_attn.q_proj
 
-        test_out = qlinear_test(test_data)
         ref_out = qlinear_ref(test_data)
-
-        self.assertTrue(torch.allclose(test_out, ref_out))
+        logging.info(ref_out)
 
         _, measure_triton = benchmark_forward(qlinear_ref, test_data, desc="Triton", verbose=True)
-        _, measure_tritonv2 = benchmark_forward(qlinear_test, test_data, desc="Triton-v2", verbose=True)
-
-        self.assertTrue(measure_tritonv2.mean < measure_triton.mean)

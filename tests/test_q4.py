@@ -2129,11 +2129,10 @@ class TestsQ4Triton(unittest.TestCase):
         model_q = AutoGPTQForCausalLM.from_quantized(
             model_id,
             device="cuda:0",
-            use_triton=False,
+            use_triton=True,
             disable_exllama=True,
             disable_exllamav2=True,
             torch_dtype=torch.float16,
-            use_tritonv2=True,
         )
         for _, submodule in model_q.named_modules():
             if isinstance(submodule, TritonV2QuantLinear):

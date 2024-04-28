@@ -16,7 +16,7 @@ from ..nn_modules.qlinear.qlinear_cuda_old import QuantLinear as QuantLinearCuda
 from ..nn_modules.qlinear.qlinear_exllama import QuantLinear as QuantLinearExllama
 from ..nn_modules.qlinear.qlinear_exllama import QuantLinear as QuantLinearExllamaV2
 from ..nn_modules.qlinear.qlinear_qigen import QuantLinear as QuantLinearQigen
-from ..nn_modules.qlinear.qlinear_triton import QuantLinear as QuantLinearTriton
+from ..nn_modules.qlinear.qlinear_tritonv2 import QuantLinear as QuantLinearTriton
 
 
 LinearLayer = Union[
@@ -402,8 +402,7 @@ def get_gptq_peft_model(
                 peft_model = get_peft_model(model.model, peft_config, adapter_name=adapter_name)
             else:
                 peft_model = PeftModel.from_pretrained(model.model, model_id, adapter_name)
-        except:
-            raise
+        except:  # noqa: E722
             raise NotImplementedError(
                 f"{model.__class__.__name__} not support {peft_config.peft_type.value} peft type yet."
             )
