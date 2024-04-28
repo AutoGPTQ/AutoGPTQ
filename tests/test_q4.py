@@ -2134,7 +2134,6 @@ class TestsQ4Triton(unittest.TestCase):
             torch_dtype=torch.float16,
         )
 
-        print(f"modules: {model_q.named_modules()}")
         for _, submodule in model_q.named_modules():
             if hasattr(submodule, "QUANT_TYPE") and submodule.QUANT_TYPE == "tritonv2":
                 break
