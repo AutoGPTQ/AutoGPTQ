@@ -9,10 +9,10 @@ from transformers import AutoTokenizer
 
 from auto_gptq import AutoGPTQForCausalLM
 from auto_gptq.utils.peft_utils import (
-    GPTQAdaLoraConfig,
-    GPTQLoraConfig,
+    AdaLoraConfig,
     GPTQLoraLinear,
     GPTQSVDLinear,
+    LoraConfig,
     get_gptq_peft_model,
 )
 
@@ -52,7 +52,7 @@ class TestPeftConversion(TestCase):
             inject_fused_mlp=False,
             use_safetensors=True,
         )
-        peft_config = GPTQLoraConfig(
+        peft_config = LoraConfig(
             r=16,
             lora_alpha=32,
             lora_dropout=0.1,
@@ -83,7 +83,7 @@ class TestPeftConversion(TestCase):
             inject_fused_mlp=False,
             use_safetensors=True,
         )
-        peft_config = GPTQAdaLoraConfig(
+        peft_config = AdaLoraConfig(
             init_r=20,
             target_r=16,
             beta1=0.85,
