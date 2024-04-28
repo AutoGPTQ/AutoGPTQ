@@ -2175,7 +2175,6 @@ class TestsQ4Triton(unittest.TestCase):
             model_basename=model_basename,
             disable_exllama=True,
             disable_exllamav2=True,
-            use_tritonv2=True,
         )
         for _, submodule in model_q.named_modules():
             if isinstance(submodule, TritonV2QuantLinear):
