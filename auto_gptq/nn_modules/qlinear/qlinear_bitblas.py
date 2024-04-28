@@ -42,16 +42,14 @@ from bitblas.ops.matmul_dequantize import (
     MatmulWeightOnlyDequantizeConfig,
 )
 from bitblas.quantization.utils import general_compress
-from bitblas.utils import get_target_from_env
+from bitblas.utils import auto_detect_nvidia_target
 
 from .qlinear_cuda_old import QuantLinear as QuantLinearOld
 
 
-BITBLAS_TARGET = get_target_from_env()
+BITBLAS_TARGET = auto_detect_nvidia_target()
 BITBLAS_DATABASE_PATH = ".bitblas_database"
 BITBLAS_PROPAGATE_WEIGHTS = False
-global_operator_cache.load_from_database(BITBLAS_DATABASE_PATH, BITBLAS_TARGET)
-
 
 def unpack_qzeros(qzeros, bits):
     qzeros = qzeros.view(torch.int32)
@@ -74,7 +72,7 @@ class QuantLinear(nn.Module):
     QUANT_TYPE = "bitblas"
     SUPPORTED_BITS = [1, 2, 4]
     OPT_FEATURES = [1, 16, 32, 64, 128, 256, 512]
-    ZEROS_TYPE = "quantized"  # "original" or "rescale" or "quantized"
+    zeros_mode = "quantized"  # "original" or "rescale" or "quantized"
     TORCH_DTYPE = torch.float16
     STORAGE_DTYPE = "int8"  # assume int8 storage
     TORCH_STORAGE_DTYPE = getattr(torch, STORAGE_DTYPE)
@@ -144,7 +142,7 @@ class QuantLinear(nn.Module):
                 (outfeatures, infeatures // self.group_size), dtype=self.TORCH_DTYPE
             ),
         )
-        if self.ZEROS_TYPE == "quantized":
+        if self.zeros_mode == "quantized":
             storage_nbit = int("".join(c for c in self.STORAGE_DTYPE if c.isdigit()))
             self.register_buffer(
                 "zeros",
@@ -189,13 +187,18 @@ class QuantLinear(nn.Module):
             propagate_a=False,
             propagate_b=propagate_b,
             layout=layout,
-            zeros_type=self.ZEROS_TYPE,
+            zeros_mode=self.zeros_mode,
         )
         self.bitblas_matmul = self._get_or_create_bitblas_operator(
             matmul_config, enable_tuning
         )
 
     def _get_or_create_bitblas_operator(self, config, enable_tuning):
+        if global_operator_cache.size() == 0:
+            global_operator_cache.load_from_database(
+                BITBLAS_DATABASE_PATH, BITBLAS_TARGET
+            )
+
         bitblas_matmul = global_operator_cache.get(config)
         if bitblas_matmul is None:
             bitblas_matmul = MatmulWeightOnlyDequantize(config, target=self.target)
@@ -247,11 +250,11 @@ class QuantLinear(nn.Module):
         self.scales = scales
         # qzeros should be dequantized to int zeros.
         intzeros = unpack_qzeros(gptq_module.qzeros, self.bits).T.contiguous()
-        if self.bitblas_matmul.config.zeros_type == "original":
+        if self.bitblas_matmul.config.zeros_mode == "original":
             self.zeros = intzeros.to(torch.float16).contiguous()
-        elif self.bitblas_matmul.config.zeros_type == "rescale":
+        elif self.bitblas_matmul.config.zeros_mode == "rescale":
             self.zeros[:, :] = intzeros.to(torch.float16)[:, :] * self.scales[:, :]
-        elif self.bitblas_matmul.config.zeros_type == "quantized":
+        elif self.bitblas_matmul.config.zeros_mode == "quantized":
             self.zeros = (
                 torch.Tensor(
                     general_compress(intzeros.T.contiguous().cpu().numpy(), self.bits)
@@ -262,7 +265,7 @@ class QuantLinear(nn.Module):
             )
         else:
             raise ValueError(
-                f"Unsupported zeros type: {self.bitblas_matmul.config.zeros_type}"
+                f"Unsupported zeros type: {self.bitblas_matmul.config.zeros_mode}"
             )
         if self.bias is not None:
             self.bias = gptq_module.bias.data.to(torch.float16).contiguous()
