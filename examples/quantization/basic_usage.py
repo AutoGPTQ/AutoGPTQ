@@ -50,6 +50,9 @@ def main():
     # load quantized model to the first GPU
     model = AutoGPTQForCausalLM.from_quantized(quantized_model_dir, device="cuda:0")
 
+    # load quantized model to CPU with QBits kernel linear.
+    model = AutoGPTQForCausalLM.from_quantized(quantized_model_dir, device="cpu")
+
     # download quantized model from Hugging Face Hub and load to the first GPU
     # model = AutoGPTQForCausalLM.from_quantized(repo_id, device="cuda:0", use_safetensors=True, use_triton=False)
 

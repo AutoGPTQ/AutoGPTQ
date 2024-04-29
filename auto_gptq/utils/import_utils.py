@@ -52,6 +52,15 @@ except Exception as e:
     MARLIN_AVAILABLE = False
     MARLIN_EXCEPTION = e
 
+try:
+    from intel_extension_for_transformers import qbits  # noqa: F401
+
+    QBITS_AVAILABLE = True
+    QBITS_EXCEPTION = None
+except Exception as e:
+    QBITS_AVAILABLE = False
+    QBITS_EXCEPTION = e
+
 
 logger = getLogger(__name__)
 
@@ -66,7 +75,9 @@ def dynamically_import_QuantLinear(
     use_qigen: bool = False,
     use_marlin: bool = False,
     use_tritonv2: bool = False,
+    use_qbits: bool = False,
 ):
+
     if use_qigen:
         if not QIGEN_AVAILABLE:
             raise ValueError(
@@ -91,7 +102,13 @@ def dynamically_import_QuantLinear(
                     disable_exllama = False
                 else:
                     disable_exllama = True
-            if bits == 4 and use_marlin:
+            if (bits == 4 or bits == 8) and use_qbits:
+                if not QBITS_AVAILABLE:
+                    raise ValueError(
+                        f"QBits appears to be not available with the error: {QBITS_EXCEPTION}. Please install with `pip install intel-extension-for-transformers`."
+                    )
+                from ..nn_modules.qlinear.qlinear_qbits import QuantLinear
+            elif bits == 4 and use_marlin:
                 from ..nn_modules.qlinear.qlinear_marlin import QuantLinear
             elif bits == 4 and not disable_exllamav2 and EXLLAMAV2_KERNELS_AVAILABLE:
                 from ..nn_modules.qlinear.qlinear_exllamav2 import QuantLinear

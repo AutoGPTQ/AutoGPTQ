@@ -80,6 +80,7 @@ def make_quant(
     desc_act: bool = False,
     trainable: bool = False,
     use_tritonv2: bool = False,
+    use_qbits: bool = False,
 ):
     # If disable_exllamav2 is True, we want to fall back on the exllama kernel and not the cuda/cuda_old ones.
     if disable_exllama is None:
@@ -98,6 +99,7 @@ def make_quant(
         disable_exllamav2=disable_exllamav2,
         use_qigen=use_qigen,
         use_tritonv2=use_tritonv2,
+        use_qbits=use_qbits,
     )
 
     if isinstance(module, QuantLinear):
@@ -122,6 +124,7 @@ def make_quant(
                 and not use_triton
                 and not use_qigen
                 and not use_tritonv2
+                and not use_qbits
             ):
                 new_layer = QuantLinear(
                     bits,
@@ -145,7 +148,6 @@ def make_quant(
                 )
             new_layer.device = ori_layer_device
             recurse_setattr(module, name, new_layer.to(ori_layer_device))
-
 
 def preprocess_checkpoint_qigen(
     module,
@@ -379,8 +381,12 @@ def autogptq_post_init(model, use_act_order: bool, max_input_length: Optional[in
     device_to_buffers_size = {}
 
     model_uses_exllama = False
+    model_uses_qbits = False
     for name, submodule in model.named_modules():
-        if hasattr(submodule, "QUANT_TYPE") and submodule.QUANT_TYPE == "exllama":
+        if hasattr(submodule, "QUANT_TYPE") and submodule.QUANT_TYPE == "qbits":
+            model_uses_qbits = True
+            submodule.post_init()
+        elif hasattr(submodule, "QUANT_TYPE") and submodule.QUANT_TYPE == "exllama":
             model_uses_exllama = True
             device = submodule.qweight.device
             if device not in device_to_buffers_size:
@@ -500,15 +506,17 @@ def autogptq_post_init(model, use_act_order: bool, max_input_length: Optional[in
             if hasattr(submodule, "QUANT_TYPE") and submodule.QUANT_TYPE == "exllamav2":
                 device = submodule.qweight.device
                 submodule.post_init(temp_dq=model.device_tensors[device])
-    torch.cuda.empty_cache()
+
+    if not model_uses_qbits:
+        torch.cuda.empty_cache()
 
     return model
 
 
 def make_sure_no_tensor_in_meta_device(
-    model, use_triton: bool, desc_act: bool, group_size: int, bits: int, disable_exllama: bool, disable_exllamav2: bool, use_marlin: bool = False, use_tritonv2: bool = False,
+    model, use_triton: bool, desc_act: bool, group_size: int, bits: int, disable_exllama: bool, disable_exllamav2: bool, use_marlin: bool = False, use_tritonv2: bool = False, use_qbits: bool = False
 ):
-    QuantLinear = dynamically_import_QuantLinear(use_triton, desc_act, group_size, bits=bits, disable_exllama=disable_exllama, disable_exllamav2=disable_exllamav2, use_marlin=use_marlin, use_tritonv2=use_tritonv2)
+    QuantLinear = dynamically_import_QuantLinear(use_triton, desc_act, group_size, bits=bits, disable_exllama=disable_exllama, disable_exllamav2=disable_exllamav2, use_marlin=use_marlin, use_tritonv2=use_tritonv2, use_qbits=use_qbits)
     for n, m in model.named_modules():
         if isinstance(m, QuantLinear) and m.bias.device == torch.device("meta"):
             m.register_buffer("bias", torch.zeros((m.outfeatures), dtype=torch.float16, device="cpu"))

@@ -39,6 +39,8 @@ from ..utils.import_utils import (
     EXLLAMA_KERNELS_AVAILABLE,
     EXLLAMAV2_KERNELS_AVAILABLE,
     MARLIN_AVAILABLE,
+    QBITS_AVAILABLE,
+    QBITS_EXCEPTION,
     QIGEN_AVAILABLE,
     TRITON_AVAILABLE,
     dynamically_import_QuantLinear,
@@ -66,6 +68,8 @@ from ._utils import (
     unpack_awq,
 )
 
+if QBITS_AVAILABLE:
+    from intel_extension_for_transformers import qbits
 
 logger = logging.getLogger(__name__)
 handler = logging.StreamHandler()
@@ -231,6 +235,7 @@ os.environ['NUMEXPR_MAX_THREADS'] = max_threads
         num_batches = len(examples)
         layers = get_module_by_name_prefix(self.model, self.layers_block_name)
 
+        cur_device = self.device
         cur_layer_device = get_device(layers[0])
         data_device = cur_layer_device if cache_examples_on_gpu else CPU
         def store_input_hook(_, args, kwargs):
@@ -260,7 +265,7 @@ os.environ['NUMEXPR_MAX_THREADS'] = max_threads
             raise ValueError
 
         force_layer_back_to_cpu = False
-        if get_device(layers[0]) == CPU:
+        if get_device(layers[0]) == CPU and cur_device != torch.device("cpu"):
             layers[0] = layers[0].to(CUDA_0)
             force_layer_back_to_cpu = True
 
@@ -294,7 +299,8 @@ os.environ['NUMEXPR_MAX_THREADS'] = max_threads
             if module is not None:
                 move_to_device(module, ori_outside_layer_module_devices[module_name])
 
-        torch.cuda.empty_cache()
+        if cur_device != torch.device("cpu"):
+            torch.cuda.empty_cache()
 
         inside_layer_modules = self.inside_layer_modules
         if not self.quantize_config.true_sequential:
@@ -304,7 +310,7 @@ os.environ['NUMEXPR_MAX_THREADS'] = max_threads
             logger.info(f"Start quantizing layer {i + 1}/{len(layers)}")
             layer = layers[i]
             force_layer_back_to_cpu = False
-            if get_device(layer) == CPU:
+            if get_device(layer) == CPU and cur_device != torch.device("cpu"):
                 move_to_device(layer, CUDA_0)
                 force_layer_back_to_cpu = True
             cur_layer_device = get_device(layer)
@@ -389,7 +395,8 @@ os.environ['NUMEXPR_MAX_THREADS'] = max_threads
             del gptq
             del layer_inputs
             layer_inputs, layer_outputs = layer_outputs, []  # TODO: is it really OK to cache only the first positional argument?
-            torch.cuda.empty_cache()
+            if cur_device != torch.device("cpu"):
+                torch.cuda.empty_cache()
 
         pack_model(
             model=self.model,
@@ -410,7 +417,8 @@ os.environ['NUMEXPR_MAX_THREADS'] = max_threads
 
         self._quantized = True
 
-        torch.cuda.empty_cache()
+        if cur_device != torch.device("cpu"):
+            torch.cuda.empty_cache()
 
     @property
     def device(self):
@@ -614,8 +622,15 @@ os.environ['NUMEXPR_MAX_THREADS'] = max_threads
     ):
         """load un-quantized pretrained model to cpu"""
 
+        use_cpu = False
         if not torch.cuda.is_available():
-            raise EnvironmentError("Load pretrained model to do quantization requires CUDA available.")
+            use_cpu = True
+            if not QBITS_AVAILABLE:
+                raise ValueError(
+                    f"QBits appears to be not available with the error: {QBITS_EXCEPTION}. Please install with `pip install intel-extension-for-transformers`."
+                )
+            else:
+                torch_dtype = torch.bfloat16 if qbits.check_isa_supported("AMX") else torch.float32
 
         def skip(*args, **kwargs):
             pass
@@ -683,7 +698,8 @@ os.environ['NUMEXPR_MAX_THREADS'] = max_threads
             model_init_kwargs["device_map"] = None
             model_init_kwargs["low_cpu_mem_usage"] = False
 
-        torch.cuda.empty_cache()
+        if not use_cpu:
+            torch.cuda.empty_cache()
 
         merged_kwargs = {**model_init_kwargs, **cached_file_kwargs}
         model = AutoModelForCausalLM.from_pretrained(pretrained_model_name_or_path, **merged_kwargs)
@@ -710,6 +726,7 @@ os.environ['NUMEXPR_MAX_THREADS'] = max_threads
         max_memory: Optional[dict] = None,
         device: Optional[Union[str, int]] = None,
         low_cpu_mem_usage: bool = False,
+        use_qbits: bool = False,
         use_triton: bool = False,
         use_qigen: bool = False,
         use_marlin: bool = False,
@@ -760,6 +777,16 @@ os.environ['NUMEXPR_MAX_THREADS'] = max_threads
             "_raise_exceptions_for_missing_entries": False,
             "_commit_hash": commit_hash,
         }
+        if not torch.cuda.is_available() or device == "cpu":
+            use_qbits = True
+
+        if use_qbits:
+            if not QBITS_AVAILABLE:
+                raise ValueError(f"QBits appears to be not available with the error: {QBITS_EXCEPTION}. Please install with `pip install intel-extension-for-transformers`.")
+            if torch_dtype is None:
+                disable_exllama = True
+                disable_exllamav2 = True
+                torch_dtype = torch.bfloat16 if qbits.check_isa_supported("AMX") else torch.float32
         if use_qigen and not QIGEN_AVAILABLE:
             logger.warning("Qigen is not installed, reset use_qigen to False.")
             use_qigen = False
@@ -833,7 +860,7 @@ os.environ['NUMEXPR_MAX_THREADS'] = max_threads
             # format marlin requires marlin kernel
             use_marlin = True
 
-        marlin_compatible, marlin_optimized = _validate_marlin_device_support()
+        marlin_compatible, marlin_optimized = (False, False) if use_qbits else _validate_marlin_device_support()
         if use_marlin and (not MARLIN_AVAILABLE or not marlin_compatible):
             raise TypeError("use_marlin is true but Marlin is not availble due to cuda/device support.")
         elif use_marlin and not marlin_optimized:
@@ -941,6 +968,7 @@ os.environ['NUMEXPR_MAX_THREADS'] = max_threads
                     desc_act=quantize_config.desc_act,
                     trainable=trainable,
                     use_tritonv2=use_tritonv2,
+                    use_qbits=use_qbits,
                 )
                 model.tie_weights()
 
@@ -1135,8 +1163,8 @@ os.environ['NUMEXPR_MAX_THREADS'] = max_threads
                 dtype=torch_dtype,  # This is very hacky but works due to https://github.com/huggingface/accelerate/blob/bd72a5f1a80d5146554458823f8aeda0a9db5297/src/accelerate/utils/modeling.py#L292
                 checkpoint=model_save_name,
                 device_map=device_map,
-                offload_state_dict=True,
-                offload_buffers=True,
+                # offload_state_dict=True,
+                # offload_buffers=True,
             )
 
             # TODO: Why are we using this custom function and not dispatch_model?
@@ -1217,6 +1245,7 @@ os.environ['NUMEXPR_MAX_THREADS'] = max_threads
                     disable_exllama=disable_exllama,
                     disable_exllamav2=disable_exllamav2,
                     use_tritonv2=use_tritonv2,
+                    use_qbits=use_qbits,
                 )
         if inject_fused_mlp:
             if cls.fused_mlp_module_type is None:
@@ -1301,12 +1330,13 @@ os.environ['NUMEXPR_MAX_THREADS'] = max_threads
         use_marlin: bool = False,
         use_qigen: bool = False,
         use_tritonv2: bool = False,
+        use_qbits: bool = False,
     ):
         GeneralQuantLinear.inject_to_model(
             model,
             dynamically_import_QuantLinear(use_triton, desc_act, group_size, bits=bits, disable_exllama=disable_exllama,
                                            disable_exllamav2=disable_exllamav2,
-                                           use_marlin=use_marlin, use_qigen=use_qigen),
+                                           use_marlin=use_marlin, use_qigen=use_qigen, use_qbits=use_qbits),
         )
 
     def __getattr__(self, item):
