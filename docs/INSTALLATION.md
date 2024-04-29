@@ -2,8 +2,9 @@
 
 On Linux and Windows, AutoGPTQ can be installed through pre-built wheels for specific PyTorch versions:
 
-| AutoGPTQ version | CUDA/ROCm version | Installation                                                                                               | Built against PyTorch |
+| AutoGPTQ version | CUDA/ROCm/ITREX version | Installation                                                                                               | Built against PyTorch |
 |------------------|-------------------|------------------------------------------------------------------------------------------------------------|-----------------------|
+| latest    | ITREX 1.4.1         | `pip install auto-gptq [qbits]`          | 2.2.1+cpu           |
 | latest (0.7.1)   | CUDA 11.8         | `pip install auto-gptq --extra-index-url https://huggingface.github.io/autogptq-index/whl/cu118/`          | 2.2.1+cu118           |
 | latest (0.7.1)   | CUDA 12.1         | `pip install auto-gptq`                                                                                    | 2.2.1+cu121           |
 | latest (0.7.1)   | ROCm 5.7          | `pip install auto-gptq --extra-index-url https://huggingface.github.io/autogptq-index/whl/rocm571/`        | 2.2.1+rocm5.7         |

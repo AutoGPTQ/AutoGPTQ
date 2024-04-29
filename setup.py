@@ -1,5 +1,7 @@
+import GPUtil
 import os
 import platform
+import pyamdgpuinfo
 import subprocess
 import sys
 from pathlib import Path
@@ -40,7 +42,14 @@ PYPI_RELEASE = os.environ.get('PYPI_RELEASE', None)
 BUILD_CUDA_EXT = int(os.environ.get('BUILD_CUDA_EXT', '1')) == 1
 DISABLE_QIGEN = int(os.environ.get('DISABLE_QIGEN', '1')) == 1
 COMPILE_MARLIN = int(os.environ.get('COMPILE_MARLIN', '1')) == 1
+DISABLE_QBITS = int(os.environ.get('COMPILE_MARLIN', '1')) == 1
 UNSUPPORTED_COMPUTE_CAPABILITIES = ['3.5', '3.7', '5.0', '5.2', '5.3']
+
+if BUILD_CUDA_EXT:
+    if len(GPUtil.getGPUs()) <= 0 and pyamdgpuinfo.detect_gpus() <= 0:
+        BUILD_CUDA_EXT = 0
+        DISABLE_QBITS = 0
+
 
 def detect_local_sm_architectures():
     """
@@ -135,6 +144,7 @@ extras_require = {
     "triton": ["triton==2.0.0"],
     "test": ["pytest", "parameterized"],
     "quality": ["ruff==0.1.5"],
+    "qbits": ["intel_extension_for_transformers"],
 }
 
 include_dirs = ["autogptq_cuda"]
@@ -243,6 +253,10 @@ if BUILD_CUDA_EXT:
         "ext_modules": extensions,
         "cmdclass": {'build_ext': cpp_extension.BuildExtension}
     }
+
+if not DISABLE_QBITS:
+    requirements.append("intel_extension_for_transformers")
+
 common_setup_kwargs.update(additional_setup_kwargs)
 setup(
     packages=find_packages(),

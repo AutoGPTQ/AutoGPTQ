@@ -60,6 +60,9 @@ You can provide a string to this argument to use pre-set model loading strategie
 
 In the simplest way, you can set `device_map='auto'` and let 🤗 Accelerate handle the device map computation. For more details of this argument, you can reference to [this document](https://huggingface.co/docs/accelerate/main/en/usage_guides/big_modeling#designing-a-device-map).
 
+### Load model with QBits kernel for CPU device
+In CPU only device, AutoGPTQ will load model with QBits linear automatically. Or you can use the argument `use_qbits` in `.from_quantized`.
+
 ## Best Practice
 
 ### At Quantization

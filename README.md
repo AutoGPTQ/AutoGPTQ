@@ -56,6 +56,8 @@ AutoGPTQ is available on Linux and Windows only. You can install the latest stab
 
 AutoGPTQ can be installed with the Triton dependency with `pip install auto-gptq[triton] --no-build-isolation` in order to be able to use the Triton backend (currently only supports linux, no 3-bits quantization).
 
+AutoGPTQ also support CPU device now and requires the installation of QBits nernel dependency with `pip install intel-extension-for-transformers`. Or you can install auto-gptq with `pip install auto-gptq[qbits]`. 
+
 For older AutoGPTQ, please refer to [the previous releases installation table](docs/INSTALLATION.md).
 
 On NVIDIA systems, AutoGPTQ does not support [Maxwell or lower](https://qiita.com/uyuni/items/733a93b975b524f89f46) GPUs.
