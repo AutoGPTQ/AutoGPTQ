@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 from logging import getLogger
 from typing import List, Optional, Union
@@ -8,6 +9,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 import transformers
+from tqdm import tqdm
 from transformers import AutoConfig
 from transformers.utils.hub import cached_file
 
@@ -17,6 +19,11 @@ from ._const import CPU, CUDA_0, EXLLAMA_DEFAULT_MAX_INPUT_LENGTH, SUPPORTED_MOD
 
 
 logger = getLogger(__name__)
+handler = logging.StreamHandler()
+formatter = logging.Formatter("%(levelname)s - %(message)s")
+handler.setFormatter(formatter)
+logger.addHandler(handler)
+logger.setLevel(logging.INFO)
 
 
 def get_device(obj: Union[torch.Tensor, nn.Module]):
@@ -73,6 +80,7 @@ def make_quant(
     use_cuda_fp16: bool = True,
     desc_act: bool = False,
     trainable: bool = False,
+    use_tritonv2: bool = False,
 ):
     # If disable_exllamav2 is True, we want to fall back on the exllama kernel and not the cuda/cuda_old ones.
     if disable_exllama is None:
@@ -86,11 +94,12 @@ def make_quant(
         desc_act=desc_act,
         group_size=group_size,
         bits=bits,
-        disable_bitblas=not use_bitblas,
-        disable_marlin=not use_marlin,
+        use_marlin=use_marlin,
+        use_bitblas=use_bitblas,
         disable_exllama=disable_exllama,
         disable_exllamav2=disable_exllamav2,
         use_qigen=use_qigen,
+        use_tritonv2=use_tritonv2,
     )
 
     if isinstance(module, QuantLinear):
@@ -109,13 +118,19 @@ def make_quant(
             elif isinstance(submodule, transformers.pytorch_utils.Conv1D):
                 in_features = submodule.weight.shape[0]
                 out_features = submodule.weight.shape[1]
-            if (not (desc_act) or group_size == -1) and not use_triton and not use_qigen:
+            bias = submodule.bias is not None
+            if (
+                (not (desc_act) or group_size == -1)
+                and not use_triton
+                and not use_qigen
+                and not use_tritonv2
+            ):
                 new_layer = QuantLinear(
                     bits,
                     group_size,
                     in_features,
                     out_features,
-                    True,
+                    bias,
                     use_cuda_fp16=use_cuda_fp16,
                     trainable=trainable,
                     weight_dtype=submodule.weight.dtype,
@@ -126,12 +141,13 @@ def make_quant(
                     group_size,
                     in_features,
                     out_features,
-                    True,
+                    bias,
                     trainable=trainable,
                     weight_dtype=submodule.weight.dtype,
                 )
             new_layer.device = ori_layer_device
             recurse_setattr(module, name, new_layer.to(ori_layer_device))
+
 
 def preprocess_checkpoint_qigen(
     module,
@@ -249,6 +265,8 @@ def pack_model(
     desc_act=False,
     warmup_triton: bool = False,
     force_layer_back_to_cpu: bool = False,
+    use_marlin: bool = False,
+    use_tritonv2: bool = False,
 ):
     QuantLinear = dynamically_import_QuantLinear(
         use_triton=use_triton,
@@ -257,7 +275,8 @@ def pack_model(
         bits=bits,
         disable_exllama=False,
         disable_exllamav2=True,
-        disable_marlin=True,
+        use_marlin=use_marlin,
+        use_tritonv2=use_tritonv2,
     )
 
     if force_layer_back_to_cpu:
@@ -276,10 +295,14 @@ def pack_model(
         desc_act=desc_act,
         disable_exllama=False,
         disable_exllamav2=True,
+        use_marlin=use_marlin,
     )
     qlayers = find_layers(model, [QuantLinear])
-    for name in qlayers:
-        logger.info(name)
+
+    pbar = tqdm(qlayers.keys(), leave=True)
+    for name in pbar:
+        pbar.set_description(f"Packing {name}...", refresh=True)
+
         quantizers[name], scale, zero, g_idx = quantizers[name]
         # so far can only pack layer on CPU
         layer_device = qlayers[name].device
@@ -290,7 +313,10 @@ def pack_model(
             zero.to(CPU),
             g_idx.to(CPU),
         )
-        qlayers[name].pack(layers[name], scale, zero, g_idx)
+        if QuantLinear.QUANT_TYPE == "marlin":
+            qlayers[name].pack(layers[name], scale)
+        else:
+            qlayers[name].pack(layers[name], scale, zero, g_idx)
         qlayers[name].to(layer_device)
     logger.info("Model packed.")
 
@@ -487,9 +513,9 @@ def autogptq_post_init(model, use_act_order: bool, max_input_length: Optional[in
 
 
 def make_sure_no_tensor_in_meta_device(
-    model, use_triton: bool, desc_act: bool, group_size: int, bits: int, disable_exllama: bool, disable_exllamav2: bool, use_marlin: bool = False, use_bitblas: bool = False
+    model, use_triton: bool, desc_act: bool, group_size: int, bits: int, disable_exllama: bool, disable_exllamav2: bool, use_marlin: bool = False, use_bitblas: bool = False, use_tritonv2: bool = False,
 ):
-    QuantLinear = dynamically_import_QuantLinear(use_triton, desc_act, group_size, bits=bits, disable_exllama=disable_exllama, disable_exllamav2=disable_exllamav2, disable_marlin=not use_marlin, disable_bitblas=not use_bitblas)
+    QuantLinear = dynamically_import_QuantLinear(use_triton, desc_act, group_size, bits=bits, disable_exllama=disable_exllama, disable_exllamav2=disable_exllamav2, use_marlin=use_marlin, use_bitblas=use_bitblas, use_tritonv2=use_tritonv2)
     for n, m in model.named_modules():
         if isinstance(m, QuantLinear) and m.bias.device == torch.device("meta"):
             m.register_buffer("bias", torch.zeros((m.outfeatures), dtype=torch.float16, device="cpu"))
@@ -547,9 +573,6 @@ def unpack_awq(
     qzeros = awq_qzeros.cuda()
     qweight = awq_qweight.cuda()
     qweight = qweight.T.contiguous()
-
-    scales = awq_scales
-    scales = scales.reshape(-1, 1, scales.shape[-1])
 
     infeatures = awq_qweight.shape[0]
 
@@ -676,6 +699,7 @@ def pack_from_tensors(
 
     return qweight, qzeros
 
+
 def get_checkpoints(model_name_or_path: str, extensions: List[str], possible_model_basenames: List[str], **cached_file_kwargs):
     """
     Retrives (and if necessary downloads from Hugging Face Hub) the model checkpoint. Sharding is supported. All the `possible_model_basenames` (e.g. `["model", "model-4bit-gptq"]`) will be explored over all `extensions` (e.g. `[".bin", ".safetensors"]`).
@@ -706,9 +730,9 @@ def get_checkpoints(model_name_or_path: str, extensions: List[str], possible_mod
             for possible_model_basename in possible_model_basenames:
                 shard_index_name = possible_model_basename + ext + ".index.json"
                 shard_index = cached_file(
-                        model_name_or_path,
-                        shard_index_name,
-                        **cached_file_kwargs,
+                    model_name_or_path,
+                    shard_index_name,
+                    **cached_file_kwargs,
                 )
                 searched_files.append(shard_index_name)
                 if shard_index is not None:
@@ -743,6 +767,7 @@ def get_checkpoints(model_name_or_path: str, extensions: List[str], possible_mod
         )
 
     return False, resolved_archive_file, true_model_basename
+
 
 __all__ = [
     "get_device",

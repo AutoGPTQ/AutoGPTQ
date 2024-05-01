@@ -23,6 +23,8 @@ SUPPORTED_MODELS = [
     "xverse",
     "deci",
     "stablelm_epoch",
+    "mpt",
+    "cohere",
 ]
 if compare_transformers_version("v4.28.0", op="ge"):
     SUPPORTED_MODELS.append("llama")
@@ -37,9 +39,11 @@ if compare_transformers_version("v4.36.0", op="ge"):
     SUPPORTED_MODELS.append("mixtral")
 if compare_transformers_version("v4.37.0", op="ge"):
     SUPPORTED_MODELS.append("qwen2")
+    SUPPORTED_MODELS.append("phi")
 if compare_transformers_version("v4.38.0", op="ge"):
     SUPPORTED_MODELS.append("gemma")
-
+if compare_transformers_version("v4.39.0.dev0", op="ge"):
+    SUPPORTED_MODELS.append("starcoder2")
 
 EXLLAMA_DEFAULT_MAX_INPUT_LENGTH = 2048
 
