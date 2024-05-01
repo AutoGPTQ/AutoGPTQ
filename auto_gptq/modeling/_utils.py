@@ -266,6 +266,7 @@ def pack_model(
     warmup_triton: bool = False,
     force_layer_back_to_cpu: bool = False,
     use_marlin: bool = False,
+    use_bitblas: bool = False,
     use_tritonv2: bool = False,
 ):
     QuantLinear = dynamically_import_QuantLinear(
@@ -276,6 +277,7 @@ def pack_model(
         disable_exllama=False,
         disable_exllamav2=True,
         use_marlin=use_marlin,
+        use_bitblas=use_bitblas,
         use_tritonv2=use_tritonv2,
     )
 
@@ -296,6 +298,7 @@ def pack_model(
         disable_exllama=False,
         disable_exllamav2=True,
         use_marlin=use_marlin,
+        use_bitblas=use_bitblas,
     )
     qlayers = find_layers(model, [QuantLinear])
 

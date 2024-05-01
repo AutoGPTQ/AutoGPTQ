@@ -10,6 +10,7 @@ from safetensors.torch import save_file as safe_save
 from tqdm import tqdm
 
 from ..nn_modules.qlinear.qlinear_bitblas import QuantLinear as BitBLASQuantLinear
+from ..quantization import CHECKPOINT_FORMAT, QUANT_METHOD, BaseQuantizeConfig
 from .import_utils import BITBLAS_AVAILABLE
 from .modeling_utils import recurse_getattr, recurse_setattr
 
@@ -21,7 +22,6 @@ logger = getLogger(__name__)
 
 
 def prepare_model_for_bitblas_load(
-    model_name_or_path,
     model,
     quantize_config,
     quant_linear_class,
@@ -30,17 +30,18 @@ def prepare_model_for_bitblas_load(
     device_map,
 ):
     # The model (e.g. model.safetensors) is already serialized in the BitBLAS format, load it directly.
-    if hasattr(quantize_config, "is_bitblas_format") and quantize_config.is_bitblas_format:
+    if quantize_config.checkpoint_format == CHECKPOINT_FORMAT.BITBLAS:
         # if the checkpoint is already in bitblas format, we can load it directly.
         model_save_name = current_model_save_name
         logger.info(f"Loading a GPTQ model, detected BitBLAS serialized format at {model_save_name}.")
         model = convert_to_bitblas(model, quant_linear_class, quantize_config, repack=False)
     else:
         # otherwise, we need to convert the model to bitblas format first and cache locally from a gptq quant linear.
-        model_save_name = _get_cached_bitblas_save_name(model_name_or_path)
+        model_save_name, is_cached = quantize_config.get_cache_file_path(quant_method=QUANT_METHOD.GPTQ,
+                                                              checkpoint_format=CHECKPOINT_FORMAT.BITBLAS)
 
         # If GPTQ model has BitBLAS version cached locally, load from the cached version (no repacking needed).
-        if os.path.isfile(model_save_name):
+        if is_cached:
             logger.info(
                 f"Loading a GPTQ model, detected a cached repacked weight for BitBLAS kernel at {model_save_name}."
             )

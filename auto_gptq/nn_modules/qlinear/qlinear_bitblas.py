@@ -37,16 +37,13 @@ except ImportError as e:
 from typing import List, Union
 
 from bitblas.cache import global_operator_cache
-from bitblas.ops.matmul_dequantize import (
-    MatmulWeightOnlyDequantize,
-    MatmulWeightOnlyDequantizeConfig,
-)
+from bitblas import MatmulConfig, Matmul
 from bitblas.quantization.utils import general_compress
 from bitblas.utils import auto_detect_nvidia_target
 
 from .qlinear_cuda_old import QuantLinear as QuantLinearOld
 
-
+bitblas.set_log_level("INFO")
 BITBLAS_TARGET = auto_detect_nvidia_target()
 BITBLAS_DATABASE_PATH = ".bitblas_database"
 BITBLAS_PROPAGATE_WEIGHTS = False
@@ -169,23 +166,20 @@ class QuantLinear(nn.Module):
     ):
         # Assuming MatmulWeightOnlyDequantizeConfig and MatmulWeightOnlyDequantize are defined elsewhere
         bitblas_dtype = self.BITBLAS_DTYPES[self.TORCH_DTYPE]
-        matmul_config = MatmulWeightOnlyDequantizeConfig(
+        W_dtype = f"uint{bits}"
+        matmul_config = MatmulConfig(
             M=self.opt_features,
             N=self.outfeatures,
             K=self.infeatures,
-            in_dtype=bitblas_dtype,
+            A_dtype=bitblas_dtype,
+            W_dtype=W_dtype,
             out_dtype=bitblas_dtype,
             accum_dtype="int32" if bitblas_dtype == "int8" else bitblas_dtype,
-            bit=bits,
             storage_dtype=self.STORAGE_DTYPE,
-            source_format="uint",
             with_scaling=True,
             with_zeros=True,
             group_size=self.group_size,
-            fast_decoding=fast_decoding,
             with_bias=bias,
-            propagate_a=False,
-            propagate_b=propagate_b,
             layout=layout,
             zeros_mode=self.zeros_mode,
         )
@@ -201,7 +195,7 @@ class QuantLinear(nn.Module):
 
         bitblas_matmul = global_operator_cache.get(config)
         if bitblas_matmul is None:
-            bitblas_matmul = MatmulWeightOnlyDequantize(config, target=self.target)
+            bitblas_matmul = Matmul(config, target=self.target)
             if enable_tuning:
                 bitblas_matmul.hardware_aware_finetune(topk=20)
                 global_operator_cache.add(config, bitblas_matmul)
@@ -280,7 +274,7 @@ class QuantLinear(nn.Module):
         A_void = ctypes.c_void_p(A.data_ptr())
         # m is the product of the last n - 1 dimensions of A
         m = ctypes.c_int32(reduce(operator.mul, A.shape[:-1], 1))
-        self.bitblas_matmul.lib.call(
+        self.bitblas_matmul.call_lib(
             A_void , *self.q_params, ctypes.c_void_p(C.data_ptr()), m
         )
         return C
