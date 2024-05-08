@@ -310,7 +310,7 @@ if BUILD_SYCL_EXT:
     _is_sycl_xpu()
     cxx_flags = [
         '-fsycl', '-O3', '-std=c++20', '-w', '-fPIC', '-DMKL_ILP64',
-        '-Wno-narrowing', '-ferror-limit=300'
+        '-Wno-narrowing'
         ]
     extra_ldflags = [
         '-fsycl', '-fPIC', '-Wl,-export-dynamic'
@@ -329,7 +329,22 @@ if BUILD_SYCL_EXT:
                 "autogptq_extension/sycl/sycl_64/autogptq_sycl_kernel_64.cpp",
                 
             ]
+    exllama_source_files=[
+           
+                "autogptq_extension/sycl/exllama/exllama_ext.cpp",
+                "autogptq_extension/sycl/exllama/sycl_buffers.cpp",
+                "autogptq_extension/sycl/exllama/sycl_func/column_remap.cpp",
+                "autogptq_extension/sycl/exllama/sycl_func/q4_matmul.cpp",
+                "autogptq_extension/sycl/exllama/sycl_func/q4_matrix.cpp"
+           
+            ]
     extensions = [
+        
+        DPCPPExtension(name="exllama_sycl",
+                       sources=exllama_source_files,
+                       include_dirs=include_headers,
+                       extra_compile_args={'cxx': cxx_flags},
+                       extra_link_args=extra_ldflags),
         DPCPPExtension(name="autogptq_sycl_256",
                        sources=sycl_256_source_files,
                        include_dirs=include_headers,
@@ -339,10 +354,11 @@ if BUILD_SYCL_EXT:
                        sources=sycl_64_source_files,
                        include_dirs=include_headers,
                        extra_compile_args={'cxx': cxx_flags},
-                       extra_link_args=extra_ldflags)
+                       extra_link_args=extra_ldflags),
+        
     ]
 
-    
+     
     additional_setup_kwargs = {
         "ext_modules": extensions,
         "cmdclass": {'build_ext': DpcppBuildExtension}
