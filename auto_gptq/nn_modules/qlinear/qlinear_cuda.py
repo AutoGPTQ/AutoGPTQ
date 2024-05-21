@@ -37,8 +37,8 @@ class QuantLinear(nn.Module):
     ):
         super().__init__()
         global _autogptq_cuda_available
-        if bits not in [2, 3, 4, 8]:
-            raise NotImplementedError("Only 2,3,4,8 bits are supported.")
+        if bits not in [2, 3, 4, 5, 6, 7, 8]:
+            raise NotImplementedError("Only 2,3,4,5,6,7,8 bits are supported.")
         if trainable:
             _autogptq_cuda_available = False
 
@@ -90,6 +90,41 @@ class QuantLinear(nn.Module):
                 ],
                 dtype=torch.int32,
             ).reshape(1, 3, 12)
+        elif self.bits == 5:
+            self.wf = torch.tensor(
+                    [
+                        [0, 5, 10, 15, 20, 25, 30, 0],
+                        [0, 3, 8, 13, 18, 23, 28, 0],
+                        [0, 1, 6, 11, 16, 21, 26, 31],
+                        [0, 4, 9, 14, 19, 24, 29, 0],
+                        [0, 2, 7, 12, 17, 22, 27, 0]
+                    ],
+                    dtype=torch.int32
+                ).reshape(1,5,8)
+ 
+        elif self.bits == 6:
+            self.wf = torch.tensor(
+                    [
+                        [0, 6, 12, 18, 24, 30],
+                        [0, 4, 10, 16, 22, 28],
+                        [0, 2, 8, 14, 20, 26]
+                    ],
+                    dtype=torch.int32
+                ).reshape(1,3,6)
+        elif self.bits == 7:
+            self.wf = torch.tensor(
+                    [
+                        [0, 7, 14, 21, 28,0],
+                        [0, 3, 10, 17, 24,31],
+                        [0, 6, 13, 20, 27, 0],
+                        [0, 2, 9, 16, 23, 30],
+                        [0, 5, 12, 19, 26, 0],
+                        [0, 1, 8, 15, 22, 29],
+                        [0, 4, 11, 18, 25, 0]  
+                    ],
+                    dtype=torch.int32
+                ).reshape(1,7,6)
+ 
 
         self.kernel_switch_threshold = kernel_switch_threshold
         self.autogptq_cuda_available = _autogptq_cuda_available
@@ -160,8 +195,152 @@ class QuantLinear(nn.Module):
                     qweight[row] |= intweight[j] << (3 * (j - i) + 2)
                 i += 10
                 row += 1
+            elif self.bits == 5:
+                for j in range(i, i + 6):
+                    qweight[row] |= intweight[j] << (5 * (j - i))
+                i += 6
+               
+                # Handle the 6th element separately
+                qweight[row] |= intweight[i] << 30
+                row += 1
+                qweight[row] |= (intweight[i] >> 2) & 0x7
+                i += 1
+               
+                # Pack the next 5 elements
+                for j in range(i, i + 5):
+                    qweight[row] |= intweight[j] << (5 * (j - i) + 3)
+                i += 5
+               
+                # Handle the 11th element separately
+                qweight[row] |= intweight[i] << 28
+                row += 1
+                qweight[row] |= (intweight[i] >> 4) & 0x1
+                i += 1
+               
+                # Pack the last set of 5 elements
+                for j in range(i, i + 6):
+                    qweight[row] |= intweight[j] << (5 * (j - i) + 1)
+                i += 6
+                qweight[row] |= (intweight[i] << 31)
+                row += 1
+                qweight[row] |= (intweight[i]>>1) & 0xF
+                i +=1
+ 
+                for j in range(i,i+5):
+                    qweight[row] |= intweight[j] << (5* (j-i)+4)
+                i += 5
+                qweight[row] |= (intweight[i] << 29)
+                row +=1
+                qweight[row] |= (intweight[i]>>3) & 0x3
+                i += 1
+ 
+                for j in range(i,i+6):
+                    qweight[row] |= intweight[j] <<(5*(j-i)+2)
+               
+                i += 6
+                row += 1
+ 
+ 
+            elif self.bits == 6:
+                for j in range(i, i + 5):
+                    qweight[row] |= intweight[j] << (6 * (j - i))
+                i += 5
+               
+                # Handle the 6th element separately
+                qweight[row] |= intweight[i] << 30
+                row += 1
+                qweight[row] |= (intweight[i] >> 2) & 0xF
+                i += 1
+               
+                # Pack the next 5 elements
+                for j in range(i, i + 4):
+                    qweight[row] |= intweight[j] << (6 * (j - i) + 4)
+                i += 4
+               
+                # Handle the 11th element separately
+                qweight[row] |= intweight[i] << 28
+                row += 1
+                qweight[row] |= (intweight[i] >> 4) & 0x3
+                i += 1
+               
+                # Pack the last set of 5 elements
+                for j in range(i, i + 5):
+                    qweight[row] |= intweight[j] << (6 * (j - i) + 2)
+                i += 5
+                row += 1
+ 
+            elif self.bits == 7:
+                for j in range(i, i + 4):
+                    qweight[row] |= intweight[j] << (7 * (j - i))
+                i += 4
+               
+                # Handle the 6th element separately
+                qweight[row] |= intweight[i] << 28
+                row += 1
+                qweight[row] |= (intweight[i] >> 4) & 0x7
+                i += 1
+               
+                # Pack the next 4 elements
+                for j in range(i, i + 4):
+                    qweight[row] |= intweight[j] << (7 * (j - i) + 3)
+                i += 4
+               
+                # Handle the 11th element separately
+                qweight[row] |= intweight[i] << 31
+                row += 1
+                qweight[row] |= (intweight[i] >> 1) & 0x3F
+                i += 1
+               
+                # Pack the last set of 5 elements
+                for j in range(i, i + 3):
+                    qweight[row] |= intweight[j] << (7 * (j - i) + 6)
+                i += 3
+               
+                # Handle the 11th element separately
+                qweight[row] |= intweight[i] << 27
+                row += 1
+                qweight[row] |= (intweight[i] >> 5) & 0x3
+                i += 1
+               
+                # Pack the last set of 5 elements
+                for j in range(i, i + 4):
+                    qweight[row] |= intweight[j] << (7 * (j - i) + 2)
+                i += 4
+               
+                qweight[row] |= intweight[i] << 30
+                row += 1
+                qweight[row] |= (intweight[i] >> 2) & 0x1F
+                i += 1
+ 
+                # Pack the last set of 5 elements
+                for j in range(i, i + 3):
+                    qweight[row] |= intweight[j] << (7 * (j - i) + 5)
+                i += 3
+               
+                qweight[row] |= intweight[i] << 26
+                row += 1
+                qweight[row] |= (intweight[i] >> 6) & 0x1
+                i += 1
+ 
+                # Pack the last set of 5 elements
+                for j in range(i, i + 4):
+                    qweight[row] |= intweight[j] << (7 * (j - i) + 1)
+                i += 4
+               
+                qweight[row] |= intweight[i] << 29
+                row += 1
+                qweight[row] |= (intweight[i] >> 3) & 0xF
+                i += 1
+               
+               
+                # Pack the last set of 5 elements
+                for j in range(i, i + 4):
+                    qweight[row] |= intweight[j] << (7 * (j - i) + 4)
+                i += 4
+                row += 1
+            
             else:
-                raise NotImplementedError("Only 2,3,4,8 bits are supported.")
+                raise NotImplementedError("Only 2,3,4,5,6,7,8 bits are supported.")
 
         qweight = qweight.astype(np.int32)
         self.qweight = torch.from_numpy(qweight)
@@ -195,6 +374,149 @@ class QuantLinear(nn.Module):
                 for j in range(i, i + 10):
                     qzeros[:, col] |= zeros[:, j] << (3 * (j - i) + 2)
                 i += 10
+                col += 1
+            
+            elif self.bits == 5:
+               
+                for j in range(i, i + 6):
+                    qzeros[:, col] |= zeros[:, j] << (5 * (j - i))
+                i += 6
+               
+                # Handle the 6th element separately
+                qzeros[:, col] |= zeros[:, i]  << 30
+                col += 1
+                qzeros[:, col] |= (zeros[:, i]  >> 2) & 0x7
+                i += 1
+               
+                # Pack the next 5 elements
+                for j in range(i, i + 5):
+                    qzeros[:, col] |= zeros[:, j] << (5 * (j - i) + 3)
+                i += 5
+               
+                # Handle the 11th element separately
+                qzeros[:, col] |= zeros[:, i]  << 28
+                col += 1
+                qzeros[:, col] |= (zeros[:, i]  >> 4) & 0x1
+                i += 1
+               
+                # Pack the last set of 5 elements
+                for j in range(i, i + 6):
+                    qzeros[:, col] |= zeros[:, j] << (5 * (j - i) + 1)
+                i += 6
+                qzeros[:, col] |= (zeros[:, i] << 31)
+                col += 1
+                qzeros[:, col] |= (zeros[:, i] >>1) & 0xF
+                i +=1
+ 
+                for j in range(i,i+5):
+                    qzeros[:, col] |=zeros[:, j] << (5* (j-i)+4)
+                i += 5
+                qzeros[:, col] |= (zeros[:, i] << 29)
+                col +=1
+                qzeros[:, col] |= (zeros[:, i] >>3) & 0x3
+                i += 1
+ 
+                for j in range(i,i+6):
+                    qzeros[:, col] |= zeros[:, j] <<(5*(j-i)+2)
+               
+                i += 6
+                col += 1
+ 
+            elif self.bits == 6:
+                for j in range(i, i + 5):
+                    qzeros[:,col] |=  zeros[:, j] << (6 * (j - i))
+                i += 5
+               
+                # Handle the 6th element separately
+                qzeros[:, col] |= zeros[:, i] << 30
+                col += 1
+                qzeros[:, col] |= (zeros[:, i] >> 2) & 0xF
+                i += 1
+               
+                # Pack the next 5 elements
+                for j in range(i, i + 4):
+                    qzeros[:, col] |= zeros[:, j] << (6 * (j - i) + 4)
+                i += 4
+               
+                # Handle the 11th element separately
+                qzeros[:, col] |= zeros[:, i] << 28
+                col += 1
+                qzeros[:, col] |= (zeros[:, i] >> 4) & 0x3
+                i += 1
+               
+                # Pack the last set of 5 elements
+                for j in range(i, i + 5):
+                    qzeros[:, col] |= zeros[:, j] << (6 * (j - i) + 2)
+                i += 5
+                col += 1
+            elif self.bits == 7:    
+                for j in range(i, i + 4):
+                    qzeros[:, col] |= zeros[:, j] << (7 * (j - i))
+                i += 4
+               
+                # Handle the 6th element separately
+                qzeros[:, col] |= zeros[:, i] << 28
+                col += 1
+                qzeros[:, col] |= (zeros[:, i] >> 4) & 0x7
+                i += 1
+               
+                # Pack the next 4 elements
+                for j in range(i, i + 4):
+                    qzeros[:, col] |= zeros[:, j] << (7 * (j - i) + 3)
+                i += 4
+               
+                # Handle the 11th element separately
+                qzeros[:, col] |= zeros[:, i] << 31
+                col += 1
+                qzeros[:, col] |= (zeros[:, i] >> 1) & 0x3F
+                i += 1
+               
+                # Pack the last set of 5 elements
+                for j in range(i, i + 3):
+                    qzeros[:, col] |= zeros[:, j] << (7 * (j - i) + 6)
+                i += 3
+               
+                # Handle the 11th element separately
+                qzeros[:, col] |= zeros[:, i] << 27
+                col += 1
+                qzeros[:, col] |= (zeros[:, i] >> 5) & 0x3
+                i += 1
+               
+                # Pack the last set of 5 elements
+                for j in range(i, i + 4):
+                    qzeros[:, col] |= zeros[:, j] << (7 * (j - i) + 2)
+                i += 4
+               
+                qzeros[:, col] |= zeros[:, i] << 30
+                col += 1
+                qzeros[:, col] |= (zeros[:, i] >> 2) & 0x1F
+                i += 1
+ 
+                # Pack the last set of 5 elements
+                for j in range(i, i + 3):
+                    qzeros[:, col] |= zeros[:, j] << (7 * (j - i) + 5)
+                i += 3
+               
+                qzeros[:, col] |= zeros[:, i] << 26
+                col += 1
+                qzeros[:, col] |= (zeros[:, i] >> 6) & 0x1
+                i += 1
+ 
+                # Pack the last set of 5 elements
+                for j in range(i, i + 4):
+                    qzeros[:, col] |= zeros[:, j] << (7 * (j - i) + 1)
+                i += 4
+               
+                qzeros[:, col] |= zeros[:, i] << 29
+                col += 1
+                qzeros[:, col] |= (zeros[:, i] >> 3) & 0xF
+                i += 1
+               
+               
+                # Pack the last set of 5 elements
+                for j in range(i, i + 4):
+                    qzeros[:, col] |= zeros[:, j] << (7 * (j - i) + 4)
+                i += 4
                 col += 1
             else:
                 raise NotImplementedError("Only 2,3,4,8 bits are supported.")
@@ -293,8 +615,102 @@ class QuantLinear(nn.Module):
                 weight[:, 1, 11] = (weight[:, 1, 11] & 0x1) | ((weight[:, 2, 0] << 1) & 0x6)
                 weight = weight & 0x7
                 weight = torch.cat([weight[:, 0, :11], weight[:, 1, 1:12], weight[:, 2, 1:11]], dim=1)
+            
+            elif self.bits == 5:
+                zeros = self.qzeros.reshape(
+                            self.qzeros.shape[0], self.qzeros.shape[1] // 5, 5, 1
+                        ).expand(-1, -1, -1,8)
+                zeros = (zeros >> self.wf.unsqueeze(0))
+                #zeros = zeros.expand(-1,-1,-1,6)
+                zeros[:, :, 0, 6] = (zeros[:,:,  0, 6] & 0x3) | ((zeros[:, :,  1, 0] << 2) & 0x1C)
+                zeros[:, :, 1, 6] = (zeros[:, :, 1, 6] & 0xF) | ((zeros[:, :, 2, 0] << 4) & 0x10)
+               
+                zeros[:, :, 2, 7] = (zeros[:,:,  2, 7] & 0x1) | ((zeros[:, :,  3, 0] << 1) & 0x1E)
+                zeros[:, :, 3, 6] = (zeros[:, :, 3, 6] & 0x7) | ((zeros[:, :, 4, 0] << 3) & 0x18)
+               
+                zeros = zeros & 0x1F
+                zeros = torch.cat([zeros[:,:,  0, 0:7], zeros[:, :, 1, 1:7], zeros[:,:,  2, 1:8], zeros[:,:,  3, 1:7], zeros[:,:,  4, 1:7]], dim=2)
+ 
+                zeros = zeros + 1
+                zeros = zeros.reshape(self.scales.shape)
+ 
+                weight = self.qweight.reshape(
+                            self.qweight.shape[0] // 5, 5, 1, self.qweight.shape[1]
+                        ).expand(-1, -1, 8, -1)
+                weight = (weight >> self.wf.unsqueeze(-1)) & 0x1F
+                #zeros = zeros.expand(-1,-1,6,-1)
+                weight[ :,0, 6] = (weight[:, 0, 6] & 0x3) | ((weight[:, 1, 0] << 2) & 0x1C)
+                weight[:, 1, 6] = (weight[:, 1, 6] &  0xF) | ((weight[:, 2, 0] << 4) & 0x10)
+                weight[:, 2, 7] = (weight[:, 2, 7] &  0x1) | ((weight[:, 3, 0] << 1) & 0x1E)
+ 
+                weight[:, 3, 6] = (weight[:, 3, 6] &  0x7) | ((weight[:, 4, 0] << 3) & 0x18)
+ 
+                weight = weight & 0x1F
+                weight = torch.cat([weight[:, 0, 0:7], weight[:, 1,1:7], weight[:, 2, 1:8],weight[:, 3, 1:7],weight[:, 4, 1:7]], dim=1)
+ 
+            elif self.bits == 6:
+                zeros = self.qzeros.reshape(
+                            self.qzeros.shape[0], self.qzeros.shape[1] // 3, 3, 1
+                        ).expand(-1, -1, -1,6)
+                zeros = (zeros >> self.wf.unsqueeze(0))
+                #zeros = zeros.expand(-1,-1,-1,6)
+                zeros[:, :, 0, 5] = (zeros[:,:,  0, 5] & 0x3) | ((zeros[:, :,  1, 0] << 2) & 0x3C)
+                zeros[:, :, 1, 5] = (zeros[:, :, 1, 5] & 0xF) | ((zeros[:, :, 2, 0] << 4) & 0x30)
+                zeros = zeros & 0x3F
+                zeros = torch.cat([zeros[:,:,  0, 0:6], zeros[:, :, 1, 1:6], zeros[:,:,  2, 1:6]], dim=2)
+ 
+                zeros = zeros + 1
+                zeros = zeros.reshape(self.scales.shape)
+ 
+                weight = self.qweight.reshape(
+                            self.qweight.shape[0] // 3, 3, 1, self.qweight.shape[1]
+                        ).expand(-1, -1, 6, -1)
+                weight = (weight >> self.wf.unsqueeze(-1)) & 0x3F
+                #zeros = zeros.expand(-1,-1,6,-1)
+                weight[ :,0, 5] = (weight[:, 0, 5] & 0x3) | ((weight[:, 1, 0] << 2) & 0x3C)
+                weight[:, 1, 5] = (weight[:, 1, 5] &  0xF) | ((weight[:, 2, 0] << 4) & 0x30)
+                weight = weight & 0x3F
+                weight = torch.cat([weight[:, 0, 0:6], weight[:, 1,1:6], weight[:, 2, 1:6]], dim=1)
+           
+            elif self.bits == 7:
+                zeros = self.qzeros.reshape(
+                            self.qzeros.shape[0], self.qzeros.shape[1] // 7, 7, 1
+                        ).expand(-1, -1, -1,6)
+                zeros = (zeros >> self.wf.unsqueeze(0))
+                #zeros = zeros.expand(-1,-1,-1,6)
+                zeros[:, :, 0, 4] = (zeros[:,:,  0, 4] & 0xF) | ((zeros[:, :,  1, 0] << 4) & 0x70)
+                zeros[:, :, 1, 5] = (zeros[:, :, 1, 5] & 0x1) | ((zeros[:, :, 2, 0] << 1) & 0x7E)
+ 
+                zeros[:, :, 2, 4] = (zeros[:,:,  2, 4] & 0x1F) | ((zeros[:, :,  3, 0] << 5) & 0x60)
+                zeros[:, :, 3, 5] = (zeros[:, :, 3, 5] & 0x3) | ((zeros[:, :, 4, 0] << 2) & 0x7C)
+ 
+                zeros[:, :, 4, 4] = (zeros[:,:,  4, 4] & 0x3F) | ((zeros[:, :,  5, 0] << 6) & 0x40)
+                zeros[:, :, 5, 5] = (zeros[:, :, 5, 5] & 0x7) | ((zeros[:, :, 6, 0] << 3) & 0x78)
+                zeros = zeros & 0x7F
+                zeros = torch.cat([zeros[:,:,  0, 0:5], zeros[:, :, 1, 1:6], zeros[:,:,  2, 1:5], zeros[:,:,  3, 1:6], zeros[:,:,  4, 1:5], zeros[:,:,  5, 1:6], zeros[:,:,  6, 1:5]], dim=2)
+ 
+                zeros = zeros + 1
+                zeros = zeros.reshape(self.scales.shape)
+ 
+                weight = self.qweight.reshape(
+                            self.qweight.shape[0] // 7, 7, 1, self.qweight.shape[1]
+                        ).expand(-1, -1, 6, -1)
+                weight = (weight >> self.wf.unsqueeze(-1)) & 0x7F
+                #zeros = zeros.expand(-1,-1,6,-1)
+                weight[ :,0, 4] = (weight[:, 0, 4] & 0xF) | ((weight[:, 1, 0] << 4) & 0x70)
+                weight[:, 1, 5] = (weight[:, 1, 5] &  0x1) | ((weight[:, 2, 0] << 1) & 0x7E)
+               
+                weight[ :,2, 4] = (weight[:, 2, 4] & 0x1F) | ((weight[:, 3, 0] << 5) & 0x60)
+                weight[:, 3, 5] = (weight[:, 3, 5] &  0x3) | ((weight[:, 4, 0] << 2) & 0x7C)
+               
+                weight[ :,4, 4] = (weight[:, 4, 4] & 0x3F) | ((weight[:, 5, 0] << 6) & 0x40)
+                weight[:, 5, 5] = (weight[:, 5, 5] &  0x7) | ((weight[:, 6, 0] << 3) & 0x78)
+                weight = weight & 0x7F
+                weight = torch.cat([weight[:, 0, 0:5], weight[:, 1,1:6], weight[:, 2, 1:5],weight[:, 3, 1:6], weight[:, 4,1:5], weight[:, 5, 1:6],weight[:,6,1:5] ], dim=1)
+
+
             else:
-                raise NotImplementedError("Only 2,3,4,8 bits are supported.")
+                raise NotImplementedError("Only 2,3,4,,5,6,7,8 bits are supported.")
 
             weight = weight.reshape(weight.shape[0] * weight.shape[1], weight.shape[2])
             num_itr = self.g_idx.shape[0] // x.shape[-1]
