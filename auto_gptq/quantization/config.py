@@ -58,7 +58,7 @@ QUANT_CONFIG_ARG_SYNONYMS = {
 
 @dataclass
 class BaseQuantizeConfig(PushToHubMixin):
-    bits: int = field(default=4, metadata={"choices": [2, 3, 4, 8]})
+    bits: int = field(default=4, metadata={"choices": [2, 3, 4, 5, 6, 7, 8]})
     group_size: int = field(default=-1)
     damp_percent: float = field(default=0.01)
     desc_act: bool = field(default=True)
