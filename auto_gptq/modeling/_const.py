@@ -15,6 +15,7 @@ SUPPORTED_MODELS = [
     "moss",
     "gpt_bigcode",
     "codegen",
+    "chatglm",
     "RefinedWebModel",
     "RefinedWeb",
     "baichuan",
