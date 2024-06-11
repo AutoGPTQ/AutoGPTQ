@@ -66,6 +66,13 @@ def dynamically_import_QuantLinear(
     use_qigen: bool = False,
     disable_marlin: bool = True,
 ):
+    try:
+        import habana_frameworks.torch.hpu  # noqa: F401
+    except ImportError as e:
+        pass
+    else:
+        from ..nn_modules.qlinear.qlinear_hpu import QuantLinear
+        return QuantLinear
     if use_qigen:
         if not QIGEN_AVAILABLE:
             raise ValueError(

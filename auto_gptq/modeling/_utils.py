@@ -470,11 +470,14 @@ def autogptq_post_init(model, use_act_order: bool, max_input_length: Optional[in
     model_uses_exllamav2 = False
 
     for _, submodule in model.named_modules():
-        if hasattr(submodule, "QUANT_TYPE") and submodule.QUANT_TYPE == "exllamav2":
-            model_uses_exllamav2 = True
-            device = submodule.qweight.device
-            scratch_fixed = submodule.scratch_space_fixed()
-            fixed_bytes[device] = max(scratch_fixed, fixed_bytes.get(device, 0))
+        if hasattr(submodule, "QUANT_TYPE"):
+            if submodule.QUANT_TYPE == "exllamav2":
+                model_uses_exllamav2 = True
+                device = submodule.qweight.device
+                scratch_fixed = submodule.scratch_space_fixed()
+                fixed_bytes[device] = max(scratch_fixed, fixed_bytes.get(device, 0))
+            elif submodule.QUANT_TYPE == "hpu":
+                submodule.post_init()
 
     if model_uses_exllamav2:
         from ..nn_modules.qlinear.qlinear_exllamav2 import ExLlamaV2DeviceTensors
