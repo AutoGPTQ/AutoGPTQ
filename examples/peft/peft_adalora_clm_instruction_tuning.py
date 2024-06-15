@@ -12,7 +12,7 @@ from transformers import AutoTokenizer, get_linear_schedule_with_warmup
 
 from auto_gptq import AutoGPTQForCausalLM, get_gptq_peft_model
 from auto_gptq.utils.data_utils import collate_data, make_data_block
-from auto_gptq.utils.peft_utils import GPTQAdaLoraConfig
+from auto_gptq.utils.peft_utils import AdaLoraConfig
 
 
 parser = ArgumentParser()
@@ -39,7 +39,7 @@ lr = args.lr
 num_epochs = args.num_epochs
 
 # creating model
-peft_config = GPTQAdaLoraConfig(
+peft_config = AdaLoraConfig(
     init_r=20,
     target_r=16,
     beta1=0.85,
