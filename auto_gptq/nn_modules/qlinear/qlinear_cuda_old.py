@@ -163,7 +163,6 @@ class QuantLinear(nn.Module):
         qweight = qweight.astype(np.int32)
         self.qweight = torch.from_numpy(qweight)
 
-        zeros -= 1
         zeros = zeros.numpy().astype(np.uint32)
         qzeros = np.zeros((zeros.shape[0], zeros.shape[1] // 32 * self.bits), dtype=np.uint32)
         i = 0
@@ -298,7 +297,6 @@ class QuantLinear(nn.Module):
                     self.wf.unsqueeze(0),
                 ).to(torch.int16 if self.bits == 8 else torch.int8)
 
-                zeros = zeros + 1
                 zeros = torch.bitwise_and(
                     zeros, (2**self.bits) - 1
                 )  # NOTE: It appears that casting here after the `zeros = zeros + 1` is important.
@@ -327,7 +325,6 @@ class QuantLinear(nn.Module):
                     dim=2,
                 )
 
-                zeros = zeros + 1
                 zeros = zeros.reshape(-1, 1, zeros.shape[1] * zeros.shape[2])
 
                 scales = self.scales
