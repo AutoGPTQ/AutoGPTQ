@@ -2,8 +2,9 @@ import json
 import logging
 import os
 from dataclasses import dataclass, field, fields
+from packaging import version
 from os.path import isdir, join
-from typing import Optional
+from typing import Optional, Any, Tuple, Dict
 
 import huggingface_hub
 from transformers.utils.hub import PushToHubMixin, cached_file
@@ -22,10 +23,21 @@ CHECKPOINT_FORMAT_FIELD_COMPAT_MARLIN = "is_marlin_format"
 QUANT_METHOD_FIELD = "quant_method"
 QUANT_CONFIG_FILENAME = "quantize_config.json"
 
+MIN_VERSION_WITH_V2 = "0.8.0-dev1"
+
+META_FIELD = "meta"
+# quantizer is the tool that did the quantization
+META_FIELD_QUANTIZER = "quantizer"
+# packer is the tool that packed the weights post quantization
+META_FIELD_PACKER = "packer"
+
+META_QUANTIZER_AUTOGPTQ = "autogptq"
 
 # checkpoint formats
 class CHECKPOINT_FORMAT:
     GPTQ = "gptq"
+    # v2 format fixed sym = False quantization
+    GPTQ_V2 = "gptq_v2"
     MARLIN = "marlin"
     AWQ_GEMM = "gemm"
 
@@ -39,6 +51,7 @@ class QUANT_METHOD:
 QUANT_METHOD_FORMAT_MAPPING = {
     QUANT_METHOD.GPTQ: {
         CHECKPOINT_FORMAT.GPTQ,
+        CHECKPOINT_FORMAT.GPTQ_V2,
         CHECKPOINT_FORMAT.MARLIN,
     },
     QUANT_METHOD.AWQ: {
@@ -65,10 +78,16 @@ class BaseQuantizeConfig(PushToHubMixin):
     static_groups: bool = field(default=False)
     sym: bool = field(default=True)
     true_sequential: bool = field(default=True)
+    lm_head: bool = field(default=False)
     quant_method: str = field(default=QUANT_METHOD.GPTQ)
+    # default to gptq v1 format for maximum compat with 3rd party inference libs with minimal loss vs v2
+    # if you inference with autogptq, save to gptq_v2 format for best result
     checkpoint_format: str = field(default=CHECKPOINT_FORMAT.GPTQ)
     model_name_or_path: Optional[str] = field(default=None)
     model_file_base_name: Optional[str] = field(default=None)
+    # properties that do not directly contributes to quantization or quant inference should be placed in meta
+    # i.e. quantizer tool (producer) + version, timestamp, entity who made the quant, etc
+    meta: Optional[Dict] = field(default=None)
 
     def __post_init__(self):
         fields_info = fields(self)
@@ -92,6 +111,49 @@ class BaseQuantizeConfig(PushToHubMixin):
         if not (0 < self.damp_percent < 1):
             raise ValueError("damp_percent must between 0 and 1.")
 
+        # validate meta
+        if self.meta is not None:
+            if not isinstance(self.meta, dict):
+                raise ValueError("meta must be a dictionary")
+            for key, value in self.meta.items():
+                if not isinstance(key, str):
+                    raise ValueError("Keys in the meta dictionary must be strings")
+        else:
+            self.meta = {}
+
+    def meta_set(self, key: str, value: Any):
+        self.meta[key] = value
+
+    def meta_get(self, key: str) -> Any:
+        return self.meta.get(key)
+
+    # verionable is a meta.property that pairs value with version i.e "value:1.0.0"
+    def meta_set_versionable(self, key: str, value: str, version: str):
+        self.meta_set(key, f"{value}:{version}")
+
+    # verionable is a meta.property that pairs value with version i.e "value:1.0.0"
+    def meta_get_versionable(self, key: str) -> Tuple[str, str]:
+        val = self.meta_get(key)
+        if val is None:
+            return None, None
+        parts = val.split(":")
+        return parts[0].lower(), parts[1].lower() if len(parts) >= 2 else None
+
+    # is quantized model quantized or packed by autogptq version with v2 checkpoint_format code
+    def is_quantized_or_packed_by_v2(self) -> bool:
+        by_v2 = False
+        # check meta.quantizer
+        producer, _version = self.meta_get_versionable(META_FIELD_QUANTIZER)
+        by_v2 = producer == META_QUANTIZER_AUTOGPTQ and version.parse(_version) >= version.parse(MIN_VERSION_WITH_V2)
+
+        # fallback to meta.packer
+        if not by_v2:
+            producer, _version = self.meta_get_versionable(META_FIELD_PACKER)
+            by_v2 = producer == META_QUANTIZER_AUTOGPTQ and version.parse(_version) >= version.parse(
+                MIN_VERSION_WITH_V2)
+
+        return by_v2
+
     def save_pretrained(self, save_dir: str, **kwargs):
         with open(join(save_dir,  QUANT_CONFIG_FILENAME), "w", encoding="utf-8") as f:
             json.dump(self.to_dict(), f, indent=2)
@@ -99,7 +161,7 @@ class BaseQuantizeConfig(PushToHubMixin):
     @classmethod
     # normalize quant config for compat and also performs validation
     def from_quant_config(cls, quantize_cfg, checkpoint_format: str = None):
-        valid_formats = {CHECKPOINT_FORMAT.GPTQ, CHECKPOINT_FORMAT.MARLIN, CHECKPOINT_FORMAT.AWQ_GEMM}
+        valid_formats = {CHECKPOINT_FORMAT.GPTQ, CHECKPOINT_FORMAT.GPTQ_V2, CHECKPOINT_FORMAT.MARLIN, CHECKPOINT_FORMAT.AWQ_GEMM}
 
         checkpoint_format_auto_inferred = False
         # compat: checkpoint_format can be passed in via from_quantized() if field missing from json
@@ -114,7 +176,11 @@ class BaseQuantizeConfig(PushToHubMixin):
 
         field_names = [field.name for field in fields(cls)]
 
-        normalized = {QUANT_METHOD_FIELD: QUANT_METHOD.GPTQ, CHECKPOINT_FORMAT_FIELD: checkpoint_format if checkpoint_format else CHECKPOINT_FORMAT.GPTQ}
+        normalized = {
+            QUANT_METHOD_FIELD: QUANT_METHOD.GPTQ,
+            # compat: default to gptq(v1) when loading models
+            CHECKPOINT_FORMAT_FIELD: checkpoint_format if checkpoint_format else CHECKPOINT_FORMAT.GPTQ
+        }
         for key, val in quantize_cfg.items():
             key = key.lower()
 
@@ -125,7 +191,7 @@ class BaseQuantizeConfig(PushToHubMixin):
             if key == CHECKPOINT_FORMAT_FIELD:
                 val = val.lower()
 
-                if val in {CHECKPOINT_FORMAT.GPTQ, CHECKPOINT_FORMAT.MARLIN, CHECKPOINT_FORMAT.AWQ_GEMM}:
+                if val in {CHECKPOINT_FORMAT.GPTQ, CHECKPOINT_FORMAT.GPTQ_V2, CHECKPOINT_FORMAT.MARLIN, CHECKPOINT_FORMAT.AWQ_GEMM}:
                     normalized[key] = val
                 else:
                     raise ValueError(f"Unknown quantization format: {val}.")
@@ -229,7 +295,7 @@ class BaseQuantizeConfig(PushToHubMixin):
         use_quant_method = quant_method if quant_method else self.quant_method
         use_checkpoint_format = checkpoint_format if checkpoint_format else self.checkpoint_format
 
-        cache_file_name = f"autogptq_model_{use_quant_method}_{use_checkpoint_format}.safetensors"
+        cache_file_name = f"autogptq_model_v2_{use_quant_method}_{use_checkpoint_format}.safetensors"
 
         if os.path.isdir(self.model_name_or_path):
             cache_file_name = os.path.join(self.model_name_or_path, cache_file_name)
@@ -251,8 +317,10 @@ class BaseQuantizeConfig(PushToHubMixin):
             "static_groups": self.static_groups,
             "sym": self.sym,
             "true_sequential": self.true_sequential,
+            "lm_head": self.lm_head,
             "model_name_or_path": self.model_name_or_path,
             "model_file_base_name": self.model_file_base_name,
             QUANT_METHOD_FIELD: self.quant_method,
             CHECKPOINT_FORMAT_FIELD: self.checkpoint_format,
+            META_FIELD: self.meta,
         }

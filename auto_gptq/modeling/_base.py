@@ -8,6 +8,7 @@ import accelerate
 import torch
 import torch.nn as nn
 import transformers
+import threadpoolctl as tctl
 from accelerate.hooks import remove_hook_from_module
 from safetensors import safe_open
 from safetensors.torch import load_file as safe_load
@@ -27,12 +28,14 @@ from ..nn_modules._fused_base import FusedBaseAttentionModule, FusedBaseMLPModul
 from ..nn_modules.qlinear import GeneralQuantLinear
 from ..quantization import GPTQ, BaseQuantizeConfig
 from ..quantization.config import (
+    META_FIELD_QUANTIZER,
+    META_QUANTIZER_AUTOGPTQ,
+    MIN_VERSION_WITH_V2,
     CHECKPOINT_FORMAT,
     CHECKPOINT_FORMAT_FIELD,
     QUANT_METHOD_FIELD,
     QUANTIZE_BLACK_LIST,
 )
-from ..utils.accelerate_utils import load_checkpoint_in_model
 from ..utils.data_utils import collate_data
 from ..utils.import_utils import (
     AUTOGPTQ_CUDA_AVAILABLE,
@@ -48,9 +51,12 @@ from ..utils.marlin_utils import (
     _validate_marlin_device_support,
     prepare_model_for_marlin_load,
 )
+from ..version import __version__
 from ._const import CPU, CUDA_0, SUPPORTED_MODELS
 from ._utils import (
     autogptq_post_init,
+    convert_gptq_v1_to_v2_format,
+    convert_gptq_v2_to_v1_format,
     find_layers,
     get_checkpoints,
     get_device,
@@ -104,6 +110,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         injected_fused_attention: bool = False,
         injected_fused_mlp: bool = False,
         trainable: bool = False,
+        qlinear_kernel: nn.Module = None
     ):
         super().__init__()
 
@@ -117,6 +124,9 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         self.injected_fused_attention = injected_fused_attention
         self.injected_fused_mlp = injected_fused_mlp
         self.trainable = trainable
+
+        # compat: state to assist in checkpoint_format gptq(v1) to gptq_v2 conversion
+        self.qlinear_kernel = qlinear_kernel
 
     @property
     def quantized(self):
@@ -186,23 +196,6 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
 
         if self.quantize_config.quant_method in QUANTIZE_BLACK_LIST:
             raise ValueError(f"Unsupported quantization operation for quant method: {self.quantize_config.quant_method}")
-
-        # alert users to limit threads so packing performance does not regress by up to ~100x
-        thread_warning = """If you have not already done so, please inject the following code at the very top of your 
-quantization script so the packing stage is optimized for speed. Using too many cores may reduce packing performance.
-----
-import os
-import math
-max_threads = str(min(8, os.cpu_count()))
-os.environ['OMP_NUM_THREADS'] = max_threads
-os.environ['OPENBLAS_NUM_THREADS'] = max_threads
-os.environ['MKL_NUM_THREADS'] = max_threads
-os.environ['VECLIB_MAXIMUM_THREADS'] = max_threads
-os.environ['NUMEXPR_NUM_THREADS'] = max_threads
-os.environ['NUMEXPR_MAX_THREADS'] = max_threads
-----
-"""
-        logger.warning(thread_warning)
 
         if use_triton and not TRITON_AVAILABLE:
             logger.warning("triton is not installed, reset use_triton to False")
@@ -300,8 +293,14 @@ os.environ['NUMEXPR_MAX_THREADS'] = max_threads
         if not self.quantize_config.true_sequential:
             inside_layer_modules = [sum(inside_layer_modules, [])]
         quantizers = {}
-        for i in range(len(layers)):
-            logger.info(f"Start quantizing layer {i + 1}/{len(layers)}")
+
+        # stores all per-layer quant stats such as avg loss and processing time
+        quant_log = []
+
+        layer_count = len(layers)
+        layer_pb = tqdm(range(layer_count))
+        for i in layer_pb:
+            layer_pb.set_description(f"Quantizing layer {i + 1} of {layer_count}")
             layer = layers[i]
             force_layer_back_to_cpu = False
             if get_device(layer) == CPU:
@@ -351,13 +350,27 @@ os.environ['NUMEXPR_MAX_THREADS'] = max_threads
                     h.remove()
 
                 for name in subset:
-                    logger.info(f"Quantizing {name} in layer {i + 1}/{len(layers)}...")
-                    scale, zero, g_idx = gptq[name].fasterquant(
-                        percdamp=self.quantize_config.damp_percent,
-                        group_size=self.quantize_config.group_size,
-                        actorder=self.quantize_config.desc_act,
-                        static_groups=self.quantize_config.static_groups,
-                    )
+                    layer_pb.set_description(f"Quantizing {name} in layer {i + 1} of {layer_count}")
+
+                    try:
+                        scale, zero, g_idx, duration, avg_loss = gptq[name].fasterquant(
+                            percdamp=self.quantize_config.damp_percent,
+                            group_size=self.quantize_config.group_size,
+                            actorder=self.quantize_config.desc_act,
+                            static_groups=self.quantize_config.static_groups,
+                        )
+
+                        stat = {"layer": i + 1, "module": name, "avg_loss": avg_loss, "time": duration}
+
+                        quant_log.append(stat)
+                        logger.info(stat)
+
+                    except torch._C._LinAlgError as e:
+                        if  "not positive-definite" in str(e).lower():
+                            logger.warning("Please increase damp or nsamples for calibration data to avoid the following quant error. "
+                                  "Ref: https://github.com/AutoGPTQ/AutoGPTQ/issues/572#issuecomment-2006686913")
+                        raise e
+
                     quantizers[f"{self.layers_block_name}.{i}.{name}"] = (
                         gptq[name].quantizer.to(CPU if force_layer_back_to_cpu else cur_layer_device),
                         move_to_device(scale, CPU if force_layer_back_to_cpu else cur_layer_device),
@@ -391,7 +404,11 @@ os.environ['NUMEXPR_MAX_THREADS'] = max_threads
             layer_inputs, layer_outputs = layer_outputs, []  # TODO: is it really OK to cache only the first positional argument?
             torch.cuda.empty_cache()
 
-        pack_model(
+        logger.info(f"Quantization summary:\n{quant_log}")
+        for module_log in quant_log:
+            logger.info(module_log)
+
+        self.qlinear_kernel = pack_model(
             model=self.model,
             quantizers=quantizers,
             bits=self.quantize_config.bits,
@@ -411,6 +428,8 @@ os.environ['NUMEXPR_MAX_THREADS'] = max_threads
         self._quantized = True
 
         torch.cuda.empty_cache()
+
+        return quant_log
 
     @property
     def device(self):
@@ -517,24 +536,85 @@ os.environ['NUMEXPR_MAX_THREADS'] = max_threads
     def save_quantized(
         self,
         save_dir: str,
-        use_safetensors: bool = True,
         safetensors_metadata: Optional[Dict[str, str]] = None,
+        checkpoint_format: Optional[str] = None,
+        use_safetensors: bool = True,
     ):
         """save quantized model and configs to local disk"""
         os.makedirs(save_dir, exist_ok=True)
 
+        # write autogptq tooling fingerprint to config
+        self.quantize_config.meta_set_versionable(
+            key=META_FIELD_QUANTIZER,
+            value=META_QUANTIZER_AUTOGPTQ,
+            version=__version__,
+        )
+
+        # The config, quantize_config and model may be edited in place in save_quantized.
+        config = copy.deepcopy(self.model.config)
+        quantize_config = copy.deepcopy(self.quantize_config)
+        model = self.model
+
         if not self.quantized:
             raise EnvironmentError("can only save quantized model, please execute .quantize first.")
 
-        self.model.to(CPU)
+        if checkpoint_format == CHECKPOINT_FORMAT.GPTQ_V2 or (checkpoint_format is None and quantize_config.checkpoint_format == CHECKPOINT_FORMAT.GPTQ_V2):
+            logger.warning(
+                f"Using 'checkpoint_format = {CHECKPOINT_FORMAT.GPTQ_V2}': the serialized model is only supported by AutoGPTQ version >= {MIN_VERSION_WITH_V2}."
+            )
 
-        model_base_name = (
-            self.quantize_config.model_file_base_name
-            or f"gptq_model-{self.quantize_config.bits}bit-{self.quantize_config.group_size}g"
-        )
+        if checkpoint_format is not None and quantize_config.checkpoint_format != checkpoint_format:
+            # Model qzeros may be edited in place.
+            # TODO: avoid inplace modification of the weights
+            model = copy.deepcopy(self.model)
+
+            if checkpoint_format == CHECKPOINT_FORMAT.GPTQ_V2:
+                if quantize_config.checkpoint_format != CHECKPOINT_FORMAT.GPTQ:
+                    raise NotImplementedError(f"Asked to serialize a model with `checkpoint_format={checkpoint_format}` but the model format is {quantize_config.checkpoint_format}. This is not supported. Please open an issue at https://github.com/AutoGPTQ/AutoGPTQ/issues.")
+
+                model = convert_gptq_v1_to_v2_format(
+                    model,
+                    quantize_config=quantize_config,
+                    qlinear_kernel=self.qlinear_kernel,
+                )
+
+                quantize_config.checkpoint_format = CHECKPOINT_FORMAT.GPTQ_V2
+            elif checkpoint_format == CHECKPOINT_FORMAT.GPTQ:
+                if quantize_config.checkpoint_format != CHECKPOINT_FORMAT.GPTQ_V2:
+                    raise NotImplementedError(f"Asked to serialize a model with `checkpoint_format={checkpoint_format}` but the model format is {quantize_config.checkpoint_format}. This is not supported. Please open an issue at https://github.com/AutoGPTQ/AutoGPTQ/issues.")
+
+                model = convert_gptq_v2_to_v1_format(
+                    model,
+                    quantize_config=quantize_config,
+                    qlinear_kernel=self.qlinear_kernel
+                )
+
+                quantize_config.checkpoint_format = CHECKPOINT_FORMAT.GPTQ
+
+        # internal is always gptq v2 but allow users to pass gptq (v1) via config
+        if checkpoint_format is None and quantize_config.checkpoint_format == CHECKPOINT_FORMAT.GPTQ:
+            # Model qzeros may be edited in place.
+            # TODO: avoid inplace modification of the weights
+            model = copy.deepcopy(self.model)
+            model = convert_gptq_v2_to_v1_format(
+                model,
+                quantize_config=quantize_config,
+                qlinear_kernel=self.qlinear_kernel
+            )
+
+        model.to(CPU)
+
+        if quantize_config.model_file_base_name is None:
+            if use_safetensors:
+                model_base_name = "model"
+            else:
+                model_base_name = "pytorch_model"
+        else:
+            model_base_name = quantize_config.model_file_base_name
+
         if use_safetensors:
             model_save_name = model_base_name + ".safetensors"
-            state_dict = self.model.state_dict()
+            state_dict = model.state_dict()
             state_dict = {k: v.clone().contiguous() for k, v in state_dict.items()}
             if safetensors_metadata is None:
                 safetensors_metadata = {}
@@ -569,38 +649,33 @@ os.environ['NUMEXPR_MAX_THREADS'] = max_threads
             # otherwise it raises an OSError
             safetensors_metadata["format"] = "pt"
 
-            # Store the quantization configuration as safetensors metadata
-            from auto_gptq import __version__
-
             safetensors_metadata["auto_gptq_version"] = str(__version__)
-            safetensors_metadata["gptq_bits"] = str(self.quantize_config.bits)
-            safetensors_metadata["gptq_group_size"] = str(self.quantize_config.group_size)
-            safetensors_metadata["gptq_desc_act"] = str(self.quantize_config.desc_act)
-            safetensors_metadata["gptq_damp_percent"] = str(self.quantize_config.damp_percent)
-            safetensors_metadata["gptq_" + CHECKPOINT_FORMAT_FIELD] = self.quantize_config.checkpoint_format
-            safetensors_metadata["gptq_" + QUANT_METHOD_FIELD] = self.quantize_config.quant_method
+            safetensors_metadata["gptq_bits"] = str(quantize_config.bits)
+            safetensors_metadata["gptq_group_size"] = str(quantize_config.group_size)
+            safetensors_metadata["gptq_desc_act"] = str(quantize_config.desc_act)
+            safetensors_metadata["gptq_damp_percent"] = str(quantize_config.damp_percent)
+            safetensors_metadata["gptq_" + CHECKPOINT_FORMAT_FIELD] = quantize_config.checkpoint_format
+            safetensors_metadata["gptq_" + QUANT_METHOD_FIELD] = quantize_config.quant_method
 
             safe_save(state_dict, join(save_dir, model_save_name), safetensors_metadata)
         else:
             model_save_name = model_base_name + ".bin"
-            torch.save(self.model.state_dict(), join(save_dir, model_save_name))
+            torch.save(model.state_dict(), join(save_dir, model_save_name))
 
-        self.model.config.quantization_config = self.quantize_config.to_dict()
-        self.model.config.save_pretrained(save_dir)
-        self.quantize_config.save_pretrained(save_dir)
-        self.quantize_config.model_name_or_path = save_dir
-        self.quantize_config.model_file_base_name = model_base_name
+        config.quantization_config = quantize_config.to_dict()
+        config.save_pretrained(save_dir)
+
+        quantize_config.model_name_or_path = save_dir
+        quantize_config.model_file_base_name = model_base_name
+        quantize_config.save_pretrained(save_dir)
 
     def save_pretrained(
         self,
         save_dir: str,
-        use_safetensors: bool = True,
-        safetensors_metadata: Optional[Dict[str, str]] = None,
         **kwargs,
     ):
-        """alias of save_quantized"""
-        logger.warning("you are using save_pretrained, which will re-direct to save_quantized.")
-        self.save_quantized(save_dir, use_safetensors, safetensors_metadata)
+        logger.warning("You are using save_pretrained, which will re-direct to save_quantized.")
+        self.save_quantized(save_dir=save_dir, **kwargs)
 
     @classmethod
     def from_pretrained(
@@ -920,7 +995,12 @@ os.environ['NUMEXPR_MAX_THREADS'] = max_threads
 
                 layers = find_layers(model)
                 ignore_layers = [cls.lm_head_name] + cls.outside_layer_modules
+
                 for name in list(layers.keys()):
+                    # allow loading of quantized lm_head
+                    if quantize_config.lm_head and name == cls.lm_head_name:
+                        continue
+
                     if any(name.startswith(ignore_layer) for ignore_layer in ignore_layers) or all(
                         not name.endswith(ignore_layer)
                         for sublist in cls.inside_layer_modules
@@ -1043,39 +1123,40 @@ os.environ['NUMEXPR_MAX_THREADS'] = max_threads
                         max_layer_name_length = len(max(gptq_layers, key=len))
                         pbar = tqdm(gptq_layers)
                         i = 0
-                        for gptq_layer_name in pbar:
-                            i += 1
-                            desc = f"Unpacking {gptq_layer_name} + '...'"
-                            desc = desc + " " * (max_layer_name_length - len(desc))
+                        with tctl.threadpool_limits(limits=1):
+                            for gptq_layer_name in pbar:
+                                i += 1
+                                desc = f"Unpacking {gptq_layer_name}"
+                                desc = desc + " " * (max_layer_name_length - len(desc))
 
-                            awq_qweight = f.get_tensor(gptq_layer_name + ".qweight")
-                            awq_qzeros = f.get_tensor(gptq_layer_name + ".qzeros")
-                            awq_scales = f.get_tensor(gptq_layer_name + ".scales")
+                                awq_qweight = f.get_tensor(gptq_layer_name + ".qweight")
+                                awq_qzeros = f.get_tensor(gptq_layer_name + ".qzeros")
+                                awq_scales = f.get_tensor(gptq_layer_name + ".scales")
 
-                            # TODO: add FAST unpacking.
-                            unpacked_qweight, unpacked_qzeros = unpack_awq(
-                                awq_qweight,
-                                awq_qzeros,
-                                awq_scales,
-                                bits=quantize_config.bits,
-                                group_size=quantize_config.group_size,
-                            )
+                                # TODO: add FAST unpacking.
+                                unpacked_qweight, unpacked_qzeros = unpack_awq(
+                                    awq_qweight,
+                                    awq_qzeros,
+                                    awq_scales,
+                                    bits=quantize_config.bits,
+                                    group_size=quantize_config.group_size,
+                                )
 
-                            # TODO: add FAST repacking, this is too slow.
-                            desc = f"Repacking {gptq_layer_name}..."
-                            desc = desc + " " * (max_layer_name_length + 12 - len(desc))
-                            pbar.set_description(desc)
-                            gptq_qweight, gptq_qzeros = pack_from_tensors(
-                                unpacked_qweight,
-                                unpacked_qzeros,
-                                awq_scales,
-                                bits=quantize_config.bits,
-                                group_size=quantize_config.group_size,
-                            )
+                                # TODO: add FAST repacking, this is too slow.
+                                desc = f"Repacking {gptq_layer_name}"
+                                desc = desc + " " * (max_layer_name_length + 12 - len(desc))
+                                pbar.set_description(desc)
+                                gptq_qweight, gptq_qzeros = pack_from_tensors(
+                                    unpacked_qweight,
+                                    unpacked_qzeros,
+                                    awq_scales,
+                                    bits=quantize_config.bits,
+                                    group_size=quantize_config.group_size,
+                                )
 
-                            new_state_dict[gptq_layer_name + ".qweight"] = gptq_qweight
-                            new_state_dict[gptq_layer_name + ".qzeros"] = gptq_qzeros
-                            new_state_dict[gptq_layer_name + ".scales"] = awq_scales
+                                new_state_dict[gptq_layer_name + ".qweight"] = gptq_qweight
+                                new_state_dict[gptq_layer_name + ".qzeros"] = gptq_qzeros
+                                new_state_dict[gptq_layer_name + ".scales"] = awq_scales
 
                         safe_save(new_state_dict, model_cache_name)
                         model_save_name = model_cache_name
@@ -1098,7 +1179,7 @@ os.environ['NUMEXPR_MAX_THREADS'] = max_threads
                     )
 
                 # Load the quant linear type we need.
-                # TODO: load directy marlin with the right quantlinear class.
+                # TODO: load marlin directly with the right quantlinear class.
                 quant_linear_class = dynamically_import_QuantLinear(
                     use_triton=use_triton,
                     desc_act=quantize_config.desc_act,
@@ -1107,12 +1188,12 @@ os.environ['NUMEXPR_MAX_THREADS'] = max_threads
                     disable_exllama=disable_exllama,
                     disable_exllamav2=disable_exllamav2,
                     use_marlin=False,
-                    use_tritonv2=use_tritonv2,  # Get the "original" QuantLienar class
+                    use_tritonv2=use_tritonv2,  # Get the "original" QuantLinear class
                 )
 
                 # Prepare model for marlin load.
-                #   If stub is marlin serialzed         --> load from directly
-                #   If stub has cached marlin version   --> load from the cached versin
+                #   If stub is marlin serialized         --> load from directly
+                #   If stub has cached marlin version   --> load from the cached version
                 #   Otherwise                           --> convert to marlin, cache, load from cache
                 model, model_save_name = prepare_model_for_marlin_load(
                     model=model,
@@ -1130,7 +1211,7 @@ os.environ['NUMEXPR_MAX_THREADS'] = max_threads
                     inject_fused_attention = False
                     inject_fused_mlp = False
 
-            load_checkpoint_in_model(
+            accelerate.utils.modeling.load_checkpoint_in_model(
                 model,
                 dtype=torch_dtype,  # This is very hacky but works due to https://github.com/huggingface/accelerate/blob/bd72a5f1a80d5146554458823f8aeda0a9db5297/src/accelerate/utils/modeling.py#L292
                 checkpoint=model_save_name,
@@ -1187,6 +1268,35 @@ os.environ['NUMEXPR_MAX_THREADS'] = max_threads
                 checkpoint,
             )
             model.load_state_dict(checkpoint)
+
+        qlinear_kernel = dynamically_import_QuantLinear(
+            use_triton=use_triton,
+            use_tritonv2=use_tritonv2,
+            desc_act=quantize_config.desc_act,
+            group_size=quantize_config.group_size,
+            bits=quantize_config.bits,
+            disable_exllama=disable_exllama,
+            disable_exllamav2=disable_exllamav2,
+            use_qigen=use_qigen,
+            use_marlin=use_marlin,
+        )
+
+        # compat: runtime convert checkpoint gptq(v1) to gptq_v2 format
+        if quantize_config.checkpoint_format == CHECKPOINT_FORMAT.GPTQ:
+            # validate sym=False v1 loading needs to be protected for models produced with new v2 format codebase
+            if not quantize_config.sym and not quantize_config.is_quantized_or_packed_by_v2():
+                raise ValueError(
+                    f"Loading of a sym=False model with checkpoint_format={CHECKPOINT_FORMAT.GPTQ} is only supported if produced by autogptq version >= {MIN_VERSION_WITH_V2}")
+
+            logger.info(f"Compatibility: converting `checkpoint_format` from `{CHECKPOINT_FORMAT.GPTQ}` to `{CHECKPOINT_FORMAT.GPTQ_V2}`.")
+
+            model = convert_gptq_v1_to_v2_format(
+                model,
+                quantize_config=quantize_config,
+                qlinear_kernel=qlinear_kernel,
+            )
+
+            quantize_config.checkpoint_format = CHECKPOINT_FORMAT.GPTQ_V2
 
         # == step4: set seqlen == #
         model_config = model.config.to_dict()
@@ -1263,6 +1373,7 @@ os.environ['NUMEXPR_MAX_THREADS'] = max_threads
             injected_fused_attention=inject_fused_attention,
             injected_fused_mlp=inject_fused_mlp and (use_triton or use_tritonv2),
             trainable=trainable,
+            qlinear_kernel=qlinear_kernel,
         )
 
     def warmup_triton(self, enabled: bool = True):

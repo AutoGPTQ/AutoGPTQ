@@ -2,6 +2,7 @@ import gc
 from logging import getLogger
 from typing import Tuple
 
+import accelerate
 import torch
 from accelerate.utils import find_tied_parameters
 from safetensors.torch import save_file as safe_save
@@ -10,7 +11,6 @@ from tqdm import tqdm
 from ..nn_modules.qlinear.qlinear_marlin import QuantLinear as MarlinQuantLinear
 from ..nn_modules.qlinear.qlinear_marlin import _get_perms, unpack_qzeros
 from ..quantization import CHECKPOINT_FORMAT, QUANT_METHOD, BaseQuantizeConfig
-from .accelerate_utils import load_checkpoint_in_model
 from .import_utils import MARLIN_AVAILABLE, MARLIN_EXCEPTION
 from .modeling_utils import recurse_getattr, recurse_setattr
 
@@ -19,7 +19,6 @@ if MARLIN_AVAILABLE:
     import autogptq_marlin_cuda
 
 logger = getLogger(__name__)
-
 
 def prepare_model_for_marlin_load(
     model,
@@ -51,7 +50,7 @@ def prepare_model_for_marlin_load(
             # TODO: Avoid loading the model with wrong QuantLinear, and directly use
             # Marlin ones. The repacking can be done directly on the safetensors, just
             # as for AWQ checkpoints.
-            load_checkpoint_in_model(
+            accelerate.utils.modeling.load_checkpoint_in_model(
                 model,
                 dtype=torch_dtype,  # This is very hacky but works due to https://github.com/huggingface/accelerate/blob/bd72a5f1a80d5146554458823f8aeda0a9db5297/src/accelerate/utils/modeling.py#L292
                 checkpoint=current_model_save_name,
@@ -138,10 +137,10 @@ def convert_to_marlin(model, model_quantlinear, quantization_config: BaseQuantiz
             Whether to repack the qweights from `model` into the Marlin's QuantLinear layers.
     """
     if repack:
-        message = "Repacking weights to be compatible with Marlin kernel..."
+        message = "Repacking weights to be compatible with Marlin kernel"
     else:
         # TODO: load directly Marlin QuantLinear.
-        message = "Overriding QuantLinear layers to use Marlin's QuantLinear..."
+        message = "Overriding QuantLinear layers to use Marlin's QuantLinear"
 
     for name, module in tqdm(model.named_modules(), desc=message, total=len(list(model.named_modules()))):
         if not isinstance(module, model_quantlinear):
