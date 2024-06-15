@@ -167,8 +167,9 @@ class GPTQ:
                 logger.debug(torch.sum(Losses))
 
         torch.cuda.synchronize()
-        logger.info(f"duration: {(time.time() - tick)}")
-        logger.info(f"avg loss: {torch.sum(Losses).item() / self.nsamples}")
+
+        duration = time.time() - tick
+        avg_loss = torch.sum(Losses).item() / self.nsamples
 
         group_size = group_size if group_size != -1 else self.columns
         if static_groups and actorder:
@@ -191,7 +192,7 @@ class GPTQ:
             zero.append(self.quantizer.zero)
         scale = torch.cat(scale, dim=1)
         zero = torch.cat(zero, dim=1)
-        return scale, zero, g_idx
+        return scale, zero, g_idx, duration, avg_loss
 
     def free(self):
         if os.environ.get("DEBUG"):

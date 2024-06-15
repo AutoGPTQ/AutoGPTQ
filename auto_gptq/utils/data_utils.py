@@ -1,13 +1,14 @@
 import copy
+import logging
 import random
 from functools import partial
-from typing import Callable, Dict, List, Optional
+from typing import Callable, Dict, List, Optional, Union
 
 import torch
 from datasets import DatasetDict, IterableDatasetDict, load_dataset
 from torch import LongTensor
 from torch.utils.data import DataLoader
-from transformers import PreTrainedTokenizer
+from transformers import PreTrainedTokenizer, PretrainedConfig
 
 
 def make_data_block(
@@ -260,4 +261,55 @@ def get_dataloader(
     return dl
 
 
-__all__ = ["make_data_block", "collate_data", "get_dataloader"]
+def prepare_examples_for_quantization(
+    cfg: PretrainedConfig,
+    examples: List[Dict[str, Union[List[int], torch.LongTensor]]],
+    batch_size: int = 1,
+):
+    def _convert_tensor_to_list(tensor):
+        if isinstance(tensor, torch.Tensor):
+            if len(tensor.shape) == 1:
+                tensor = tensor.unsqueeze(0)
+            tensor = tensor.long()
+            return tensor.cpu().numpy().tolist()
+        return [tensor]
+
+    # warn if # of examples is too low for accurate quant
+    if len(examples) < 128:
+        logging.warning(
+            f"If you experience high avg_loss during quantization, please increase # of examples to 128 or higher. "
+            f"Current examples size: {len(examples)}.")
+
+    new_examples = []
+    for example in examples:
+        input_ids = _convert_tensor_to_list(example["input_ids"])
+        attention_mask = _convert_tensor_to_list(example["attention_mask"])
+        if "labels" in example:
+            labels = _convert_tensor_to_list(example["labels"])
+        elif "label" in example:
+            labels = _convert_tensor_to_list(example["label"])
+        elif "label_ids" in example:
+            labels = _convert_tensor_to_list(example["label_ids"])
+        else:
+            labels = copy.deepcopy(input_ids)
+        new_examples.append(
+            {
+                "input_ids": input_ids,
+                "attention_mask": attention_mask,
+                "labels": labels,
+            }
+        )
+    pad_token_id = cfg.pad_token_id
+    if pad_token_id is None or pad_token_id < 0:
+        pad_token_id = cfg.eos_token_id
+
+    new_examples = [
+        collate_data(new_examples[start : start + batch_size], pad_token_id)
+        for start in range(0, len(new_examples), batch_size)
+    ]
+    for new_example in new_examples:
+        del new_example["labels"]
+
+    return new_examples
+
+__all__ = ["make_data_block", "collate_data", "get_dataloader", "prepare_examples_for_quantization"]

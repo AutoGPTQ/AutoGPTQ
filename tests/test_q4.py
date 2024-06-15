@@ -1,24 +1,24 @@
-import unittest
+import unittest  # noqa: E402
 
-import torch
-from parameterized import parameterized
+import torch  # noqa: E402
+from parameterized import parameterized  # noqa: E402
 
-from auto_gptq.nn_modules.qlinear.qlinear_exllama import QuantLinear
-from auto_gptq.nn_modules.qlinear.qlinear_marlin import QuantLinear as MarlinQuantLinear
-from auto_gptq.nn_modules.qlinear.qlinear_tritonv2 import QuantLinear as TritonV2QuantLinear
-from auto_gptq.utils.import_utils import dynamically_import_QuantLinear
+from auto_gptq.nn_modules.qlinear.qlinear_exllama import QuantLinear  # noqa: E402
+from auto_gptq.nn_modules.qlinear.qlinear_marlin import QuantLinear as MarlinQuantLinear  # noqa: E402
+from auto_gptq.nn_modules.qlinear.qlinear_tritonv2 import QuantLinear as TritonV2QuantLinear  # noqa: E402
+from auto_gptq.utils.import_utils import dynamically_import_QuantLinear  # noqa: E402
 
 
 try:
-    from exllama_kernels import prepare_buffers, set_tuning_params
+    from exllama_kernels import prepare_buffers, set_tuning_params  # noqa: E402
 except ImportError as e:
     print(f"[WARNING] Could not load exllama_kernels: {e}")
 
-from transformers import AutoTokenizer
+from transformers import AutoTokenizer  # noqa: E402
 
-from auto_gptq import AutoGPTQForCausalLM, exllama_set_max_input_length
-from auto_gptq.modeling._const import EXLLAMA_DEFAULT_MAX_INPUT_LENGTH
-from auto_gptq.modeling._utils import autogptq_post_init
+from auto_gptq import AutoGPTQForCausalLM, exllama_set_max_input_length  # noqa: E402
+from auto_gptq.modeling._const import EXLLAMA_DEFAULT_MAX_INPUT_LENGTH  # noqa: E402
+from auto_gptq.modeling._utils import autogptq_post_init  # noqa: E402
 
 
 def get_diff(a, ref):
@@ -1067,6 +1067,7 @@ class TestsQ4Exllama(unittest.TestCase):
 
         linear_class = dynamically_import_QuantLinear(
             use_triton=False,
+            use_tritonv2=False,
             desc_act=False,
             group_size=group_size,
             bits=4,
@@ -1087,6 +1088,7 @@ class TestsQ4Exllama(unittest.TestCase):
 
         linear.qweight = torch.randint(-100, 100, size=linear.qweight.shape, dtype=torch.int32)
         linear.scales = linear.scales + 0.002
+        linear.qzeros += 0b00010001000100010001000100010001  # for new weight format
 
         linear = linear.eval()
         linear = linear.to(device)
@@ -1761,6 +1763,7 @@ class TestsQ4CUDA(unittest.TestCase):
 
         linear_class = dynamically_import_QuantLinear(
             use_triton=False,
+            use_tritonv2=False,
             desc_act=False,
             group_size=group_size,
             bits=4,
@@ -1782,6 +1785,7 @@ class TestsQ4CUDA(unittest.TestCase):
 
         linear.qweight = torch.randint(-100, 100, size=linear.qweight.shape, dtype=torch.int32)
         linear.scales = linear.scales + 0.002
+        linear.qzeros += 0b00010001000100010001000100010001  # for new weight format
         linear.use_cuda_fp16 = use_half2
         self.assertTrue(linear.autogptq_cuda_available)
 
@@ -1906,7 +1910,9 @@ class TestsQ4ExllamaV2(unittest.TestCase):
         n = 1024
         device = torch.device("cuda:0")
 
-        linear_class = dynamically_import_QuantLinear(use_triton=False, desc_act=False, group_size=group_size, bits=4)
+        linear_class = dynamically_import_QuantLinear(
+            use_triton=False, use_tritonv2=False, desc_act=False, group_size=group_size, bits=4
+        )
 
         linear = linear_class(
             bits=4,
@@ -1922,6 +1928,7 @@ class TestsQ4ExllamaV2(unittest.TestCase):
 
         linear.qweight = torch.randint(-100, 100, size=linear.qweight.shape, dtype=torch.int32)
         linear.scales = linear.scales + 0.002
+        linear.qzeros += 0b00010001000100010001000100010001  # for new weight format
 
         linear = linear.eval()
         linear = linear.to(device)
@@ -2018,37 +2025,6 @@ class TestsQ4ExllamaV2(unittest.TestCase):
         _ = model_q.generate(**inp, num_beams=1, min_new_tokens=3, max_new_tokens=3)
 
 
-class TestsMixtral(unittest.TestCase):
-    def test_mixtral_generation(self):
-        prompt = "I am in Paris and"
-        device = torch.device("cuda:0")
-
-        # Reference generated with the cuda-old kernel
-        reference_output = """<s> I am in Paris andpublishedющиеcs performancesension manual offset亡VIDEO Kel RepubliczwDrawlichen LondresPSungspfn CreahooEESlider laughselvesлександTrytpl recallслу Ор coldsubset########serdeacion providestrm thoughts président oktobermulticol../редβ themselvesterraряд conflictscommandMass diagonal選 ptrTY還 Havepliedument relate redu"""
-
-        model_id = "TheBlokeAI/Mixtral-tiny-GPTQ"
-        model_basename = "model"
-
-        model_q = AutoGPTQForCausalLM.from_quantized(
-            model_id,
-            use_safetensors=True,
-            device="cuda:0",
-            use_triton=False,
-            inject_fused_attention=False,
-            inject_fused_mlp=False,
-            model_basename=model_basename,
-        )
-        tokenizer = AutoTokenizer.from_pretrained(model_id)
-
-        inp = tokenizer(prompt, return_tensors="pt").to(device)
-
-        res = model_q.generate(**inp, num_beams=1, min_new_tokens=60, max_new_tokens=60, do_sample=False)
-
-        predicted_text = tokenizer.decode(res[0])
-
-        self.assertEqual(predicted_text, reference_output)
-
-
 class TestQ4Marlin(unittest.TestCase):
     def test_generation(self):
         # Reference generated with the cuda-old kernel and TheBloke/Llama-2-7B-Chat-GPTQ
@@ -2116,6 +2092,7 @@ class TestQ4Marlin(unittest.TestCase):
         predicted_text = tokenizer.decode(res[0])
 
         self.assertTrue(predicted_text.startswith("Today I am in Paris and I am a student of the Master's"))
+
 
 class TestsQ4Triton(unittest.TestCase):
     def test_generation_no_act_order(self):

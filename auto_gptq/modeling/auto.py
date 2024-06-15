@@ -9,6 +9,7 @@ from .codegen import CodeGenGPTQForCausalLM
 from .cohere import CohereGPTQForCausalLM
 from .decilm import DeciLMGPTQForCausalLM
 from .gemma import GemmaGPTQForCausalLM
+from .chatglm import ChatGLMForCausalLM
 from .gpt2 import GPT2GPTQForCausalLM
 from .gpt_bigcode import GPTBigCodeGPTQForCausalLM
 from .gpt_neox import GPTNeoXGPTQForCausalLM
@@ -39,6 +40,7 @@ GPTQ_CAUSAL_LM_MODEL_MAP = {
     "llama": LlamaGPTQForCausalLM,
     "opt": OPTGPTQForCausalLM,
     "moss": MOSSGPTQForCausalLM,
+    "chatglm": ChatGLMForCausalLM,
     "gpt_bigcode": GPTBigCodeGPTQForCausalLM,
     "codegen": CodeGenGPTQForCausalLM,
     "cohere": CohereGPTQForCausalLM,

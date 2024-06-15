@@ -1,4 +1,4 @@
-from auto_gptq.modeling import BaseGPTQForCausalLM
+from ._base import BaseGPTQForCausalLM
 
 
 class MPTGPTQForCausalLM(BaseGPTQForCausalLM):
