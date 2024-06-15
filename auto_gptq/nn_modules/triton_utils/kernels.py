@@ -159,7 +159,6 @@ def quant_matmul_248_kernel(
         zeros = tl.load(zeros_ptrs + g_idx[:, None] * stride_zeros)  # (BLOCK_SIZE_K, BLOCK_SIZE_N,)
 
         zeros = (zeros >> zeros_shifter[None, :]) & maxq
-        zeros = zeros + 1
 
         a = tl.load(a_ptrs, mask=a_mask, other=0.0)  # (BLOCK_SIZE_M, BLOCK_SIZE_K)
         b = tl.load(b_ptrs)  # (BLOCK_SIZE_K, BLOCK_SIZE_N), but repeated
@@ -318,7 +317,6 @@ def transpose_quant_matmul_248_kernel(
         zeros = tl.load(zeros_ptrs)  # (BLOCK_SIZE_K, BLOCK_SIZE_N,)
 
         zeros = (zeros >> zeros_shifter[None, :]) & maxq
-        zeros = zeros + 1
 
         a = tl.load(a_ptrs, mask=a_mask, other=0.0)  # (BLOCK_SIZE_M, BLOCK_SIZE_N)
         b = tl.load(b_ptrs)  # (BLOCK_SIZE_K, BLOCK_SIZE_N), but repeated

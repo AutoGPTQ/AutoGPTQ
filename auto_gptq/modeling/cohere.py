@@ -17,4 +17,3 @@ class CohereGPTQForCausalLM(BaseGPTQForCausalLM):
     ]
 
 __all__ = ["CohereGPTQForCausalLM"]
-    

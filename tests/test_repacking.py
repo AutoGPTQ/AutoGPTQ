@@ -11,7 +11,7 @@ from auto_gptq.nn_modules.qlinear.qlinear_marlin import _get_perms, dequantize_w
 
 
 def gen_quant4(k, n, groupsize=-1):
-    maxq = 2 ** 4 - 1
+    maxq = 2**4 - 1
     w = torch.randn((k, n), dtype=torch.half, device="cpu")
 
     original_w = w.clone()
@@ -35,11 +35,13 @@ def gen_quant4(k, n, groupsize=-1):
     ref = (w - (maxq + 1) // 2).half() * s
 
     if groupsize != -1:
+
         def reshape(w):
             w = w.reshape((groupsize, -1, n))
             w = w.permute(1, 0, 2)
             w = w.reshape((k, n)).contiguous()
             return w
+
         ref = reshape(ref)
         w = reshape(w)
 
@@ -49,7 +51,6 @@ def gen_quant4(k, n, groupsize=-1):
 
     return original_w, linear, s
 
-original_w, linear, s = gen_quant4(64, 128)
 
 class TestRepacking(unittest.TestCase):
     def test_marlin_fast_repacking(self):

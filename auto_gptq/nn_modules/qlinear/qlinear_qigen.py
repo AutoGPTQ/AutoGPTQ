@@ -165,6 +165,7 @@ class QuantLinear(nn.Module):
         hint=1,
         p=8,
         l1=2**18,
+        **kwargs,
     ):
         super().__init__()
         if bits not in [2, 4]:
