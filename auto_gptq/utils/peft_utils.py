@@ -31,11 +31,6 @@ LinearLayer = Union[
 ]
 
 
-class GPTQLoraConfig(LoraConfig):
-    injected_fused_attention: bool = False
-    injected_fused_mlp: bool = False
-
-
 def _get_linear_feature_count(linear_layer: LinearLayer) -> Tuple[int, int]:
     in_features = getattr(linear_layer, "in_features", getattr(linear_layer, "infeatures"))
     out_features = getattr(linear_layer, "out_features", getattr(linear_layer, "outfeatures"))
@@ -136,7 +131,7 @@ class GPTQLoraModel(LoraModel):
 
     @staticmethod
     def _create_new_module(
-        lora_config: GPTQLoraConfig,
+        lora_config: LoraConfig,
         adapter_name: str,
         target: torch.nn.Linear,
         **kwargs,
@@ -172,11 +167,6 @@ class GPTQLoraModel(LoraModel):
 
     def merge_and_unload(self):
         raise NotImplementedError("gptq model not support merge and unload")
-
-
-class GPTQAdaLoraConfig(AdaLoraConfig):
-    injected_fused_attention: bool = False
-    injected_fused_mlp: bool = False
 
 
 class GPTQSVDLinear(torch.nn.Linear, AdaLoraLayer):
@@ -261,7 +251,7 @@ class GPTQAdaLoraModel(AdaLoraModel):
 
     @staticmethod
     def _create_new_module(
-        lora_config: GPTQLoraConfig,
+        lora_config: LoraConfig,
         adapter_name: str,
         target: torch.nn.Linear,
         **kwargs,
@@ -320,23 +310,23 @@ def find_all_linear_names(
 
 @contextmanager
 def hijack_peft_mappings():
-    PEFT_TYPE_TO_CONFIG_MAPPING[PeftType.LORA] = GPTQLoraConfig
+    PEFT_TYPE_TO_CONFIG_MAPPING[PeftType.LORA] = LoraConfig
     PEFT_TYPE_TO_MODEL_MAPPING[PeftType.LORA] = GPTQLoraModel
-    PEFT_TYPE_TO_CONFIG_MAPPING[PeftType.ADALORA] = GPTQAdaLoraConfig
+    PEFT_TYPE_TO_CONFIG_MAPPING[PeftType.ADALORA] = AdaLoraConfig
     PEFT_TYPE_TO_MODEL_MAPPING[PeftType.ADALORA] = GPTQAdaLoraModel
 
     try:
         yield
     except:
-        PEFT_TYPE_TO_CONFIG_MAPPING[PeftType.LORA] = GPTQLoraConfig
+        PEFT_TYPE_TO_CONFIG_MAPPING[PeftType.LORA] = LoraConfig
         PEFT_TYPE_TO_MODEL_MAPPING[PeftType.LORA] = GPTQLoraModel
-        PEFT_TYPE_TO_CONFIG_MAPPING[PeftType.ADALORA] = GPTQAdaLoraConfig
+        PEFT_TYPE_TO_CONFIG_MAPPING[PeftType.ADALORA] = AdaLoraConfig
         PEFT_TYPE_TO_MODEL_MAPPING[PeftType.ADALORA] = GPTQAdaLoraModel
         raise
     finally:
-        PEFT_TYPE_TO_CONFIG_MAPPING[PeftType.LORA] = GPTQLoraConfig
+        PEFT_TYPE_TO_CONFIG_MAPPING[PeftType.LORA] = LoraConfig
         PEFT_TYPE_TO_MODEL_MAPPING[PeftType.LORA] = GPTQLoraModel
-        PEFT_TYPE_TO_CONFIG_MAPPING[PeftType.ADALORA] = GPTQAdaLoraConfig
+        PEFT_TYPE_TO_CONFIG_MAPPING[PeftType.ADALORA] = AdaLoraConfig
         PEFT_TYPE_TO_MODEL_MAPPING[PeftType.ADALORA] = GPTQAdaLoraModel
 
 
@@ -355,21 +345,6 @@ def get_gptq_peft_model(
     if not train_mode and not model_id:
         raise ValueError("model_id(where to load adapters) not specified when in inference mode.")
 
-    if model.fused_attn_module_type is not None and not model.injected_fused_attention:
-        peft_types = [PeftType.LORA.value, PeftType.ADALORA.value]
-        warnings.warn(
-            f"You can just ignore this warning if the peft type you use isn't in {peft_types}.\n"
-            f"{model.__class__.__name__} supports injecting fused attention but not enables this time. "
-            "If you are training adapters, you must also disable fused attention injection when loading quantized "
-            "base model at inference time, otherwise adapters may not be added to base model properly. "
-            "If you are loading adapters to do inference, you can reference to adapter's config file to check "
-            "whether the adapters are trained using base model that not enable fused attention injection."
-        )
-    if model.injected_fused_mlp:
-        raise NotImplementedError(
-            "GPTQ model that enables fused mlp injection is not supported to integrate with peft."
-        )
-
     if train_mode:
         peft_type = peft_config.peft_type
         if not isinstance(peft_type, str):
@@ -377,12 +352,10 @@ def get_gptq_peft_model(
         if peft_type in [PeftType.LORA.value, PeftType.ADALORA.value]:
             if auto_find_all_linears:
                 peft_config.target_modules = find_all_linear_names(model, ignore_lm_head=True)
-            if peft_type == PeftType.LORA.value and not isinstance(peft_config, GPTQLoraConfig):
-                peft_config = GPTQLoraConfig(**peft_config.to_dict())
-            if peft_type == PeftType.ADALORA.value and not isinstance(peft_config, GPTQAdaLoraConfig):
-                peft_config = GPTQAdaLoraConfig(**peft_config.to_dict())
-            peft_config.injected_fused_attention = model.injected_fused_attention
-            peft_config.injected_fused_mlp = model.injected_fused_mlp
+            if peft_type == PeftType.LORA.value and not isinstance(peft_config, LoraConfig):
+                peft_config = LoraConfig(**peft_config.to_dict())
+            if peft_type == PeftType.ADALORA.value and not isinstance(peft_config, AdaLoraConfig):
+                peft_config = AdaLoraConfig(**peft_config.to_dict())
         if peft_type == PeftType.ADAPTION_PROMPT.value:
             if peft_config.adapter_layers > model.config.num_hidden_layers:
                 warnings.warn(
@@ -391,10 +364,6 @@ def get_gptq_peft_model(
                     f"will reset value to {model.config.num_hidden_layers}."
                 )
                 peft_config.adapter_layers = model.config.num_hidden_layers
-            if model.injected_fused_attention:
-                raise NotImplementedError(
-                    "model with fused attention injected isn't supported to use ADAPTION_PROMPT peft type yet."
-                )
 
     with hijack_peft_mappings():
         try:
@@ -411,9 +380,7 @@ def get_gptq_peft_model(
 
 
 __all__ = [
-    "GPTQLoraConfig",
     "GPTQLoraModel",
-    "GPTQAdaLoraConfig",
     "GPTQAdaLoraModel",
     "find_all_linear_names",
     "get_gptq_peft_model",
