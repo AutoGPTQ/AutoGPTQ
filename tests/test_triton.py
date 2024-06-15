@@ -52,8 +52,6 @@ def benchmark_forward(
 
 def get_model_and_tokenizer(
         model_id=MODEL_ID,
-        inject_fused_attention=False,
-        inject_fused_mlp=False,
         **model_kwargs,
 ):
     tokenizer = AutoTokenizer.from_pretrained(
@@ -66,8 +64,6 @@ def get_model_and_tokenizer(
     model = AutoGPTQForCausalLM.from_quantized(
         model_id,
         trainable=True,
-        inject_fused_attention=inject_fused_attention,
-        inject_fused_mlp=inject_fused_mlp,
         disable_exllamav2=True,
         disable_exllama=True,
         **model_kwargs,
@@ -82,8 +78,6 @@ class TestTriton(unittest.TestCase):
         ref_model, _ = get_model_and_tokenizer(
             model_id=MODEL_ID,
             use_triton=True,
-            inject_fused_attention=False,
-            inject_fused_mlp=False,
         )
 
         hidden_size = ref_model.model.model.embed_tokens.weight.shape[1]
