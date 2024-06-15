@@ -1929,6 +1929,7 @@ class TestsQ4ExllamaV2(unittest.TestCase):
         linear = linear.to(device)
 
         linear = autogptq_post_init(linear, use_act_order=False)
+        linear.qzeros += 0b00010001000100010001000100010001  # for new weight format
 
         inp = torch.rand(1, m, k, dtype=torch.float16).to(device)
 
