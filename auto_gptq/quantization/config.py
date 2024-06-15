@@ -78,6 +78,7 @@ class BaseQuantizeConfig(PushToHubMixin):
     static_groups: bool = field(default=False)
     sym: bool = field(default=True)
     true_sequential: bool = field(default=True)
+    # if lm_head is quantized
     lm_head: bool = field(default=False)
     quant_method: str = field(default=QUANT_METHOD.GPTQ)
     # default to gptq v1 format for maximum compat with 3rd party inference libs with minimal loss vs v2
