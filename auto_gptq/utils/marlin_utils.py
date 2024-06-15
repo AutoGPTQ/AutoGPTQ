@@ -86,28 +86,15 @@ def prepare_model_for_marlin_load(
 
 
 # Validate marlin support
-def _validate_marlin_device_support() -> Tuple[bool, bool]:
+def _validate_marlin_device_support() -> bool:
     """
-        Validates if the current device is compatible and optimized for Marlin.
+        Validates if the current device is compatible for Marlin.
         ref: https://github.com/IST-DASLab/marlin?tab=readme-ov-file#requirements
 
         Returns:
-            Tuple[bool, bool]: The first indicates if CUDA device is compatible for Marlin,
-                               the second indicates if CUDA device is optimized for Marlin.
+            bool: indicates if CUDA device is compatible for Marlin
         """
-    supported = False
-    optimized = False
-
-    # >=hopper is compatible but not optimized
-    if torch.cuda.get_device_capability()[0] >= 9:
-        supported = True
-        optimized = False
-    # ampere and ada are supported and optimized
-    elif torch.cuda.get_device_capability()[0] >= 8:
-        supported = True
-        optimized = True
-
-    return supported, optimized
+    return torch.cuda.get_device_capability()[0] >= 8
 
 
 # Adapted from https://github.com/rib-2/marlin/tree/conversion
