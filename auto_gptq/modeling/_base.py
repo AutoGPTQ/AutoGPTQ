@@ -608,38 +608,17 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         torch.nn.init.uniform_ = skip
         torch.nn.init.normal_ = skip
 
-        # Parameters related to loading from Hugging Face Hub
-        cache_dir = model_init_kwargs.pop("cache_dir", None)
-        force_download = model_init_kwargs.pop("force_download", False)
-        resume_download = model_init_kwargs.pop("resume_download", False)
-        proxies = model_init_kwargs.pop("proxies", None)
-        local_files_only = model_init_kwargs.pop("local_files_only", False)
-        use_auth_token = model_init_kwargs.pop("use_auth_token", None)
-        revision = model_init_kwargs.pop("revision", None)
-        subfolder = model_init_kwargs.pop("subfolder", "")
-        commit_hash = model_init_kwargs.pop("_commit_hash", None)
-
-        cached_file_kwargs = {
-            "cache_dir": cache_dir,
-            "force_download": force_download,
-            "proxies": proxies,
-            "resume_download": resume_download,
-            "local_files_only": local_files_only,
-            "use_auth_token": use_auth_token,
-            "revision": revision,
-            "subfolder": subfolder,
-            "_commit_hash": commit_hash,
-        }
-
-        config = AutoConfig.from_pretrained(
-            pretrained_model_name_or_path, trust_remote_code=True, **cached_file_kwargs
-        )
-        if config.model_type not in SUPPORTED_MODELS:
-            raise TypeError(f"{config.model_type} isn't supported yet.")
-
         # enforce some values despite user specified
         model_init_kwargs["torch_dtype"] = torch_dtype
         model_init_kwargs["trust_remote_code"] = trust_remote_code
+
+        config = AutoConfig.from_pretrained(
+            pretrained_model_name_or_path, **model_init_kwargs
+        )
+
+        if config.model_type not in SUPPORTED_MODELS:
+            raise TypeError(f"{config.model_type} isn't supported yet.")
+
         if max_memory:
             if "disk" in max_memory:
                 raise NotImplementedError("disk offload not support yet.")
@@ -669,8 +648,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
 
         torch.cuda.empty_cache()
 
-        merged_kwargs = {**model_init_kwargs, **cached_file_kwargs}
-        model = AutoModelForCausalLM.from_pretrained(pretrained_model_name_or_path, **merged_kwargs)
+        model = AutoModelForCausalLM.from_pretrained(pretrained_model_name_or_path, **model_init_kwargs)
 
         model_config = model.config.to_dict()
         seq_len_keys = ["max_position_embeddings", "seq_length", "n_positions"]
