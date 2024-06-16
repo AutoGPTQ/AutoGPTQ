@@ -1,6 +1,5 @@
 import gc
 from logging import getLogger
-from typing import Tuple
 
 import accelerate
 import torch

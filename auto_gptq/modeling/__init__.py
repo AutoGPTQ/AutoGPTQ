@@ -2,11 +2,11 @@ from ._base import BaseGPTQForCausalLM, BaseQuantizeConfig
 from .auto import GPTQ_CAUSAL_LM_MODEL_MAP, AutoGPTQForCausalLM
 from .baichuan import BaiChuanGPTQForCausalLM
 from .bloom import BloomGPTQForCausalLM
+from .chatglm import ChatGLMForCausalLM
 from .codegen import CodeGenGPTQForCausalLM
 from .cohere import CohereGPTQForCausalLM
 from .decilm import DeciLMGPTQForCausalLM
 from .gemma import GemmaGPTQForCausalLM
-from .chatglm import ChatGLMForCausalLM
 from .gpt2 import GPT2GPTQForCausalLM
 from .gpt_bigcode import GPTBigCodeGPTQForCausalLM
 from .gpt_neox import GPTNeoXGPTQForCausalLM

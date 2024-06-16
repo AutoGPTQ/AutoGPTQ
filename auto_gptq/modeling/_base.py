@@ -1,38 +1,29 @@
 import copy
 import logging
 import os
-from os.path import isdir, join
+from os.path import join
 from typing import Dict, List, Optional, Union
 
 import accelerate
 import torch
 import torch.nn as nn
 import transformers
-import threadpoolctl as tctl
 from accelerate.hooks import remove_hook_from_module
-from safetensors import safe_open
-from safetensors.torch import load_file as safe_load
 from safetensors.torch import save_file as safe_save
 from tqdm import tqdm
 from transformers import AutoConfig, AutoModelForCausalLM, PreTrainedModel
 from transformers.modeling_utils import no_init_weights
 from transformers.utils.generic import ContextManagers
 from transformers.utils.hub import (
-    CommitOperationAdd,
     PushToHubMixin,
-    create_commit,
-    create_repo,
 )
 
-from ..nn_modules.qlinear import GeneralQuantLinear
 from ..quantization import GPTQ, BaseQuantizeConfig
 from ..quantization.config import (
+    FORMAT,
     META_FIELD_QUANTIZER,
     META_QUANTIZER_AUTOGPTQ,
     MIN_VERSION_WITH_V2,
-    FORMAT,
-    FORMAT_FIELD,
-    QUANT_METHOD_FIELD,
     QUANTIZE_BLACK_LIST,
 )
 from ..utils.data_utils import collate_data

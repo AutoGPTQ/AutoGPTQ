@@ -2,11 +2,11 @@ import json
 import logging
 import os
 from dataclasses import dataclass, field, fields
-from packaging import version
 from os.path import isdir, join
-from typing import Optional, Any, Tuple, Dict
+from typing import Any, Dict, Optional, Tuple
 
 import huggingface_hub
+from packaging import version
 from transformers.utils.hub import PushToHubMixin, cached_file
 
 

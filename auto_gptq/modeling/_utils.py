@@ -6,7 +6,6 @@ from typing import List, Optional, Union
 
 import accelerate
 import threadpoolctl as tctl
-import numpy as np
 import torch
 import torch.nn as nn
 import transformers
