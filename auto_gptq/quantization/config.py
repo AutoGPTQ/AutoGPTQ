@@ -18,8 +18,8 @@ logger.propagate = False
 logger.addHandler(handler)
 logger.setLevel(logging.INFO)
 
-CHECKPOINT_FORMAT_FIELD = "checkpoint_format"
-CHECKPOINT_FORMAT_FIELD_COMPAT_MARLIN = "is_marlin_format"
+FORMAT_FIELD = "format"
+FORMAT_FIELD_COMPAT_MARLIN = "is_marlin_format"
 QUANT_METHOD_FIELD = "quant_method"
 QUANT_CONFIG_FILENAME = "quantize_config.json"
 
@@ -33,8 +33,8 @@ META_FIELD_PACKER = "packer"
 
 META_QUANTIZER_AUTOGPTQ = "autogptq"
 
-# checkpoint formats
-class CHECKPOINT_FORMAT:
+# saved formats
+class FORMAT:
     GPTQ = "gptq"
     # v2 format fixed sym = False quantization
     GPTQ_V2 = "gptq_v2"
@@ -48,9 +48,9 @@ class QUANT_METHOD:
 
 QUANT_METHOD_FORMAT_MAPPING = {
     QUANT_METHOD.GPTQ: {
-        CHECKPOINT_FORMAT.GPTQ,
-        CHECKPOINT_FORMAT.GPTQ_V2,
-        CHECKPOINT_FORMAT.MARLIN,
+        FORMAT.GPTQ,
+        FORMAT.GPTQ_V2,
+        FORMAT.MARLIN,
     },
 }
 
@@ -60,7 +60,9 @@ QUANTIZE_BLACK_LIST = {}
 # compat
 QUANT_CONFIG_ARG_SYNONYMS = {
     "w_bit": "bits",
-    "q_group_size": "group_size",}
+    "q_group_size": "group_size",
+    "checkpoint_format": "format",
+}
 
 
 @dataclass
@@ -76,9 +78,12 @@ class BaseQuantizeConfig(PushToHubMixin):
     quant_method: str = field(default=QUANT_METHOD.GPTQ)
     # default to gptq v1 format for maximum compat with 3rd party inference libs with minimal loss vs v2
     # if you inference with autogptq, save to gptq_v2 format for best result
-    checkpoint_format: str = field(default=CHECKPOINT_FORMAT.GPTQ)
+    format: FORMAT = field(default=FORMAT.GPTQ)
+
+    # TODO: remove
     model_name_or_path: Optional[str] = field(default=None)
     model_file_base_name: Optional[str] = field(default=None)
+
     # properties that do not directly contributes to quantization or quant inference should be placed in meta
     # i.e. quantizer tool (producer) + version, timestamp, entity who made the quant, etc
     meta: Optional[Dict] = field(default=None)
@@ -87,13 +92,13 @@ class BaseQuantizeConfig(PushToHubMixin):
         fields_info = fields(self)
 
         # validate quant method and format is matched
-        valid_checkpoint_formats = QUANT_METHOD_FORMAT_MAPPING.get(self.quant_method, None)
-        if valid_checkpoint_formats is None:
+        valid_formats = QUANT_METHOD_FORMAT_MAPPING.get(self.quant_method, None)
+        if valid_formats is None:
             raise ValueError(f"Unsupported quantization method: {self.quant_method}")
 
-        if self.checkpoint_format not in valid_checkpoint_formats:
+        if self.format not in valid_formats:
             raise ValueError(
-                f"The checkpoint format used is {self.checkpoint_format}, and the quantization method is {self.quant_method}. "
+                f"The checkpoint format used is {self.format}, and the quantization method is {self.quant_method}. "
                 f"This is not supported, please open an issue at https://github.com/AutoGPTQ/AutoGPTQ/issues.")
 
         if self.bits not in fields_info[0].metadata["choices"]:
@@ -133,7 +138,7 @@ class BaseQuantizeConfig(PushToHubMixin):
         parts = val.split(":")
         return parts[0].lower(), parts[1].lower() if len(parts) >= 2 else None
 
-    # is quantized model quantized or packed by autogptq version with v2 checkpoint_format code
+    # is quantized model quantized or packed by autogptq version with v2 format code
     def is_quantized_or_packed_by_v2(self) -> bool:
         by_v2 = False
         # check meta.quantizer
@@ -154,26 +159,26 @@ class BaseQuantizeConfig(PushToHubMixin):
 
     @classmethod
     # normalize quant config for compat and also performs validation
-    def from_quant_config(cls, quantize_cfg, checkpoint_format: str = None):
-        valid_formats = {CHECKPOINT_FORMAT.GPTQ, CHECKPOINT_FORMAT.GPTQ_V2, CHECKPOINT_FORMAT.MARLIN}
+    def from_quant_config(cls, quantize_cfg, format: str = None):
+        valid_formats = {FORMAT.GPTQ, FORMAT.GPTQ_V2, FORMAT.MARLIN}
 
-        checkpoint_format_auto_inferred = False
-        # compat: checkpoint_format can be passed in via from_quantized() if field missing from json
-        if checkpoint_format:
-            if checkpoint_format not in valid_formats:
-                raise ValueError(f"Unknown quantization checkpoint format: {checkpoint_format}.")
-            if quantize_cfg.get(CHECKPOINT_FORMAT_FIELD):
+        format_auto_inferred = False
+        # compat: format can be passed in via from_quantized() if field missing from json
+        if format:
+            if format not in valid_formats:
+                raise ValueError(f"Unknown quantization checkpoint format: {format}.")
+            if quantize_cfg.get(FORMAT_FIELD):
                 raise ValueError("Conflict: quantization checkpoint_format is passed in and also exists in model config.")
         # compat: warn if checkpoint_format is missing
-        elif quantize_cfg.get(CHECKPOINT_FORMAT_FIELD) is None:
-            checkpoint_format_auto_inferred = True
+        elif quantize_cfg.get(FORMAT_FIELD) is None:
+            format_auto_inferred = True
 
         field_names = [field.name for field in fields(cls)]
 
         normalized = {
             QUANT_METHOD_FIELD: QUANT_METHOD.GPTQ,
             # compat: default to gptq(v1) when loading models
-            CHECKPOINT_FORMAT_FIELD: checkpoint_format if checkpoint_format else CHECKPOINT_FORMAT.GPTQ
+            FORMAT_FIELD: format if format else FORMAT.GPTQ
         }
         for key, val in quantize_cfg.items():
             key = key.lower()
@@ -182,33 +187,33 @@ class BaseQuantizeConfig(PushToHubMixin):
             if key in QUANT_CONFIG_ARG_SYNONYMS and QUANT_CONFIG_ARG_SYNONYMS[key] in field_names:
                 key = QUANT_CONFIG_ARG_SYNONYMS[key]
 
-            if key == CHECKPOINT_FORMAT_FIELD:
+            if key == FORMAT_FIELD:
                 val = val.lower()
 
-                if val in {CHECKPOINT_FORMAT.GPTQ, CHECKPOINT_FORMAT.GPTQ_V2, CHECKPOINT_FORMAT.MARLIN}:
+                if val in {FORMAT.GPTQ, FORMAT.GPTQ_V2, FORMAT.MARLIN}:
                     normalized[key] = val
                 else:
                     raise ValueError(f"Unknown quantization format: {val}.")
             elif key == QUANT_METHOD_FIELD:
                 val = val.lower()
                 # compat: some hf models use quant_method=marlin
-                if val == CHECKPOINT_FORMAT.MARLIN:
-                    normalized[CHECKPOINT_FORMAT_FIELD] = CHECKPOINT_FORMAT.MARLIN
+                if val == FORMAT.MARLIN:
+                    normalized[FORMAT_FIELD] = FORMAT.MARLIN
                 elif val not in {QUANT_METHOD.GPTQ}:
                     raise ValueError(f"Unknown quantization method: {val}.")
                 else:
                     normalized[QUANT_METHOD_FIELD] = val
-            elif key == CHECKPOINT_FORMAT_FIELD_COMPAT_MARLIN and val:
-                normalized[CHECKPOINT_FORMAT_FIELD] = CHECKPOINT_FORMAT.MARLIN
+            elif key == FORMAT_FIELD_COMPAT_MARLIN and val:
+                normalized[FORMAT_FIELD] = FORMAT.MARLIN
             elif key in field_names:
                 normalized[key] = val
             else:
                 logger.info(f"Ignoring unknown parameter in the quantization configuration: {key}.")
 
-        if checkpoint_format_auto_inferred:
-            logger.info(f"`checkpoint_format` is missing from the quantization configuration and is automatically inferred to {normalized[CHECKPOINT_FORMAT_FIELD]}.")
+        if format_auto_inferred:
+            logger.info(f"`format` is missing from the quantization configuration and is automatically inferred to {normalized[FORMAT_FIELD]}.")
 
-        if normalized[CHECKPOINT_FORMAT_FIELD] in {CHECKPOINT_FORMAT.MARLIN}:
+        if normalized[FORMAT_FIELD] in {FORMAT.MARLIN}:
             # Marlin do not reorder the rows.
             normalized["desc_act"] = False
 
@@ -232,7 +237,7 @@ class BaseQuantizeConfig(PushToHubMixin):
         revision = kwargs.pop("revision", None)
         subfolder = kwargs.pop("subfolder", None)
         commit_hash = kwargs.pop("_commit_hash", None)
-        checkpoint_format = kwargs.pop("checkpoint_format", None)
+        format = kwargs.pop("format", None)
 
         transformers_config = False
         for quantize_config_filename in [
@@ -274,9 +279,9 @@ class BaseQuantizeConfig(PushToHubMixin):
             if transformers_config:
                 args_from_json = args_from_json["quantization_config"]
 
-            return cls.from_quant_config(args_from_json, checkpoint_format)
+            return cls.from_quant_config(args_from_json, format)
 
-    def get_cache_file_path(self, quant_method: QUANT_METHOD = None, checkpoint_format: CHECKPOINT_FORMAT = None):
+    def get_cache_file_path(self, quant_method: QUANT_METHOD = None, format: FORMAT = None):
         """
         Gets The Cached Weight Path.
         If remote:   $HF_HOME/assets/autogptq/{model_name_or_path}/_{quant-method}_{checkpoint_format}.safetensors
@@ -284,9 +289,9 @@ class BaseQuantizeConfig(PushToHubMixin):
         """
 
         use_quant_method = quant_method if quant_method else self.quant_method
-        use_checkpoint_format = checkpoint_format if checkpoint_format else self.checkpoint_format
+        use_format = format if format else self.format
 
-        cache_file_name = f"autogptq_model_v2_{use_quant_method}_{use_checkpoint_format}.safetensors"
+        cache_file_name = f"autogptq_model_v2_{use_quant_method}_{use_format}.safetensors"
 
         if os.path.isdir(self.model_name_or_path):
             cache_file_name = os.path.join(self.model_name_or_path, cache_file_name)
@@ -303,15 +308,21 @@ class BaseQuantizeConfig(PushToHubMixin):
         return {
             "bits": self.bits,
             "group_size": self.group_size,
+
+            # TODO: move to meta since damp and true_sequential does not participate in inference
             "damp_percent": self.damp_percent,
+            "true_sequential": self.true_sequential,
+
             "desc_act": self.desc_act,
             "static_groups": self.static_groups,
             "sym": self.sym,
-            "true_sequential": self.true_sequential,
             "lm_head": self.lm_head,
+
+            # TODO: deprecate
             "model_name_or_path": self.model_name_or_path,
             "model_file_base_name": self.model_file_base_name,
+
             QUANT_METHOD_FIELD: self.quant_method,
-            CHECKPOINT_FORMAT_FIELD: self.checkpoint_format,
+            FORMAT_FIELD: self.format,
             META_FIELD: self.meta,
         }

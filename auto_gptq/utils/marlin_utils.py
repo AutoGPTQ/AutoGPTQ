@@ -10,7 +10,7 @@ from tqdm import tqdm
 
 from ..nn_modules.qlinear.qlinear_marlin import QuantLinear as MarlinQuantLinear
 from ..nn_modules.qlinear.qlinear_marlin import _get_perms, unpack_qzeros
-from ..quantization import CHECKPOINT_FORMAT, QUANT_METHOD, BaseQuantizeConfig
+from ..quantization import FORMAT, QUANT_METHOD, BaseQuantizeConfig
 from .import_utils import MARLIN_AVAILABLE, MARLIN_EXCEPTION
 from .modeling_utils import recurse_getattr, recurse_setattr
 
@@ -19,6 +19,7 @@ if MARLIN_AVAILABLE:
     import autogptq_marlin_cuda
 
 logger = getLogger(__name__)
+
 
 def prepare_model_for_marlin_load(
     model,
@@ -29,13 +30,13 @@ def prepare_model_for_marlin_load(
     device_map,
 ):
     # The model (e.g. model.safetensors) is already serialized in the Marlin format, load it directly.
-    if quantize_config.checkpoint_format == CHECKPOINT_FORMAT.MARLIN:
+    if quantize_config.format == FORMAT.MARLIN:
         model_save_name = current_model_save_name
         logger.info(f"Loading a GPTQ model, detected Marlin serialized format at {model_save_name}.")
         model = convert_to_marlin(model, quant_linear_class, quantize_config, repack=False)
     else:
         model_save_name, is_cached = quantize_config.get_cache_file_path(quant_method=QUANT_METHOD.GPTQ,
-                                                              checkpoint_format=CHECKPOINT_FORMAT.MARLIN)
+                                                                         format=FORMAT.MARLIN)
 
         # If GPTQ model has Marlin version cached locally, load from the cached version (no repacking needed).
         if is_cached:
@@ -190,6 +191,6 @@ def convert_to_marlin(model, model_quantlinear, quantization_config: BaseQuantiz
         gc.collect()
 
     # Set quantization config to be Marlin.
-    quantization_config.checkpoint_format = CHECKPOINT_FORMAT.MARLIN
+    quantization_config.format = FORMAT.MARLIN
 
     return model

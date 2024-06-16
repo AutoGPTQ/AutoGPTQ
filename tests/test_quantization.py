@@ -9,16 +9,16 @@ from parameterized import parameterized  # noqa: E402
 from transformers import AutoTokenizer  # noqa: E402
 
 from auto_gptq import AutoGPTQForCausalLM, __version__  # noqa: E402
-from auto_gptq.quantization import CHECKPOINT_FORMAT, QUANT_CONFIG_FILENAME, BaseQuantizeConfig  # noqa: E402
+from auto_gptq.quantization import FORMAT, QUANT_CONFIG_FILENAME, BaseQuantizeConfig  # noqa: E402
 from auto_gptq.quantization.config import META_FIELD_QUANTIZER, META_QUANTIZER_AUTOGPTQ
 
 class TestQuantization(unittest.TestCase):
     @parameterized.expand([
-        (False, True, CHECKPOINT_FORMAT.GPTQ_V2),
-        (False, False, CHECKPOINT_FORMAT.GPTQ),
-        (True, True, CHECKPOINT_FORMAT.MARLIN),
+        (False, True, FORMAT.GPTQ_V2),
+        (False, False, FORMAT.GPTQ),
+        (True, True, FORMAT.MARLIN),
     ])
-    def test_quantize(self, use_marlin: bool, sym: bool, checkpoint_format: CHECKPOINT_FORMAT):
+    def test_quantize(self, use_marlin: bool, sym: bool, format: FORMAT):
         pretrained_model_dir = "TinyLlama/TinyLlama-1.1B-intermediate-step-1431k-3T"
 
         tokenizer = AutoTokenizer.from_pretrained(pretrained_model_dir, use_fast=True)
@@ -34,7 +34,7 @@ class TestQuantization(unittest.TestCase):
             group_size=128,
             desc_act=True,
             sym=sym,
-            checkpoint_format=checkpoint_format,
+            format=format,
         )
 
         model = AutoGPTQForCausalLM.from_pretrained(
@@ -74,7 +74,7 @@ class TestQuantization(unittest.TestCase):
             torch.cuda.empty_cache()
 
             # skip compat test with sym=False and v1 since we do meta version safety check
-            if not sym and checkpoint_format == CHECKPOINT_FORMAT.GPTQ:
+            if not sym and format == FORMAT.GPTQ:
                 return
 
             # test compat: 1) with simple dict type 2) is_marlin_format
@@ -109,6 +109,6 @@ class TestQuantization(unittest.TestCase):
                 tmpdirname,
                 device="cuda:0",
                 quantize_config=compat_quantize_config,
-                checkpoint_format=checkpoint_format,
+                format=format,
             )
             assert isinstance(model.quantize_config, BaseQuantizeConfig)

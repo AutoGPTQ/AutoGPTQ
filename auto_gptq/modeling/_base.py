@@ -30,8 +30,8 @@ from ..quantization.config import (
     META_FIELD_QUANTIZER,
     META_QUANTIZER_AUTOGPTQ,
     MIN_VERSION_WITH_V2,
-    CHECKPOINT_FORMAT,
-    CHECKPOINT_FORMAT_FIELD,
+    FORMAT,
+    FORMAT_FIELD,
     QUANT_METHOD_FIELD,
     QUANTIZE_BLACK_LIST,
 )
@@ -408,7 +408,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             desc_act=self.quantize_config.desc_act,
             warmup_triton=autotune_warmup_after_quantized,
             force_layer_back_to_cpu=force_layer_back_to_cpu,
-            use_marlin=self.quantize_config.checkpoint_format == CHECKPOINT_FORMAT.MARLIN,
+            use_marlin=self.quantize_config.format == FORMAT.MARLIN,
         )
         if device_map:
             self.model = remove_hook_from_module(self.model, recurse=True)
@@ -527,7 +527,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         self,
         save_dir: str,
         safetensors_metadata: Optional[Dict[str, str]] = None,
-        checkpoint_format: Optional[str] = None,
+        format: Optional[str] = None,
         use_safetensors: bool = True,
     ):
         """save quantized model and configs to local disk"""
@@ -548,19 +548,19 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         if not self.quantized:
             raise EnvironmentError("can only save quantized model, please execute .quantize first.")
 
-        if checkpoint_format == CHECKPOINT_FORMAT.GPTQ_V2 or (checkpoint_format is None and quantize_config.checkpoint_format == CHECKPOINT_FORMAT.GPTQ_V2):
+        if format == FORMAT.GPTQ_V2 or (format is None and quantize_config.format == FORMAT.GPTQ_V2):
             logger.warning(
-                f"Using 'checkpoint_format = {CHECKPOINT_FORMAT.GPTQ_V2}': the serialized model is only supported by AutoGPTQ version >= {MIN_VERSION_WITH_V2}."
+                f"Using 'checkpoint_format = {FORMAT.GPTQ_V2}': the serialized model is only supported by AutoGPTQ version >= {MIN_VERSION_WITH_V2}."
             )
 
-        if checkpoint_format is not None and quantize_config.checkpoint_format != checkpoint_format:
+        if format is not None and quantize_config.format != format:
             # Model qzeros may be edited in place.
             # TODO: avoid inplace modification of the weights
             model = copy.deepcopy(self.model)
 
-            if checkpoint_format == CHECKPOINT_FORMAT.GPTQ_V2:
-                if quantize_config.checkpoint_format != CHECKPOINT_FORMAT.GPTQ:
-                    raise NotImplementedError(f"Asked to serialize a model with `checkpoint_format={checkpoint_format}` but the model format is {quantize_config.checkpoint_format}. This is not supported. Please open an issue at https://github.com/AutoGPTQ/AutoGPTQ/issues.")
+            if format == FORMAT.GPTQ_V2:
+                if quantize_config.format != FORMAT.GPTQ:
+                    raise NotImplementedError(f"Asked to serialize a model with `checkpoint_format={format}` but the model format is {quantize_config.format}. This is not supported. Please open an issue at https://github.com/AutoGPTQ/AutoGPTQ/issues.")
 
                 model = convert_gptq_v1_to_v2_format(
                     model,
@@ -568,10 +568,10 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                     qlinear_kernel=self.qlinear_kernel,
                 )
 
-                quantize_config.checkpoint_format = CHECKPOINT_FORMAT.GPTQ_V2
-            elif checkpoint_format == CHECKPOINT_FORMAT.GPTQ:
-                if quantize_config.checkpoint_format != CHECKPOINT_FORMAT.GPTQ_V2:
-                    raise NotImplementedError(f"Asked to serialize a model with `checkpoint_format={checkpoint_format}` but the model format is {quantize_config.checkpoint_format}. This is not supported. Please open an issue at https://github.com/AutoGPTQ/AutoGPTQ/issues.")
+                quantize_config.format = FORMAT.GPTQ_V2
+            elif format == FORMAT.GPTQ:
+                if quantize_config.format != FORMAT.GPTQ_V2:
+                    raise NotImplementedError(f"Asked to serialize a model with `checkpoint_format={format}` but the model format is {quantize_config.format}. This is not supported. Please open an issue at https://github.com/AutoGPTQ/AutoGPTQ/issues.")
 
                 model = convert_gptq_v2_to_v1_format(
                     model,
@@ -579,10 +579,10 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                     qlinear_kernel=self.qlinear_kernel
                 )
 
-                quantize_config.checkpoint_format = CHECKPOINT_FORMAT.GPTQ
+                quantize_config.format = FORMAT.GPTQ
 
         # internal is always gptq v2 but allow users to pass gptq (v1) via config
-        if checkpoint_format is None and quantize_config.checkpoint_format == CHECKPOINT_FORMAT.GPTQ:
+        if format is None and quantize_config.format == FORMAT.GPTQ:
             # Model qzeros may be edited in place.
             # TODO: avoid inplace modification of the weights
             model = copy.deepcopy(self.model)
@@ -638,15 +638,6 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             # Format is required to enable Accelerate to load the metadata
             # otherwise it raises an OSError
             safetensors_metadata["format"] = "pt"
-
-            safetensors_metadata["auto_gptq_version"] = str(__version__)
-            safetensors_metadata["gptq_bits"] = str(quantize_config.bits)
-            safetensors_metadata["gptq_group_size"] = str(quantize_config.group_size)
-            safetensors_metadata["gptq_desc_act"] = str(quantize_config.desc_act)
-            safetensors_metadata["gptq_damp_percent"] = str(quantize_config.damp_percent)
-            safetensors_metadata["gptq_" + CHECKPOINT_FORMAT_FIELD] = quantize_config.checkpoint_format
-            safetensors_metadata["gptq_" + QUANT_METHOD_FIELD] = quantize_config.quant_method
-
             safe_save(state_dict, join(save_dir, model_save_name), safetensors_metadata)
         else:
             model_save_name = model_base_name + ".bin"
@@ -788,7 +779,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         trainable: bool = False,
         disable_exllama: Optional[bool] = None,
         disable_exllamav2: bool = False,
-        checkpoint_format: Optional[str] = None,
+        format: Optional[str|FORMAT] = None,
         **kwargs,
     ):
         """load quantized model from local disk"""
@@ -878,12 +869,12 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             raise TypeError(f"{config.model_type} isn't supported yet.")
 
         if quantize_config is None:
-            quantize_config = BaseQuantizeConfig.from_pretrained(model_name_or_path, checkpoint_format=checkpoint_format, **cached_file_kwargs, **kwargs)
+            quantize_config = BaseQuantizeConfig.from_pretrained(model_name_or_path, format=format, **cached_file_kwargs, **kwargs)
         else:
             if not isinstance(quantize_config, BaseQuantizeConfig):
-                quantize_config = BaseQuantizeConfig.from_quant_config(quantize_config, checkpoint_format)
+                quantize_config = BaseQuantizeConfig.from_quant_config(quantize_config, format)
 
-        if quantize_config.checkpoint_format == CHECKPOINT_FORMAT.MARLIN:
+        if quantize_config.format == FORMAT.MARLIN:
             # format marlin requires marlin kernel
             use_marlin = True
 
@@ -1131,7 +1122,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                 desc_act=quantize_config.desc_act,
                 trainable=trainable,
                 use_qigen=True,
-                use_marlin=quantize_config.checkpoint_format == CHECKPOINT_FORMAT.MARLIN,
+                use_marlin=quantize_config.format == FORMAT.MARLIN,
             )
             preprocess_checkpoint_qigen(
                 model,
@@ -1154,13 +1145,13 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         )
 
         # compat: runtime convert checkpoint gptq(v1) to gptq_v2 format
-        if quantize_config.checkpoint_format == CHECKPOINT_FORMAT.GPTQ:
+        if quantize_config.format == FORMAT.GPTQ:
             # validate sym=False v1 loading needs to be protected for models produced with new v2 format codebase
             if not quantize_config.sym and not quantize_config.is_quantized_or_packed_by_v2():
                 raise ValueError(
-                    f"Loading of a sym=False model with checkpoint_format={CHECKPOINT_FORMAT.GPTQ} is only supported if produced by autogptq version >= {MIN_VERSION_WITH_V2}")
+                    f"Loading of a sym=False model with checkpoint_format={FORMAT.GPTQ} is only supported if produced by autogptq version >= {MIN_VERSION_WITH_V2}")
 
-            logger.info(f"Compatibility: converting `checkpoint_format` from `{CHECKPOINT_FORMAT.GPTQ}` to `{CHECKPOINT_FORMAT.GPTQ_V2}`.")
+            logger.info(f"Compatibility: converting `checkpoint_format` from `{FORMAT.GPTQ}` to `{FORMAT.GPTQ_V2}`.")
 
             model = convert_gptq_v1_to_v2_format(
                 model,
@@ -1168,7 +1159,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                 qlinear_kernel=qlinear_kernel,
             )
 
-            quantize_config.checkpoint_format = CHECKPOINT_FORMAT.GPTQ_V2
+            quantize_config.format = FORMAT.GPTQ_V2
 
         # == step4: set seqlen == #
         model_config = model.config.to_dict()
