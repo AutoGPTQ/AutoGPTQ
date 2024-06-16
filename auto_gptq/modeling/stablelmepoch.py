@@ -1,10 +1,4 @@
-from logging import getLogger
-
-from ..utils.import_utils import compare_transformers_version
 from ._base import BaseGPTQForCausalLM
-
-
-logger = getLogger(__name__)
 
 
 class StableLMEpochGPTQForCausalLM(BaseGPTQForCausalLM):
