@@ -891,7 +891,9 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                 if any(name.startswith(ignore_layer) for ignore_layer in ignore_layers) or all(
                     not name.endswith(ignore_layer) for sublist in cls.inside_layer_modules for ignore_layer in sublist
                 ):
-                    logger.info(f"The layer {name} is not quantized.")
+                    # log non-lm-head quantizerd layers only
+                    if name is not cls.lm_head_name:
+                        logger.info(f"The layer {name} is not quantized.")
                     del layers[name]
 
             make_quant(
