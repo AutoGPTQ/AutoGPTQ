@@ -100,7 +100,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         quantize_config: BaseQuantizeConfig,
         is_triton_backend: bool = False,
         trainable: bool = False,
-        qlinear_kernel: nn.Module = None
+        qlinear_kernel: nn.Module = None,
     ):
         super().__init__()
 
@@ -183,7 +183,9 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             raise EnvironmentError("can't execute quantize because the model is quantized.")
 
         if self.quantize_config.quant_method in QUANTIZE_BLACK_LIST:
-            raise ValueError(f"Unsupported quantization operation for quant method: {self.quantize_config.quant_method}")
+            raise ValueError(
+                f"Unsupported quantization operation for quant method: {self.quantize_config.quant_method}"
+            )
 
         if use_triton and not TRITON_AVAILABLE:
             logger.warning("triton is not installed, reset use_triton to False")
@@ -214,6 +216,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
 
         cur_layer_device = get_device(layers[0])
         data_device = cur_layer_device if cache_examples_on_gpu else CPU
+
         def store_input_hook(_, args, kwargs):
             # Positional arguments.
             layer_input = []
@@ -354,9 +357,11 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                         logger.info(stat)
 
                     except torch._C._LinAlgError as e:
-                        if  "not positive-definite" in str(e).lower():
-                            logger.warning("Please increase damp or nsamples for calibration data to avoid the following quant error. "
-                                  "Ref: https://github.com/AutoGPTQ/AutoGPTQ/issues/572#issuecomment-2006686913")
+                        if "not positive-definite" in str(e).lower():
+                            logger.warning(
+                                "Please increase damp or nsamples for calibration data to avoid the following quant error. "
+                                "Ref: https://github.com/AutoGPTQ/AutoGPTQ/issues/572#issuecomment-2006686913"
+                            )
                         raise e
 
                     quantizers[f"{self.layers_block_name}.{i}.{name}"] = (
@@ -389,7 +394,10 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             del layer
             del gptq
             del layer_inputs
-            layer_inputs, layer_outputs = layer_outputs, []  # TODO: is it really OK to cache only the first positional argument?
+            layer_inputs, layer_outputs = (
+                layer_outputs,
+                [],
+            )  # TODO: is it really OK to cache only the first positional argument?
             torch.cuda.empty_cache()
 
         logger.info(f"Quantization summary:\n{quant_log}")
@@ -479,7 +487,9 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
 
             if format == FORMAT.GPTQ_V2:
                 if quantize_config.format != FORMAT.GPTQ:
-                    raise NotImplementedError(f"Asked to serialize a model with `checkpoint_format={format}` but the model format is {quantize_config.format}. This is not supported. Please open an issue at https://github.com/AutoGPTQ/AutoGPTQ/issues.")
+                    raise NotImplementedError(
+                        f"Asked to serialize a model with `checkpoint_format={format}` but the model format is {quantize_config.format}. This is not supported. Please open an issue at https://github.com/AutoGPTQ/AutoGPTQ/issues."
+                    )
 
                 model = convert_gptq_v1_to_v2_format(
                     model,
@@ -490,12 +500,12 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                 quantize_config.format = FORMAT.GPTQ_V2
             elif format == FORMAT.GPTQ:
                 if quantize_config.format != FORMAT.GPTQ_V2:
-                    raise NotImplementedError(f"Asked to serialize a model with `checkpoint_format={format}` but the model format is {quantize_config.format}. This is not supported. Please open an issue at https://github.com/AutoGPTQ/AutoGPTQ/issues.")
+                    raise NotImplementedError(
+                        f"Asked to serialize a model with `checkpoint_format={format}` but the model format is {quantize_config.format}. This is not supported. Please open an issue at https://github.com/AutoGPTQ/AutoGPTQ/issues."
+                    )
 
                 model = convert_gptq_v2_to_v1_format(
-                    model,
-                    quantize_config=quantize_config,
-                    qlinear_kernel=self.qlinear_kernel
+                    model, quantize_config=quantize_config, qlinear_kernel=self.qlinear_kernel
                 )
 
                 quantize_config.format = FORMAT.GPTQ
@@ -506,9 +516,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             # TODO: avoid inplace modification of the weights
             model = copy.deepcopy(self.model)
             model = convert_gptq_v2_to_v1_format(
-                model,
-                quantize_config=quantize_config,
-                qlinear_kernel=self.qlinear_kernel
+                model, quantize_config=quantize_config, qlinear_kernel=self.qlinear_kernel
             )
 
         model.to(CPU)
@@ -690,7 +698,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         trainable: bool = False,
         disable_exllama: Optional[bool] = None,
         disable_exllamav2: bool = False,
-        format: Optional[str|FORMAT] = None,
+        format: Optional[str | FORMAT] = None,
         **kwargs,
     ):
         """load quantized model from local disk"""
@@ -771,7 +779,9 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             raise TypeError(f"{config.model_type} isn't supported yet.")
 
         if quantize_config is None:
-            quantize_config = BaseQuantizeConfig.from_pretrained(model_name_or_path, format=format, **cached_file_kwargs, **kwargs)
+            quantize_config = BaseQuantizeConfig.from_pretrained(
+                model_name_or_path, format=format, **cached_file_kwargs, **kwargs
+            )
         else:
             if not isinstance(quantize_config, BaseQuantizeConfig):
                 quantize_config = BaseQuantizeConfig.from_quant_config(quantize_config, format)
@@ -813,7 +823,12 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         model_name_or_path = str(model_name_or_path)
 
         # Retrieve (and if necessary download) the quantized checkpoint(s).
-        is_sharded, resolved_archive_file, true_model_basename = get_checkpoints(model_name_or_path=model_name_or_path, extensions=extensions, possible_model_basenames=possible_model_basenames, **cached_file_kwargs)
+        is_sharded, resolved_archive_file, true_model_basename = get_checkpoints(
+            model_name_or_path=model_name_or_path,
+            extensions=extensions,
+            possible_model_basenames=possible_model_basenames,
+            **cached_file_kwargs,
+        )
 
         quantize_config.model_file_base_name = true_model_basename
 
@@ -842,7 +857,6 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             logger.warning("Overriding use_cuda_fp16 to False since torch_dtype is not torch.float16.")
             use_cuda_fp16 = False
 
-
         torch.nn.init.kaiming_uniform_ = skip
         torch.nn.init.uniform_ = skip
         torch.nn.init.normal_ = skip
@@ -867,9 +881,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                     continue
 
                 if any(name.startswith(ignore_layer) for ignore_layer in ignore_layers) or all(
-                    not name.endswith(ignore_layer)
-                    for sublist in cls.inside_layer_modules
-                    for ignore_layer in sublist
+                    not name.endswith(ignore_layer) for sublist in cls.inside_layer_modules for ignore_layer in sublist
                 ):
                     logger.info(f"The layer {name} is not quantized.")
                     del layers[name]
@@ -936,11 +948,17 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
 
         if use_marlin:
             if is_sharded:
-                raise ValueError("The loading of sharded checkpoints with Marlin is currently not supported. Please raise an issue in AutoGPTQ repository.")
+                raise ValueError(
+                    "The loading of sharded checkpoints with Marlin is currently not supported. Please raise an issue in AutoGPTQ repository."
+                )
             if torch.version.hip:
-                raise ValueError("Can not use Marlin int4*fp16 kernel with AMD ROCm version of PyTorch as the kernel is not compatible. Please do not use `use_marlin=True` when using ROCm devices.")
+                raise ValueError(
+                    "Can not use Marlin int4*fp16 kernel with AMD ROCm version of PyTorch as the kernel is not compatible. Please do not use `use_marlin=True` when using ROCm devices."
+                )
             if not _validate_marlin_device_support():
-                raise ValueError(f'Can not use Marlin int4*fp16 kernel with a device of compute capability {torch.cuda.get_device_capability()}, the minimum compute capability is 8.0 for Marlin kernel. Please do not use `use_marlin=True`, or please upgrade your GPU ("The more you buy, the more you save." - Taiwanese proverb).')
+                raise ValueError(
+                    f'Can not use Marlin int4*fp16 kernel with a device of compute capability {torch.cuda.get_device_capability()}, the minimum compute capability is 8.0 for Marlin kernel. Please do not use `use_marlin=True`, or please upgrade your GPU ("The more you buy, the more you save." - Taiwanese proverb).'
+                )
 
             # Validate the model can run in Marlin.
             if torch_dtype != torch.float16:
@@ -1003,7 +1021,8 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             # validate sym=False v1 loading needs to be protected for models produced with new v2 format codebase
             if not quantize_config.sym and not quantize_config.is_quantized_or_packed_by_v2():
                 raise ValueError(
-                    f"Loading of a sym=False model with checkpoint_format={FORMAT.GPTQ} is only supported if produced by autogptq version >= {MIN_VERSION_WITH_V2}")
+                    f"Loading of a sym=False model with checkpoint_format={FORMAT.GPTQ} is only supported if produced by autogptq version >= {MIN_VERSION_WITH_V2}"
+                )
 
             logger.info(f"Compatibility: converting `checkpoint_format` from `{FORMAT.GPTQ}` to `{FORMAT.GPTQ_V2}`.")
 
@@ -1053,6 +1072,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             return
 
         from ..nn_modules.qlinear.qlinear_tritonv2 import QuantLinear
+
         QuantLinear.warmup(self.model, seqlen=self.model.seqlen)
 
     def enable_trainable_mode(self, enabled: bool = True):
@@ -1078,9 +1098,15 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
     ):
         GeneralQuantLinear.inject_to_model(
             model,
-            dynamically_import_QuantLinear(use_triton, desc_act, group_size, bits=bits, disable_exllama=disable_exllama,
-                                           disable_exllamav2=disable_exllamav2,
-                                           use_marlin=use_marlin),
+            dynamically_import_QuantLinear(
+                use_triton,
+                desc_act,
+                group_size,
+                bits=bits,
+                disable_exllama=disable_exllama,
+                disable_exllamav2=disable_exllamav2,
+                use_marlin=use_marlin,
+            ),
         )
 
     def __getattr__(self, item):

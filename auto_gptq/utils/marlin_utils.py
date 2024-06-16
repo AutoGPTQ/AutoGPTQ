@@ -35,8 +35,9 @@ def prepare_model_for_marlin_load(
         logger.info(f"Loading a GPTQ model, detected Marlin serialized format at {model_save_name}.")
         model = convert_to_marlin(model, quant_linear_class, quantize_config, repack=False)
     else:
-        model_save_name, is_cached = quantize_config.get_cache_file_path(quant_method=QUANT_METHOD.GPTQ,
-                                                                         format=FORMAT.MARLIN)
+        model_save_name, is_cached = quantize_config.get_cache_file_path(
+            quant_method=QUANT_METHOD.GPTQ, format=FORMAT.MARLIN
+        )
 
         # If GPTQ model has Marlin version cached locally, load from the cached version (no repacking needed).
         if is_cached:
@@ -89,12 +90,12 @@ def prepare_model_for_marlin_load(
 # Validate marlin support
 def _validate_marlin_device_support() -> bool:
     """
-        Validates if the current device is compatible for Marlin.
-        ref: https://github.com/IST-DASLab/marlin?tab=readme-ov-file#requirements
+    Validates if the current device is compatible for Marlin.
+    ref: https://github.com/IST-DASLab/marlin?tab=readme-ov-file#requirements
 
-        Returns:
-            bool: indicates if CUDA device is compatible for Marlin
-        """
+    Returns:
+        bool: indicates if CUDA device is compatible for Marlin
+    """
     return torch.cuda.get_device_capability()[0] >= 8
 
 
@@ -114,7 +115,9 @@ def _validate_marlin_compatibility(cfg: BaseQuantizeConfig):
 
 
 @torch.no_grad()
-def convert_to_marlin(model, model_quantlinear, quantization_config: BaseQuantizeConfig, repack: bool, strict: bool = False):
+def convert_to_marlin(
+    model, model_quantlinear, quantization_config: BaseQuantizeConfig, repack: bool, strict: bool = False
+):
     """
     Converts GPTQ-packed weights to the Marlin format. This assumes that the model already meets Marlin kernel constraints.
 
@@ -162,7 +165,6 @@ def convert_to_marlin(model, model_quantlinear, quantization_config: BaseQuantiz
                         "Marlin kernel is compatible only with checkpoints using symmetric quantization."
                         "Found non-symmetric quantization for the weight {name}."
                     )
-
 
             _, _scale_perm, _scale_perm_single = _get_perms()
 

@@ -33,6 +33,7 @@ META_FIELD_PACKER = "packer"
 
 META_QUANTIZER_AUTOGPTQ = "autogptq"
 
+
 # saved formats
 class FORMAT:
     GPTQ = "gptq"
@@ -99,7 +100,8 @@ class BaseQuantizeConfig(PushToHubMixin):
         if self.format not in valid_formats:
             raise ValueError(
                 f"The checkpoint format used is {self.format}, and the quantization method is {self.quant_method}. "
-                f"This is not supported, please open an issue at https://github.com/AutoGPTQ/AutoGPTQ/issues.")
+                f"This is not supported, please open an issue at https://github.com/AutoGPTQ/AutoGPTQ/issues."
+            )
 
         if self.bits not in fields_info[0].metadata["choices"]:
             raise ValueError(f"only support quantize to {fields_info[0].metadata['choices']} bits.")
@@ -149,12 +151,13 @@ class BaseQuantizeConfig(PushToHubMixin):
         if not by_v2:
             producer, _version = self.meta_get_versionable(META_FIELD_PACKER)
             by_v2 = producer == META_QUANTIZER_AUTOGPTQ and version.parse(_version) >= version.parse(
-                MIN_VERSION_WITH_V2)
+                MIN_VERSION_WITH_V2
+            )
 
         return by_v2
 
     def save_pretrained(self, save_dir: str, **kwargs):
-        with open(join(save_dir,  QUANT_CONFIG_FILENAME), "w", encoding="utf-8") as f:
+        with open(join(save_dir, QUANT_CONFIG_FILENAME), "w", encoding="utf-8") as f:
             json.dump(self.to_dict(), f, indent=2)
 
     @classmethod
@@ -168,7 +171,9 @@ class BaseQuantizeConfig(PushToHubMixin):
             if format not in valid_formats:
                 raise ValueError(f"Unknown quantization checkpoint format: {format}.")
             if quantize_cfg.get(FORMAT_FIELD):
-                raise ValueError("Conflict: quantization checkpoint_format is passed in and also exists in model config.")
+                raise ValueError(
+                    "Conflict: quantization checkpoint_format is passed in and also exists in model config."
+                )
         # compat: warn if checkpoint_format is missing
         elif quantize_cfg.get(FORMAT_FIELD) is None:
             format_auto_inferred = True
@@ -178,7 +183,7 @@ class BaseQuantizeConfig(PushToHubMixin):
         normalized = {
             QUANT_METHOD_FIELD: QUANT_METHOD.GPTQ,
             # compat: default to gptq(v1) when loading models
-            FORMAT_FIELD: format if format else FORMAT.GPTQ
+            FORMAT_FIELD: format if format else FORMAT.GPTQ,
         }
         for key, val in quantize_cfg.items():
             key = key.lower()
@@ -211,7 +216,9 @@ class BaseQuantizeConfig(PushToHubMixin):
                 logger.info(f"Ignoring unknown parameter in the quantization configuration: {key}.")
 
         if format_auto_inferred:
-            logger.info(f"`format` is missing from the quantization configuration and is automatically inferred to {normalized[FORMAT_FIELD]}.")
+            logger.info(
+                f"`format` is missing from the quantization configuration and is automatically inferred to {normalized[FORMAT_FIELD]}."
+            )
 
         if normalized[FORMAT_FIELD] in {FORMAT.MARLIN}:
             # Marlin do not reorder the rows.
@@ -308,20 +315,16 @@ class BaseQuantizeConfig(PushToHubMixin):
         return {
             "bits": self.bits,
             "group_size": self.group_size,
-
             # TODO: move to meta since damp and true_sequential does not participate in inference
             "damp_percent": self.damp_percent,
             "true_sequential": self.true_sequential,
-
             "desc_act": self.desc_act,
             "static_groups": self.static_groups,
             "sym": self.sym,
             "lm_head": self.lm_head,
-
             # TODO: deprecate
             "model_name_or_path": self.model_name_or_path,
             "model_file_base_name": self.model_file_base_name,
-
             QUANT_METHOD_FIELD: self.quant_method,
             FORMAT_FIELD: self.format,
             META_FIELD: self.meta,

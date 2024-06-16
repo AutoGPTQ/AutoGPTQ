@@ -43,16 +43,12 @@ class QuantLinear(nn.Module, TritonModuleMixin):
 
     QUANT_TYPE = "tritonv2"
 
-    def __init__(
-        self, bits, group_size, infeatures, outfeatures, bias, trainable=False, **kwargs
-    ):
+    def __init__(self, bits, group_size, infeatures, outfeatures, bias, trainable=False, **kwargs):
         super().__init__()
         if bits not in [2, 4, 8]:
             raise NotImplementedError("Only 2,4,8 bits are supported.")
         if infeatures % 32 != 0 or outfeatures % 32 != 0:
-            raise NotImplementedError(
-                "in_feature and out_feature must be divisible by 32."
-            )
+            raise NotImplementedError("in_feature and out_feature must be divisible by 32.")
         self.infeatures = infeatures
         self.outfeatures = outfeatures
         self.bits = bits
@@ -82,14 +78,10 @@ class QuantLinear(nn.Module, TritonModuleMixin):
         )
         self.register_buffer(
             "g_idx",
-            torch.tensor(
-                [i // self.group_size for i in range(infeatures)], dtype=torch.int32
-            ),
+            torch.tensor([i // self.group_size for i in range(infeatures)], dtype=torch.int32),
         )
         if bias:
-            self.register_buffer(
-                "bias", torch.zeros((outfeatures), dtype=torch.float16)
-            )
+            self.register_buffer("bias", torch.zeros((outfeatures), dtype=torch.float16))
         else:
             self.bias = None
 
@@ -117,10 +109,9 @@ class QuantLinear(nn.Module, TritonModuleMixin):
         intweight = []
         for idx in range(self.infeatures):
             intweight.append(
-                torch.round(
-                    (W[:, idx] + scale_zeros[self.g_idx[idx]])
-                    / self.scales[self.g_idx[idx]]
-                ).to(torch.int)[:, None]
+                torch.round((W[:, idx] + scale_zeros[self.g_idx[idx]]) / self.scales[self.g_idx[idx]]).to(torch.int)[
+                    :, None
+                ]
             )
         intweight = torch.cat(intweight, dim=1)
         intweight = intweight.t().contiguous()
@@ -128,9 +119,7 @@ class QuantLinear(nn.Module, TritonModuleMixin):
 
         i = 0
         row = 0
-        qweight = np.zeros(
-            (intweight.shape[0] // 32 * self.bits, intweight.shape[1]), dtype=np.uint32
-        )
+        qweight = np.zeros((intweight.shape[0] // 32 * self.bits, intweight.shape[1]), dtype=np.uint32)
         while row < qweight.shape[0]:
             if self.bits in [2, 4, 8]:
                 for j in range(i, i + (32 // self.bits)):
@@ -144,9 +133,7 @@ class QuantLinear(nn.Module, TritonModuleMixin):
         self.qweight = torch.from_numpy(qweight)
 
         zeros = zeros.numpy().astype(np.uint32)
-        qzeros = np.zeros(
-            (zeros.shape[0], zeros.shape[1] // 32 * self.bits), dtype=np.uint32
-        )
+        qzeros = np.zeros((zeros.shape[0], zeros.shape[1] // 32 * self.bits), dtype=np.uint32)
         i = 0
         col = 0
         while col < qzeros.shape[1]:

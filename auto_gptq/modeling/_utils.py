@@ -115,10 +115,7 @@ def make_quant(
                 in_features = submodule.weight.shape[0]
                 out_features = submodule.weight.shape[1]
             bias = submodule.bias is not None
-            if (
-                (not (desc_act) or group_size == -1)
-                and not use_triton
-            ):
+            if (not (desc_act) or group_size == -1) and not use_triton:
                 new_layer = QuantLinear(
                     bits,
                     group_size,
@@ -159,9 +156,15 @@ def convert_gptq_v1_to_v2_format(
                 if quantize_config.bits == 2:
                     submodule.qzeros.data += 0b01010101010101010101010101010101
                 elif quantize_config.bits == 3:
-                    submodule.qzeros.data[:,range(0,submodule.qzeros.data.shape[1],3)] += 0b00100100100100100100100100100100
-                    submodule.qzeros.data[:,range(1,submodule.qzeros.data.shape[1],3)] += 0b10010010010010010010010010010010
-                    submodule.qzeros.data[:,range(2,submodule.qzeros.data.shape[1],3)] += 0b01001001001001001001001001001001
+                    submodule.qzeros.data[:, range(0, submodule.qzeros.data.shape[1], 3)] += (
+                        0b00100100100100100100100100100100
+                    )
+                    submodule.qzeros.data[:, range(1, submodule.qzeros.data.shape[1], 3)] += (
+                        0b10010010010010010010010010010010
+                    )
+                    submodule.qzeros.data[:, range(2, submodule.qzeros.data.shape[1], 3)] += (
+                        0b01001001001001001001001001001001
+                    )
                 elif quantize_config.bits == 4:
                     submodule.qzeros.data += 0b00010001000100010001000100010001
                 elif quantize_config.bits == 8:
@@ -185,9 +188,15 @@ def convert_gptq_v2_to_v1_format(
                 if quantize_config.bits == 2:
                     submodule.qzeros.data -= 0b01010101010101010101010101010101
                 elif quantize_config.bits == 3:
-                    submodule.qzeros.data[:,range(0,submodule.qzeros.data.shape[1],3)] -= 0b00100100100100100100100100100100
-                    submodule.qzeros.data[:,range(1,submodule.qzeros.data.shape[1],3)] -= 0b10010010010010010010010010010010
-                    submodule.qzeros.data[:,range(2,submodule.qzeros.data.shape[1],3)] -= 0b01001001001001001001001001001001
+                    submodule.qzeros.data[:, range(0, submodule.qzeros.data.shape[1], 3)] -= (
+                        0b00100100100100100100100100100100
+                    )
+                    submodule.qzeros.data[:, range(1, submodule.qzeros.data.shape[1], 3)] -= (
+                        0b10010010010010010010010010010010
+                    )
+                    submodule.qzeros.data[:, range(2, submodule.qzeros.data.shape[1], 3)] -= (
+                        0b01001001001001001001001001001001
+                    )
                 elif quantize_config.bits == 4:
                     submodule.qzeros.data -= 0b00010001000100010001000100010001
                 elif quantize_config.bits == 8:
@@ -453,15 +462,32 @@ def autogptq_post_init(model, use_act_order: bool, max_input_length: Optional[in
 
 
 def make_sure_no_tensor_in_meta_device(
-    model, use_triton: bool, desc_act: bool, group_size: int, bits: int, disable_exllama: bool, disable_exllamav2: bool, use_marlin: bool = False,
+    model,
+    use_triton: bool,
+    desc_act: bool,
+    group_size: int,
+    bits: int,
+    disable_exllama: bool,
+    disable_exllamav2: bool,
+    use_marlin: bool = False,
 ):
-    QuantLinear = dynamically_import_QuantLinear(use_triton, desc_act, group_size, bits=bits, disable_exllama=disable_exllama, disable_exllamav2=disable_exllamav2, use_marlin=use_marlin)
+    QuantLinear = dynamically_import_QuantLinear(
+        use_triton,
+        desc_act,
+        group_size,
+        bits=bits,
+        disable_exllama=disable_exllama,
+        disable_exllamav2=disable_exllamav2,
+        use_marlin=use_marlin,
+    )
     for n, m in model.named_modules():
         if isinstance(m, QuantLinear) and m.bias.device == torch.device("meta"):
             m.register_buffer("bias", torch.zeros((m.outfeatures), dtype=torch.float16, device="cpu"))
 
 
-def get_checkpoints(model_name_or_path: str, extensions: List[str], possible_model_basenames: List[str], **cached_file_kwargs):
+def get_checkpoints(
+    model_name_or_path: str, extensions: List[str], possible_model_basenames: List[str], **cached_file_kwargs
+):
     """
     Retrives (and if necessary downloads from Hugging Face Hub) the model checkpoint. Sharding is supported. All the `possible_model_basenames` (e.g. `["model", "model-4bit-gptq"]`) will be explored over all `extensions` (e.g. `[".bin", ".safetensors"]`).
     """

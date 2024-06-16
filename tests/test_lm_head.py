@@ -31,7 +31,9 @@ class TestLmHead(unittest.TestCase):
         # validate lm_head is loaded as quantized layer
         assert model.lm_head.__class__.__name__ == "QuantLinear"
 
-        res = model.model.generate(**inputs, num_beams=1, min_new_tokens=1, max_new_tokens=128, repetition_penalty=1.25)
+        res = model.model.generate(
+            **inputs, num_beams=1, min_new_tokens=1, max_new_tokens=128, repetition_penalty=1.25
+        )
         res_str = tokenizer.decode(res[0])
 
         print(f"prompt: {prompt}")

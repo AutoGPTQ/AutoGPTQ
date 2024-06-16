@@ -90,9 +90,13 @@ class QuantLinear(nn.Module):
         super().__init__()
 
         if torch.version.hip:
-            raise ValueError("Can not use Marlin int4*fp16 kernel with AMD ROCm version of PyTorch as the kernel is not compatible. Please do not use `use_marlin=True` when using ROCm devices.")
+            raise ValueError(
+                "Can not use Marlin int4*fp16 kernel with AMD ROCm version of PyTorch as the kernel is not compatible. Please do not use `use_marlin=True` when using ROCm devices."
+            )
         if not torch.cuda.get_device_capability()[0] >= 8:
-            raise ValueError(f'Can not use Marlin int4*fp16 kernel with a device of compute capability {torch.cuda.get_device_capability()}, the minimum compute capability is 8.0 for Marlin kernel. Please do not use `use_marlin=True`, or please upgrade your GPU ("The more you buy, the more you save." - Taiwanese proverb).')
+            raise ValueError(
+                f'Can not use Marlin int4*fp16 kernel with a device of compute capability {torch.cuda.get_device_capability()}, the minimum compute capability is 8.0 for Marlin kernel. Please do not use `use_marlin=True`, or please upgrade your GPU ("The more you buy, the more you save." - Taiwanese proverb).'
+            )
 
         if infeatures % 128 != 0 or outfeatures % 256 != 0:
             raise ValueError("`infeatures` must be divisible by 128 and `outfeatures` by 256.")
@@ -217,6 +221,7 @@ def unpack_4bit_to_32bit_signed(qweight, qzeros):
 
     return unpacked_weights, unpacked_zeros
 
+
 def unpack_qzeros(qzeros):
     unpacked_zeros = torch.zeros(
         (qzeros.shape[0], qzeros.shape[1] * 8),
@@ -243,6 +248,7 @@ def dequantize_weight(layer):
     unpacked_qweight = (unpacked_qweight - unpacked_qzeros) * scales
 
     return unpacked_qweight.T, unpacked_qzeros
+
 
 def dequantize_qzeros(layer):
     qzeros = layer.qzeros

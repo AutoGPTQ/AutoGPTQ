@@ -1,5 +1,5 @@
 # Never enforce `E501` (line length violations).
-ignore = ["C901", "E501", "E741", "W605"]
+lint.ignore = ["C901", "E501", "E741", "W605"]
 select = ["C", "E", "F", "I", "W"]
 line-length = 119
 

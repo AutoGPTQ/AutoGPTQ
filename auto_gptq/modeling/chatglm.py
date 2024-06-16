@@ -12,4 +12,5 @@ class ChatGLMForCausalLM(BaseGPTQForCausalLM):
         ["mlp.dense_4h_to_h"],
     ]
 
+
 __all__ = ["ChatGLMForCausalLM"]

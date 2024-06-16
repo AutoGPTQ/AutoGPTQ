@@ -1900,9 +1900,7 @@ class TestsQ4ExllamaV2(unittest.TestCase):
         n = 1024
         device = torch.device("cuda:0")
 
-        linear_class = dynamically_import_QuantLinear(
-            use_triton=False, desc_act=False, group_size=group_size, bits=4
-        )
+        linear_class = dynamically_import_QuantLinear(use_triton=False, desc_act=False, group_size=group_size, bits=4)
 
         linear = linear_class(
             bits=4,

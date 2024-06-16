@@ -12,12 +12,15 @@ from auto_gptq import AutoGPTQForCausalLM, __version__  # noqa: E402
 from auto_gptq.quantization import FORMAT, QUANT_CONFIG_FILENAME, BaseQuantizeConfig  # noqa: E402
 from auto_gptq.quantization.config import META_FIELD_QUANTIZER, META_QUANTIZER_AUTOGPTQ
 
+
 class TestQuantization(unittest.TestCase):
-    @parameterized.expand([
-        (False, True, FORMAT.GPTQ_V2),
-        (False, False, FORMAT.GPTQ),
-        (True, True, FORMAT.MARLIN),
-    ])
+    @parameterized.expand(
+        [
+            (False, True, FORMAT.GPTQ_V2),
+            (False, False, FORMAT.GPTQ),
+            (True, True, FORMAT.MARLIN),
+        ]
+    )
     def test_quantize(self, use_marlin: bool, sym: bool, format: FORMAT):
         pretrained_model_dir = "TinyLlama/TinyLlama-1.1B-intermediate-step-1431k-3T"
 
@@ -45,14 +48,14 @@ class TestQuantization(unittest.TestCase):
 
         model.quantize(examples)
 
-        with (tempfile.TemporaryDirectory() as tmpdirname):
+        with tempfile.TemporaryDirectory() as tmpdirname:
             model.save_pretrained(
                 tmpdirname,
             )
 
             logging.info(f"Saved config mem: {model.quantize_config}")
 
-            with open(tmpdirname + "/" + QUANT_CONFIG_FILENAME, 'r') as f:
+            with open(tmpdirname + "/" + QUANT_CONFIG_FILENAME, "r") as f:
                 file_dict = json.loads(f.read())
                 # skip comparison of these two model path specific fields that do not exist in memory
                 file_dict["model_name_or_path"] = None
@@ -69,7 +72,10 @@ class TestQuantization(unittest.TestCase):
             )
 
             logging.info(f"Loaded config: {model.quantize_config}")
-            assert model.quantize_config.meta_get_versionable(META_FIELD_QUANTIZER) == (META_QUANTIZER_AUTOGPTQ, __version__)
+            assert model.quantize_config.meta_get_versionable(META_FIELD_QUANTIZER) == (
+                META_QUANTIZER_AUTOGPTQ,
+                __version__,
+            )
             del model
             torch.cuda.empty_cache()
 

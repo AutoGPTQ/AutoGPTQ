@@ -56,9 +56,7 @@ def dequant_kernel_248(
     tl.device_assert(g_idx >= 0, "index out of bounds: 0 <= tmp0 < 0")
     groups = tl.where(tmp2, tmp1, g_idx)  # tmp3 are g_idx
 
-    scales = tl.load(scales_ptr + (col_idx + (outfeatures * groups)), None).to(
-        tl.float32
-    )
+    scales = tl.load(scales_ptr + (col_idx + (outfeatures * groups)), None).to(tl.float32)
 
     # Unpack weights
     weights = qweights >> wf_weights  # bit shift qweight
@@ -112,9 +110,7 @@ def dequant248(qweight, scales, qzeros, g_idx, bits, maxq=None):
     return out
 
 
-def quant_matmul_248(
-    input, qweight, scales, qzeros, g_idx, bits, maxq=None, transpose=False
-):
+def quant_matmul_248(input, qweight, scales, qzeros, g_idx, bits, maxq=None, transpose=False):
     W = dequant248(qweight, scales, qzeros, g_idx, bits, maxq=maxq)
     if transpose:
         return input @ W.t()
@@ -138,7 +134,5 @@ class QuantLinearFunction(torch.autograd.Function):
         grad_input = None
 
         if ctx.needs_input_grad[0]:
-            grad_input = quant_matmul_248(
-                grad_output, qweight, scales, qzeros, g_idx, bits, maxq, transpose=True
-            )
+            grad_input = quant_matmul_248(grad_output, qweight, scales, qzeros, g_idx, bits, maxq, transpose=True)
         return grad_input, None, None, None, None, None, None

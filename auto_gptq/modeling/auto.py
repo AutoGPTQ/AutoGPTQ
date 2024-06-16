@@ -101,7 +101,7 @@ class AutoGPTQForCausalLM:
         low_cpu_mem_usage: bool = False,
         use_triton: bool = False,
         use_cuda_fp16: bool = True,
-        quantize_config: Optional[BaseQuantizeConfig|Dict] = None,
+        quantize_config: Optional[BaseQuantizeConfig | Dict] = None,
         model_basename: Optional[str] = None,
         use_safetensors: bool = True,
         trust_remote_code: bool = False,
