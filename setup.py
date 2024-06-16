@@ -1,6 +1,4 @@
 import os
-import platform
-import subprocess
 import sys
 from pathlib import Path
 
@@ -38,7 +36,6 @@ common_setup_kwargs = {
 
 PYPI_RELEASE = os.environ.get('PYPI_RELEASE', None)
 BUILD_CUDA_EXT = int(os.environ.get('BUILD_CUDA_EXT', '1')) == 1
-DISABLE_QIGEN = int(os.environ.get('DISABLE_QIGEN', '1')) == 1
 COMPILE_MARLIN = int(os.environ.get('COMPILE_MARLIN', '1')) == 1
 UNSUPPORTED_COMPUTE_CAPABILITIES = ['3.5', '3.7', '5.0', '5.2', '5.3']
 
@@ -144,18 +141,6 @@ additional_setup_kwargs = {}
 if BUILD_CUDA_EXT:
     from torch.utils import cpp_extension
 
-    if platform.system() != "Windows" and platform.machine() != "aarch64" and not DISABLE_QIGEN:
-        print("Generating qigen kernels...")
-        cores_info = subprocess.run("cat /proc/cpuinfo | grep cores | head -1", shell=True, check=True, text=True, stdout=subprocess.PIPE).stdout.split(" ")
-        if (len(cores_info) == 3 and cores_info[1].startswith("cores")) or (len(cores_info) == 2):
-            p = int(cores_info[-1])
-        else:
-            p = os.cpu_count()
-        try:
-            subprocess.check_output(["python", "./autogptq_extension/qigen/generate.py", "--module", "--search", "--p", str(p)])
-        except subprocess.CalledProcessError:
-            raise Exception("Generating QiGen kernels failed with the error shown above.")
-
     if not ROCM_VERSION:
         from distutils.sysconfig import get_python_lib
         conda_cuda_include_dir = os.path.join(get_python_lib(), "nvidia/cuda_runtime/include")
@@ -181,39 +166,20 @@ if BUILD_CUDA_EXT:
         )
     ]
 
-    if platform.system() != "Windows":
-        if platform.machine() != "aarch64" and not DISABLE_QIGEN:
-            extensions.append(
-                cpp_extension.CppExtension(
-                    "cQIGen",
-                    [
-                        'autogptq_extension/qigen/backend.cpp'
-                    ],
-                    extra_compile_args = ["-O3", "-mavx", "-mavx2", "-mfma", "-march=native", "-ffast-math", "-ftree-vectorize", "-faligned-new", "-std=c++17", "-fopenmp", "-fno-signaling-nans", "-fno-trapping-math"]
-                )
+    # Marlin is not ROCm-compatible, CUDA only
+    if not ROCM_VERSION and COMPILE_MARLIN:
+        extensions.append(
+            cpp_extension.CUDAExtension(
+                'autogptq_marlin_cuda',
+                [
+                    'autogptq_extension/marlin/marlin_cuda.cpp',
+                    'autogptq_extension/marlin/marlin_cuda_kernel.cu',
+                    'autogptq_extension/marlin/marlin_repack.cu'
+                ]
             )
+        )
 
-        # Marlin is not ROCm-compatible, CUDA only
-        if not ROCM_VERSION and COMPILE_MARLIN:
-            extensions.append(
-                cpp_extension.CUDAExtension(
-                    'autogptq_marlin_cuda',
-                    [
-                        'autogptq_extension/marlin/marlin_cuda.cpp',
-                        'autogptq_extension/marlin/marlin_cuda_kernel.cu',
-                        'autogptq_extension/marlin/marlin_repack.cu'
-                    ]
-                )
-            )
-
-    if os.name == "nt":
-        # On Windows, fix an error LNK2001: unresolved external symbol cublasHgemm bug in the compilation
-        cuda_path = os.environ.get("CUDA_PATH", None)
-        if cuda_path is None:
-            raise ValueError("The environment variable CUDA_PATH must be set to the path to the CUDA install when installing from source on Windows systems.")
-        extra_link_args = ["-L", f"{cuda_path}/lib/x64/cublas.lib"]
-    else:
-        extra_link_args = []
+    extra_link_args = []
 
     extensions.append(
         cpp_extension.CUDAExtension(

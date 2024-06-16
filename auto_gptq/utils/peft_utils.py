@@ -15,7 +15,6 @@ from ..nn_modules.qlinear.qlinear_cuda import QuantLinear as QuantLinearCuda
 from ..nn_modules.qlinear.qlinear_cuda_old import QuantLinear as QuantLinearCudaOld
 from ..nn_modules.qlinear.qlinear_exllama import QuantLinear as QuantLinearExllama
 from ..nn_modules.qlinear.qlinear_exllama import QuantLinear as QuantLinearExllamaV2
-from ..nn_modules.qlinear.qlinear_qigen import QuantLinear as QuantLinearQigen
 from ..nn_modules.qlinear.qlinear_tritonv2 import QuantLinear as QuantLinearTriton
 
 
@@ -26,7 +25,6 @@ LinearLayer = Union[
     QuantLinearCudaOld,
     QuantLinearExllama,
     QuantLinearExllamaV2,
-    QuantLinearQigen,
     QuantLinearTriton,
 ]
 
@@ -147,7 +145,6 @@ class GPTQLoraModel(LoraModel):
             QuantLinearCudaOld,
             QuantLinearExllama,
             QuantLinearExllamaV2,
-            QuantLinearQigen,
             QuantLinearTriton,
         }
 
@@ -272,7 +269,6 @@ class GPTQAdaLoraModel(AdaLoraModel):
             QuantLinearCudaOld,
             QuantLinearExllama,
             QuantLinearExllamaV2,
-            QuantLinearQigen,
             QuantLinearTriton,
         }
 

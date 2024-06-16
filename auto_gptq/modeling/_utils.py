@@ -77,7 +77,6 @@ def make_quant(
     use_marlin: bool = False,
     disable_exllama: Optional[bool] = None,
     disable_exllamav2: bool = False,
-    use_qigen: bool = False,
     use_cuda_fp16: bool = True,
     desc_act: bool = False,
     trainable: bool = False,
@@ -97,7 +96,6 @@ def make_quant(
         use_marlin=use_marlin,
         disable_exllama=disable_exllama,
         disable_exllamav2=disable_exllamav2,
-        use_qigen=use_qigen,
     )
 
     if isinstance(module, QuantLinear):
@@ -120,7 +118,6 @@ def make_quant(
             if (
                 (not (desc_act) or group_size == -1)
                 and not use_triton
-                and not use_qigen
             ):
                 new_layer = QuantLinear(
                     bits,
@@ -151,8 +148,6 @@ def convert_gptq_v1_to_v2_format(
     quantize_config: BaseQuantizeConfig,
     qlinear_kernel: nn.Module,
 ):
-    use_qigen = qlinear_kernel.QUANT_TYPE == "qigen"
-
     # Limit thread usage to avoid auto-parallizataion regression
     with tctl.threadpool_limits(limits=1):
         for _, submodule in model.named_modules():
@@ -161,21 +156,18 @@ def convert_gptq_v1_to_v2_format(
             # v1 checkpoint format with sym=False saved via convert_gptq_v2_to_v1_format() will
             # overflow ~<=13% based on testing
             if isinstance(submodule, qlinear_kernel):
-                if use_qigen:
-                    submodule.zeros.data += 1
+                if quantize_config.bits == 2:
+                    submodule.qzeros.data += 0b01010101010101010101010101010101
+                elif quantize_config.bits == 3:
+                    submodule.qzeros.data[:,range(0,submodule.qzeros.data.shape[1],3)] += 0b00100100100100100100100100100100
+                    submodule.qzeros.data[:,range(1,submodule.qzeros.data.shape[1],3)] += 0b10010010010010010010010010010010
+                    submodule.qzeros.data[:,range(2,submodule.qzeros.data.shape[1],3)] += 0b01001001001001001001001001001001
+                elif quantize_config.bits == 4:
+                    submodule.qzeros.data += 0b00010001000100010001000100010001
+                elif quantize_config.bits == 8:
+                    submodule.qzeros.data += 0b00000001000000010000000100000001
                 else:
-                    if quantize_config.bits == 2:
-                        submodule.qzeros.data += 0b01010101010101010101010101010101
-                    elif quantize_config.bits == 3:
-                        submodule.qzeros.data[:,range(0,submodule.qzeros.data.shape[1],3)] += 0b00100100100100100100100100100100
-                        submodule.qzeros.data[:,range(1,submodule.qzeros.data.shape[1],3)] += 0b10010010010010010010010010010010
-                        submodule.qzeros.data[:,range(2,submodule.qzeros.data.shape[1],3)] += 0b01001001001001001001001001001001
-                    elif quantize_config.bits == 4:
-                        submodule.qzeros.data += 0b00010001000100010001000100010001
-                    elif quantize_config.bits == 8:
-                        submodule.qzeros.data += 0b00000001000000010000000100000001
-                    else:
-                        raise NotImplementedError("Only 2,3,4,8 bits are supported.")
+                    raise NotImplementedError("Only 2,3,4,8 bits are supported.")
 
     return model
 
@@ -185,136 +177,25 @@ def convert_gptq_v2_to_v1_format(
     quantize_config: BaseQuantizeConfig,
     qlinear_kernel: nn.Module,
 ):
-    use_qigen = qlinear_kernel.QUANT_TYPE == "qigen"
-
     # Limit thread usage to avoid auto-parallizataion regression
     with tctl.threadpool_limits(limits=1):
         for _, submodule in model.named_modules():
             # sym=False has underflow probability of ~<=13% during testing. No underflow possible for sym=True.
             if isinstance(submodule, qlinear_kernel):
-                if use_qigen:
-                    submodule.zeros.data -= 1
+                if quantize_config.bits == 2:
+                    submodule.qzeros.data -= 0b01010101010101010101010101010101
+                elif quantize_config.bits == 3:
+                    submodule.qzeros.data[:,range(0,submodule.qzeros.data.shape[1],3)] -= 0b00100100100100100100100100100100
+                    submodule.qzeros.data[:,range(1,submodule.qzeros.data.shape[1],3)] -= 0b10010010010010010010010010010010
+                    submodule.qzeros.data[:,range(2,submodule.qzeros.data.shape[1],3)] -= 0b01001001001001001001001001001001
+                elif quantize_config.bits == 4:
+                    submodule.qzeros.data -= 0b00010001000100010001000100010001
+                elif quantize_config.bits == 8:
+                    submodule.qzeros.data -= 0b00000001000000010000000100000001
                 else:
-                    if quantize_config.bits == 2:
-                        submodule.qzeros.data -= 0b01010101010101010101010101010101
-                    elif quantize_config.bits == 3:
-                        submodule.qzeros.data[:,range(0,submodule.qzeros.data.shape[1],3)] -= 0b00100100100100100100100100100100
-                        submodule.qzeros.data[:,range(1,submodule.qzeros.data.shape[1],3)] -= 0b10010010010010010010010010010010
-                        submodule.qzeros.data[:,range(2,submodule.qzeros.data.shape[1],3)] -= 0b01001001001001001001001001001001
-                    elif quantize_config.bits == 4:
-                        submodule.qzeros.data -= 0b00010001000100010001000100010001
-                    elif quantize_config.bits == 8:
-                        submodule.qzeros.data -= 0b00000001000000010000000100000001
-                    else:
-                        raise NotImplementedError("Only 2,3,4,8 bits are supported.")
+                    raise NotImplementedError("Only 2,3,4,8 bits are supported.")
 
     return model
-
-
-def preprocess_checkpoint_qigen(
-    module,
-    names,
-    bits,
-    group_size,
-    checkpoint,
-    name="",
-):
-    try:
-        import cQIGen as qinfer
-    except ImportError:
-        logger.error("cQIGen not installed.")
-        raise
-
-    QuantLinear = dynamically_import_QuantLinear(
-        use_triton=False,
-        desc_act=False,
-        group_size=group_size,
-        bits=bits,
-        disable_exllama=False,
-        use_qigen=True,
-    )
-    if isinstance(module, QuantLinear):
-        in_features = module.infeatures
-        out_features = module.outfeatures
-
-        zeros = checkpoint[name + ".qzeros"]
-        scales = checkpoint[name + ".scales"].float()
-
-        if zeros.dtype != torch.float32:
-            new_zeros = torch.zeros_like(scales).float().contiguous()
-            if bits == 4:
-                qinfer.unpack_zeros4(zeros, new_zeros, new_zeros.shape[0], new_zeros.shape[1])
-            elif bits == 2:
-                qinfer.unpack_zeros2(zeros, new_zeros, new_zeros.shape[0], new_zeros.shape[1])
-            elif bits == 3:
-                logger.info("Unpacking zeros for 3 bits")
-            new_scales = scales.contiguous()
-        else:
-            if scales.shape[1] != out_features:
-                new_scales = scales.transpose(0, 1).contiguous()
-            else:
-                new_scales = scales.contiguous()
-            if zeros.shape[1] != out_features:
-                new_zeros = zeros.transpose(0, 1).contiguous()
-            else:
-                new_zeros = zeros.contiguous()
-
-        checkpoint[name + ".zeros"], checkpoint[name + ".scales"] = (
-            new_zeros,
-            new_scales,
-        )
-        del checkpoint[name + ".qzeros"]
-        del checkpoint[name + ".g_idx"]
-        if name + ".bias" in checkpoint:
-            checkpoint[name + ".bias"] = checkpoint[name + ".bias"].float()
-        else:
-            checkpoint[name + ".bias"] = torch.zeros(out_features)
-        checkpoint_qweight = checkpoint[name + ".qweight"].int().contiguous()
-        if bits == 4:
-            qweight = torch.zeros(int(in_features // 8 * out_features)).int().contiguous()
-            qinfer.pack4(
-                checkpoint_qweight,
-                qweight,
-                in_features // 8,
-                out_features,
-                module.mb,
-                module.tb,
-                module.cutoff,
-            )  # * (module.tt//tb))
-        elif bits == 3:
-            qweight = torch.zeros(int(in_features // 32 * 3 * out_features)).int().contiguous()
-            qinfer.pack3(
-                checkpoint_qweight,
-                qweight,
-                in_features // 32 * 3,
-                out_features,
-                module.mb // 32 * 3,
-                module.tb,
-                module.cutoff,
-            )
-        elif bits == 2:
-            qweight = torch.zeros(int(in_features // 16 * out_features)).int().contiguous()
-            qinfer.pack2(
-                checkpoint_qweight,
-                qweight,
-                in_features // 16,
-                out_features,
-                module.mb,
-                module.tb,
-                module.cutoff,
-            )  # * (module.tt//tb))
-        checkpoint[name + ".qweight"] = qweight
-        return
-
-    for name1, child in module.named_children():
-        preprocess_checkpoint_qigen(
-            child,
-            names,
-            bits,
-            group_size,
-            checkpoint,
-            name + "." + name1 if name != "" else name1,
-        )
 
 
 def pack_model(
@@ -656,7 +537,6 @@ __all__ = [
     "get_module_by_name_prefix",
     "get_module_by_name_suffix",
     "make_quant",
-    "preprocess_checkpoint_qigen",
     "pack_model",
     "autogptq_post_init",
     "check_and_get_model_type",

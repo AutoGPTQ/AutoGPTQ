@@ -41,7 +41,6 @@ from ..utils.import_utils import (
     EXLLAMA_KERNELS_AVAILABLE,
     EXLLAMAV2_KERNELS_AVAILABLE,
     MARLIN_AVAILABLE,
-    QIGEN_AVAILABLE,
     TRITON_AVAILABLE,
     dynamically_import_QuantLinear,
 )
@@ -65,7 +64,6 @@ from ._utils import (
     make_sure_no_tensor_in_meta_device,
     move_to_device,
     pack_model,
-    preprocess_checkpoint_qigen,
     simple_dispatch_model,
 )
 
@@ -767,7 +765,6 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         device: Optional[Union[str, int]] = None,
         low_cpu_mem_usage: bool = False,
         use_triton: bool = False,
-        use_qigen: bool = False,
         use_marlin: bool = False,
         torch_dtype: Optional[torch.dtype] = None,
         use_cuda_fp16: bool = True,
@@ -813,9 +810,6 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             "_raise_exceptions_for_missing_entries": False,
             "_commit_hash": commit_hash,
         }
-        if use_qigen and not QIGEN_AVAILABLE:
-            logger.warning("Qigen is not installed, reset use_qigen to False.")
-            use_qigen = False
         if use_triton and not TRITON_AVAILABLE:
             logger.warning("Triton is not installed, reset use_triton to False.")
             use_triton = False
@@ -845,12 +839,6 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                 "2. You are using pytorch without CUDA support.\n"
                 "3. CUDA and nvcc are not installed in your device."
             )
-
-        if use_qigen and QIGEN_AVAILABLE:
-            logger.warning("QIgen is active. Ignores all settings related to cuda.")
-            use_triton = False
-            disable_exllama = True
-            disable_exllamav2 = True
 
         if not disable_exllamav2 and not disable_exllama:
             logger.warning(
@@ -934,182 +922,44 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             pass
 
         if torch_dtype is None:
-            if not use_qigen:
-                torch_dtype = torch.float16
-            else:
-                torch_dtype = torch.float32
+            torch_dtype = torch.float16
 
         if torch_dtype != torch.float16:
             logger.warning("Overriding use_cuda_fp16 to False since torch_dtype is not torch.float16.")
             use_cuda_fp16 = False
 
-        if not use_qigen:
-            torch.nn.init.kaiming_uniform_ = skip
-            torch.nn.init.uniform_ = skip
-            torch.nn.init.normal_ = skip
 
-            transformers.modeling_utils._init_weights = False
+        torch.nn.init.kaiming_uniform_ = skip
+        torch.nn.init.uniform_ = skip
+        torch.nn.init.normal_ = skip
 
-            init_contexts = [no_init_weights()]
-            if low_cpu_mem_usage:
-                init_contexts.append(accelerate.init_empty_weights(include_buffers=False))
+        transformers.modeling_utils._init_weights = False
 
-            with ContextManagers(init_contexts):
-                model = AutoModelForCausalLM.from_config(
-                    config, trust_remote_code=trust_remote_code, torch_dtype=torch_dtype
-                )
+        init_contexts = [no_init_weights()]
+        if low_cpu_mem_usage:
+            init_contexts.append(accelerate.init_empty_weights(include_buffers=False))
 
-                layers = find_layers(model)
-                ignore_layers = [cls.lm_head_name] + cls.outside_layer_modules
-
-                for name in list(layers.keys()):
-                    # allow loading of quantized lm_head
-                    if quantize_config.lm_head and name == cls.lm_head_name:
-                        continue
-
-                    if any(name.startswith(ignore_layer) for ignore_layer in ignore_layers) or all(
-                        not name.endswith(ignore_layer)
-                        for sublist in cls.inside_layer_modules
-                        for ignore_layer in sublist
-                    ):
-                        logger.info(f"The layer {name} is not quantized.")
-                        del layers[name]
-
-                make_quant(
-                    model,
-                    layers,
-                    quantize_config.bits,
-                    quantize_config.group_size,
-                    use_triton=use_triton,
-                    disable_exllama=disable_exllama,
-                    disable_exllamav2=disable_exllamav2,
-                    use_cuda_fp16=use_cuda_fp16,
-                    desc_act=quantize_config.desc_act,
-                    trainable=trainable,
-                )
-                model.tie_weights()
-
-            # == step3: load checkpoint and dispatch == #
-            if isinstance(device_map, str) and device_map not in [
-                "auto",
-                "balanced",
-                "balanced_low_0",
-                "sequential",
-            ]:
-                raise ValueError(
-                    "If passing a string for `device_map`, please choose 'auto', 'balanced', 'balanced_low_0' or "
-                    "'sequential'."
-                )
-            if isinstance(device_map, dict):
-                max_memory = None
-            else:
-                if device is None and not device_map and not max_memory:
-                    device_map = "auto"
-                if device is not None:
-                    device = torch.device(device)
-                    if not max_memory and not device_map:
-                        device_map = {"": device.index if device.type == "cuda" else device.type}
-                if not isinstance(device_map, dict) and device_map != "sequential":
-                    max_memory = accelerate.utils.get_balanced_memory(
-                        model=model,
-                        max_memory=max_memory,
-                        no_split_module_classes=[cls.layer_type],
-                        low_zero=(device_map == "balanced_low_0"),
-                    )
-            if not isinstance(device_map, dict):
-                device_map = accelerate.infer_auto_device_map(
-                    model,
-                    max_memory=max_memory,
-                    no_split_module_classes=[cls.layer_type],
-                )
-
-            if low_cpu_mem_usage:
-                make_sure_no_tensor_in_meta_device(
-                    model,
-                    use_triton,
-                    quantize_config.desc_act,
-                    quantize_config.group_size,
-                    bits=quantize_config.bits,
-                    disable_exllama=disable_exllama,
-                    disable_exllamav2=disable_exllamav2,
-                )
-
-            if use_marlin:
-                if is_sharded:
-                    raise ValueError("The loading of sharded checkpoints with Marlin is currently not supported. Please raise an issue in AutoGPTQ repository.")
-                if torch.version.hip:
-                    raise ValueError("Can not use Marlin int4*fp16 kernel with AMD ROCm version of PyTorch as the kernel is not compatible. Please do not use `use_marlin=True` when using ROCm devices.")
-                if not _validate_marlin_device_support():
-                    raise ValueError(f'Can not use Marlin int4*fp16 kernel with a device of compute capability {torch.cuda.get_device_capability()}, the minimum compute capability is 8.0 for Marlin kernel. Please do not use `use_marlin=True`, or please upgrade your GPU ("The more you buy, the more you save." - Taiwanese proverb).')
-
-                # Validate the model can run in Marlin.
-                if torch_dtype != torch.float16:
-                    raise ValueError("Marlin kernel requires torch_dtype=torch.float16.")
-                unsupported_reason = _validate_marlin_compatibility(quantize_config)
-                if unsupported_reason is not None:
-                    raise ValueError(
-                        f"The model {model_name_or_path} can not be converted to use the Marlin kernel for the following reason: {unsupported_reason}, which is not supported by Marlin kernel."
-                    )
-
-                # Load the quant linear type we need.
-                # TODO: load marlin directly with the right quantlinear class.
-                quant_linear_class = dynamically_import_QuantLinear(
-                    use_triton=use_triton,
-                    desc_act=quantize_config.desc_act,
-                    group_size=quantize_config.group_size,
-                    bits=quantize_config.bits,
-                    disable_exllama=disable_exllama,
-                    disable_exllamav2=disable_exllamav2,
-                    use_marlin=False,
-                )
-
-                # Prepare model for marlin load.
-                #   If stub is marlin serialized         --> load from directly
-                #   If stub has cached marlin version   --> load from the cached version
-                #   Otherwise                           --> convert to marlin, cache, load from cache
-                model, model_save_name = prepare_model_for_marlin_load(
-                    model=model,
-                    quantize_config=quantize_config,
-                    quant_linear_class=quant_linear_class,
-                    torch_dtype=torch_dtype,
-                    current_model_save_name=model_save_name,
-                    device_map=device_map,
-                )
-
-            accelerate.utils.modeling.load_checkpoint_in_model(
-                model,
-                dtype=torch_dtype,  # This is very hacky but works due to https://github.com/huggingface/accelerate/blob/bd72a5f1a80d5146554458823f8aeda0a9db5297/src/accelerate/utils/modeling.py#L292
-                checkpoint=model_save_name,
-                device_map=device_map,
-                offload_state_dict=True,
-                offload_buffers=True,
-            )
-
-            # TODO: Why are we using this custom function and not dispatch_model?
-            model = simple_dispatch_model(model, device_map)
-        else:
-            # Using QiGen.
-
-            if is_sharded:
-                raise ValueError("The loading of sharded checkpoints with QiGen is currently not supported. Please raise an issue in AutoGPTQ repository.")
-
-            if quantize_config.desc_act:
-                NotImplementedError("desc_act=True is not yet supported with QiGen.")
+        with ContextManagers(init_contexts):
             model = AutoModelForCausalLM.from_config(
                 config, trust_remote_code=trust_remote_code, torch_dtype=torch_dtype
             )
 
             layers = find_layers(model)
             ignore_layers = [cls.lm_head_name] + cls.outside_layer_modules
+
             for name in list(layers.keys()):
-                if any(name.startswith(ignore_layer) for ignore_layer in ignore_layers):
-                    logger.info(f"{name} not been quantized, will be ignored when make_quant.")
+                # allow loading of quantized lm_head
+                if quantize_config.lm_head and name == cls.lm_head_name:
+                    continue
+
+                if any(name.startswith(ignore_layer) for ignore_layer in ignore_layers) or all(
+                    not name.endswith(ignore_layer)
+                    for sublist in cls.inside_layer_modules
+                    for ignore_layer in sublist
+                ):
+                    logger.info(f"The layer {name} is not quantized.")
                     del layers[name]
 
-            if model_save_name.endswith(".safetensors"):
-                checkpoint = safe_load(model_save_name)
-            else:
-                checkpoint = torch.load(model_save_name)
             make_quant(
                 model,
                 layers,
@@ -1121,17 +971,108 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                 use_cuda_fp16=use_cuda_fp16,
                 desc_act=quantize_config.desc_act,
                 trainable=trainable,
-                use_qigen=True,
                 use_marlin=quantize_config.format == FORMAT.MARLIN,
             )
-            preprocess_checkpoint_qigen(
-                model,
-                layers,
-                quantize_config.bits,
-                quantize_config.group_size,
-                checkpoint,
+            model.tie_weights()
+
+        # == step3: load checkpoint and dispatch == #
+        if isinstance(device_map, str) and device_map not in [
+            "auto",
+            "balanced",
+            "balanced_low_0",
+            "sequential",
+        ]:
+            raise ValueError(
+                "If passing a string for `device_map`, please choose 'auto', 'balanced', 'balanced_low_0' or "
+                "'sequential'."
             )
-            model.load_state_dict(checkpoint)
+        if isinstance(device_map, dict):
+            max_memory = None
+        else:
+            if device is None and not device_map and not max_memory:
+                device_map = "auto"
+            if device is not None:
+                device = torch.device(device)
+                if not max_memory and not device_map:
+                    device_map = {"": device.index if device.type == "cuda" else device.type}
+            if not isinstance(device_map, dict) and device_map != "sequential":
+                max_memory = accelerate.utils.get_balanced_memory(
+                    model=model,
+                    max_memory=max_memory,
+                    no_split_module_classes=[cls.layer_type],
+                    low_zero=(device_map == "balanced_low_0"),
+                )
+        if not isinstance(device_map, dict):
+            device_map = accelerate.infer_auto_device_map(
+                model,
+                max_memory=max_memory,
+                no_split_module_classes=[cls.layer_type],
+            )
+
+        if low_cpu_mem_usage:
+            make_sure_no_tensor_in_meta_device(
+                model,
+                use_triton,
+                quantize_config.desc_act,
+                quantize_config.group_size,
+                bits=quantize_config.bits,
+                disable_exllama=disable_exllama,
+                disable_exllamav2=disable_exllamav2,
+            )
+
+        if use_marlin:
+            if is_sharded:
+                raise ValueError("The loading of sharded checkpoints with Marlin is currently not supported. Please raise an issue in AutoGPTQ repository.")
+            if torch.version.hip:
+                raise ValueError("Can not use Marlin int4*fp16 kernel with AMD ROCm version of PyTorch as the kernel is not compatible. Please do not use `use_marlin=True` when using ROCm devices.")
+            if not _validate_marlin_device_support():
+                raise ValueError(f'Can not use Marlin int4*fp16 kernel with a device of compute capability {torch.cuda.get_device_capability()}, the minimum compute capability is 8.0 for Marlin kernel. Please do not use `use_marlin=True`, or please upgrade your GPU ("The more you buy, the more you save." - Taiwanese proverb).')
+
+            # Validate the model can run in Marlin.
+            if torch_dtype != torch.float16:
+                raise ValueError("Marlin kernel requires torch_dtype=torch.float16.")
+            unsupported_reason = _validate_marlin_compatibility(quantize_config)
+            if unsupported_reason is not None:
+                raise ValueError(
+                    f"The model {model_name_or_path} can not be converted to use the Marlin kernel for the following reason: {unsupported_reason}, which is not supported by Marlin kernel."
+                )
+
+            # Load the quant linear type we need.
+            # TODO: load marlin directly with the right quantlinear class.
+            quant_linear_class = dynamically_import_QuantLinear(
+                use_triton=use_triton,
+                desc_act=quantize_config.desc_act,
+                group_size=quantize_config.group_size,
+                bits=quantize_config.bits,
+                disable_exllama=disable_exllama,
+                disable_exllamav2=disable_exllamav2,
+                use_marlin=False,
+            )
+
+            # Prepare model for marlin load.
+            #   If stub is marlin serialized         --> load from directly
+            #   If stub has cached marlin version   --> load from the cached version
+            #   Otherwise                           --> convert to marlin, cache, load from cache
+            model, model_save_name = prepare_model_for_marlin_load(
+                model=model,
+                quantize_config=quantize_config,
+                quant_linear_class=quant_linear_class,
+                torch_dtype=torch_dtype,
+                current_model_save_name=model_save_name,
+                device_map=device_map,
+            )
+
+        accelerate.utils.modeling.load_checkpoint_in_model(
+            model,
+            dtype=torch_dtype,  # This is very hacky but works due to https://github.com/huggingface/accelerate/blob/bd72a5f1a80d5146554458823f8aeda0a9db5297/src/accelerate/utils/modeling.py#L292
+            checkpoint=model_save_name,
+            device_map=device_map,
+            offload_state_dict=True,
+            offload_buffers=True,
+        )
+
+        # TODO: Why are we using this custom function and not dispatch_model?
+        model = simple_dispatch_model(model, device_map)
 
         qlinear_kernel = dynamically_import_QuantLinear(
             use_triton=use_triton,
@@ -1140,7 +1081,6 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             bits=quantize_config.bits,
             disable_exllama=disable_exllama,
             disable_exllamav2=disable_exllamav2,
-            use_qigen=use_qigen,
             use_marlin=use_marlin,
         )
 
@@ -1194,7 +1134,6 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         #     disable_exllama=disable_exllama,
         #     disable_exllamav2=disable_exllamav2,
         #     use_marlin=use_marlin,
-        #     use_qigen=use_qigen,
         # )
 
         return cls(
@@ -1236,13 +1175,12 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         disable_exllama: bool = True,
         disable_exllamav2: bool = False,
         use_marlin: bool = False,
-        use_qigen: bool = False,
     ):
         GeneralQuantLinear.inject_to_model(
             model,
             dynamically_import_QuantLinear(use_triton, desc_act, group_size, bits=bits, disable_exllama=disable_exllama,
                                            disable_exllamav2=disable_exllamav2,
-                                           use_marlin=use_marlin, use_qigen=use_qigen),
+                                           use_marlin=use_marlin),
         )
 
     def __getattr__(self, item):
