@@ -147,8 +147,6 @@ def load_model_tokenizer(
     use_triton: bool = False,
     use_safetensors: bool = True,
     use_fast_tokenizer: bool = False,
-    inject_fused_attention: bool = True,
-    inject_fused_mlp: bool = True,
     disable_exllama: bool = False,
 ):
     tokenizer = AutoTokenizer.from_pretrained(
@@ -172,8 +170,6 @@ def load_model_tokenizer(
             max_memory=max_memory,
             low_cpu_mem_usage=True,
             use_triton=use_triton,
-            inject_fused_attention=inject_fused_attention,
-            inject_fused_mlp=inject_fused_mlp,
             use_cuda_fp16=True,
             quantize_config=quantize_config,
             model_basename=model_basename,
@@ -237,8 +233,6 @@ def main():
     parser.add_argument("--use_safetensors", action="store_true")
     parser.add_argument("--use_fast_tokenizer", action="store_true")
     parser.add_argument("--disable_exllama", action="store_true")
-    parser.add_argument("--no_inject_fused_attention", action="store_true")
-    parser.add_argument("--no_inject_fused_mlp", action="store_true")
     parser.add_argument("--num_samples", type=int, default=10)
     parser.add_argument("--per_gpu_max_memory", type=int, default=None)
     parser.add_argument("--cpu_max_memory", type=int, default=None)
@@ -280,8 +274,6 @@ def main():
         use_triton=args.use_triton,
         use_safetensors=True,
         use_fast_tokenizer=args.use_fast_tokenizer,
-        inject_fused_attention=not args.no_inject_fused_attention,
-        inject_fused_mlp=not args.no_inject_fused_mlp,
         disable_exllama=args.disable_exllama,
     )
     end = time.time()

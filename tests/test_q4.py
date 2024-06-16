@@ -1067,7 +1067,6 @@ class TestsQ4Exllama(unittest.TestCase):
 
         linear_class = dynamically_import_QuantLinear(
             use_triton=False,
-            use_tritonv2=False,
             desc_act=False,
             group_size=group_size,
             bits=4,
@@ -1136,8 +1135,6 @@ class TestsQ4Exllama(unittest.TestCase):
             revision=revision,
             device="cuda:0",
             use_triton=False,
-            inject_fused_attention=False,
-            inject_fused_mlp=False,
             model_basename=model_basename,
             disable_exllama=False,
             disable_exllamav2=True,
@@ -1176,8 +1173,6 @@ class TestsQ4Exllama(unittest.TestCase):
             model_id,
             device="cuda:0",
             use_triton=False,
-            inject_fused_attention=False,
-            inject_fused_mlp=False,
             disable_exllama=False,
             disable_exllamav2=True,
         )
@@ -1207,8 +1202,6 @@ class TestsQ4Exllama(unittest.TestCase):
             revision=revision,
             device="cuda:0",
             use_triton=False,
-            inject_fused_attention=False,
-            inject_fused_mlp=False,
             model_basename=model_basename,
             disable_exllama=False,
             disable_exllamav2=True,
@@ -1763,7 +1756,6 @@ class TestsQ4CUDA(unittest.TestCase):
 
         linear_class = dynamically_import_QuantLinear(
             use_triton=False,
-            use_tritonv2=False,
             desc_act=False,
             group_size=group_size,
             bits=4,
@@ -1833,8 +1825,6 @@ class TestsQ4CUDA(unittest.TestCase):
             revision=revision,
             device=device,
             use_triton=False,
-            inject_fused_attention=False,
-            inject_fused_mlp=False,
             model_basename=model_basename,
             disable_exllama=True,
             disable_exllamav2=True,
@@ -1911,7 +1901,7 @@ class TestsQ4ExllamaV2(unittest.TestCase):
         device = torch.device("cuda:0")
 
         linear_class = dynamically_import_QuantLinear(
-            use_triton=False, use_tritonv2=False, desc_act=False, group_size=group_size, bits=4
+            use_triton=False, desc_act=False, group_size=group_size, bits=4
         )
 
         linear = linear_class(
@@ -1983,8 +1973,6 @@ class TestsQ4ExllamaV2(unittest.TestCase):
             revision=revision,
             device="cuda:0",
             use_triton=False,
-            inject_fused_attention=False,
-            inject_fused_mlp=False,
             model_basename=model_basename,
         )
         tokenizer = AutoTokenizer.from_pretrained(model_id)
@@ -2011,8 +1999,6 @@ class TestsQ4ExllamaV2(unittest.TestCase):
             revision=revision,
             device="cuda:0",
             use_triton=False,
-            inject_fused_attention=False,
-            inject_fused_mlp=False,
             model_basename=model_basename,
         )
 
@@ -2106,11 +2092,10 @@ class TestsQ4Triton(unittest.TestCase):
         model_q = AutoGPTQForCausalLM.from_quantized(
             model_id,
             device="cuda:0",
-            use_triton=False,
+            use_triton=True,
             disable_exllama=True,
             disable_exllamav2=True,
             torch_dtype=torch.float16,
-            use_tritonv2=True,
         )
         for _, submodule in model_q.named_modules():
             if isinstance(submodule, TritonV2QuantLinear):
@@ -2147,13 +2132,10 @@ class TestsQ4Triton(unittest.TestCase):
             model_id,
             revision=revision,
             device="cuda:0",
-            use_triton=False,
-            inject_fused_attention=False,
-            inject_fused_mlp=False,
+            use_triton=True,
             model_basename=model_basename,
             disable_exllama=True,
             disable_exllamav2=True,
-            use_tritonv2=True,
         )
         for _, submodule in model_q.named_modules():
             if isinstance(submodule, TritonV2QuantLinear):

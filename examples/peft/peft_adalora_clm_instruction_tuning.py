@@ -62,8 +62,6 @@ model = AutoGPTQForCausalLM.from_quantized(
     use_triton=True,
     warmup_triton=False,
     trainable=True,
-    inject_fused_attention=True,
-    inject_fused_mlp=False,
 )
 model.warmup_triton()
 device = model.device

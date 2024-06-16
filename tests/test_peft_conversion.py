@@ -48,8 +48,6 @@ class TestPeftConversion(TestCase):
             use_triton=False,
             warmup_triton=False,
             trainable=True,
-            inject_fused_attention=True,
-            inject_fused_mlp=False,
             use_safetensors=True,
         )
         peft_config = GPTQLoraConfig(
@@ -79,8 +77,6 @@ class TestPeftConversion(TestCase):
             use_triton=False,
             warmup_triton=False,
             trainable=True,
-            inject_fused_attention=True,
-            inject_fused_mlp=False,
             use_safetensors=True,
         )
         peft_config = GPTQAdaLoraConfig(

@@ -175,8 +175,6 @@ def main():
             device="cuda:0",
             use_triton=args.use_triton,
             max_memory=max_memory,
-            inject_fused_mlp=True,
-            inject_fused_attention=True,
             trust_remote_code=args.trust_remote_code,
         )
 

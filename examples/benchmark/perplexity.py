@@ -91,8 +91,6 @@ if __name__ == "__main__":
             model_basename=args.model_basename,
             use_safetensors=True,
             trust_remote_code=args.trust_remote_code,
-            inject_fused_mlp=False,
-            inject_fused_attention=False,
             disable_exllama=args.disable_exllama,
         )
     else:
