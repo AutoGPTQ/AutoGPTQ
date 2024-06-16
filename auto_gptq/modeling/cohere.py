@@ -1,9 +1,4 @@
-from logging import getLogger
-
 from ._base import BaseGPTQForCausalLM
-
-
-logger = getLogger(__name__)
 
 
 class CohereGPTQForCausalLM(BaseGPTQForCausalLM):
