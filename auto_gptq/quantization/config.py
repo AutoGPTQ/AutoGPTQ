@@ -39,13 +39,11 @@ class CHECKPOINT_FORMAT:
     # v2 format fixed sym = False quantization
     GPTQ_V2 = "gptq_v2"
     MARLIN = "marlin"
-    AWQ_GEMM = "gemm"
 
 
 # quant methods
 class QUANT_METHOD:
     GPTQ = "gptq"
-    AWQ = "awq"
 
 
 QUANT_METHOD_FORMAT_MAPPING = {
@@ -54,19 +52,15 @@ QUANT_METHOD_FORMAT_MAPPING = {
         CHECKPOINT_FORMAT.GPTQ_V2,
         CHECKPOINT_FORMAT.MARLIN,
     },
-    QUANT_METHOD.AWQ: {
-        CHECKPOINT_FORMAT.AWQ_GEMM
-    }
 }
 
-# awq is inference only
-QUANTIZE_BLACK_LIST = {QUANT_METHOD.AWQ}
+# inference only methods should go here
+QUANTIZE_BLACK_LIST = {}
 
 # compat
 QUANT_CONFIG_ARG_SYNONYMS = {
     "w_bit": "bits",
-    "q_group_size": "group_size",
-}
+    "q_group_size": "group_size",}
 
 
 @dataclass
@@ -161,7 +155,7 @@ class BaseQuantizeConfig(PushToHubMixin):
     @classmethod
     # normalize quant config for compat and also performs validation
     def from_quant_config(cls, quantize_cfg, checkpoint_format: str = None):
-        valid_formats = {CHECKPOINT_FORMAT.GPTQ, CHECKPOINT_FORMAT.GPTQ_V2, CHECKPOINT_FORMAT.MARLIN, CHECKPOINT_FORMAT.AWQ_GEMM}
+        valid_formats = {CHECKPOINT_FORMAT.GPTQ, CHECKPOINT_FORMAT.GPTQ_V2, CHECKPOINT_FORMAT.MARLIN}
 
         checkpoint_format_auto_inferred = False
         # compat: checkpoint_format can be passed in via from_quantized() if field missing from json
@@ -191,7 +185,7 @@ class BaseQuantizeConfig(PushToHubMixin):
             if key == CHECKPOINT_FORMAT_FIELD:
                 val = val.lower()
 
-                if val in {CHECKPOINT_FORMAT.GPTQ, CHECKPOINT_FORMAT.GPTQ_V2, CHECKPOINT_FORMAT.MARLIN, CHECKPOINT_FORMAT.AWQ_GEMM}:
+                if val in {CHECKPOINT_FORMAT.GPTQ, CHECKPOINT_FORMAT.GPTQ_V2, CHECKPOINT_FORMAT.MARLIN}:
                     normalized[key] = val
                 else:
                     raise ValueError(f"Unknown quantization format: {val}.")
@@ -200,15 +194,12 @@ class BaseQuantizeConfig(PushToHubMixin):
                 # compat: some hf models use quant_method=marlin
                 if val == CHECKPOINT_FORMAT.MARLIN:
                     normalized[CHECKPOINT_FORMAT_FIELD] = CHECKPOINT_FORMAT.MARLIN
-                elif val not in {QUANT_METHOD.GPTQ, QUANT_METHOD.AWQ}:
+                elif val not in {QUANT_METHOD.GPTQ}:
                     raise ValueError(f"Unknown quantization method: {val}.")
                 else:
                     normalized[QUANT_METHOD_FIELD] = val
             elif key == CHECKPOINT_FORMAT_FIELD_COMPAT_MARLIN and val:
                 normalized[CHECKPOINT_FORMAT_FIELD] = CHECKPOINT_FORMAT.MARLIN
-            elif key == "version" and val.lower() == CHECKPOINT_FORMAT.AWQ_GEMM:
-                normalized[QUANT_METHOD_FIELD] = QUANT_METHOD.AWQ
-                normalized[CHECKPOINT_FORMAT_FIELD] = CHECKPOINT_FORMAT.AWQ_GEMM
             elif key in field_names:
                 normalized[key] = val
             else:
@@ -217,8 +208,8 @@ class BaseQuantizeConfig(PushToHubMixin):
         if checkpoint_format_auto_inferred:
             logger.info(f"`checkpoint_format` is missing from the quantization configuration and is automatically inferred to {normalized[CHECKPOINT_FORMAT_FIELD]}.")
 
-        if normalized[CHECKPOINT_FORMAT_FIELD] in {CHECKPOINT_FORMAT.AWQ_GEMM, CHECKPOINT_FORMAT.MARLIN}:
-            # AWQ and Marlin do not reorder the rows.
+        if normalized[CHECKPOINT_FORMAT_FIELD] in {CHECKPOINT_FORMAT.MARLIN}:
+            # Marlin do not reorder the rows.
             normalized["desc_act"] = False
 
         if "sym" not in normalized:

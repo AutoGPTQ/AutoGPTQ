@@ -109,8 +109,6 @@ def _validate_marlin_compatibility(cfg: BaseQuantizeConfig):
         return "The quantized model uses asymmetric quantization"
     if cfg.desc_act:
         return "The quantized model uses act-order (also called desc-act) scheme"
-    if cfg.quant_method == QUANT_METHOD.AWQ:
-        return "awq_gemm format is currently not compatible with marlin"
     return None
 
 

@@ -64,11 +64,9 @@ from ._utils import (
     make_quant,
     make_sure_no_tensor_in_meta_device,
     move_to_device,
-    pack_from_tensors,
     pack_model,
     preprocess_checkpoint_qigen,
     simple_dispatch_model,
-    unpack_awq,
 )
 
 
@@ -1044,97 +1042,6 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                     disable_exllama=disable_exllama,
                     disable_exllamav2=disable_exllamav2,
                 )
-
-            # TODO: move this logic in an awq_utils.py file.
-            if quantize_config.checkpoint_format == CHECKPOINT_FORMAT.AWQ_GEMM:
-                if is_sharded:
-                    raise ValueError("The loading of sharded checkpoints with AWQ checkpoints is currently not supported. Please raise an issue in AutoGPTQ repository.")
-
-                if use_marlin:
-                    raise ValueError(
-                        "Tried to load an AWQ model with use_marlin=True. This is currently not supported. Please open an issue in AutoGPTQ repository."
-                    )
-
-                model_cache_name, is_cached = quantize_config.get_cache_file_path()
-
-                if is_cached:
-                    model_save_name = model_cache_name
-                    logger.info(f"Loading an AWQ model, detected a cached repacked weight at {model_save_name}.")
-                else:
-                    logger.info(
-                        "Loading an AWQ model. This requires repacking the weights, and no cached repacked checkpoint was found. Grab a coffee!"
-                    )
-
-                    if "safetensors" not in model_save_name:
-                        raise NotImplementedError(
-                            f"Conversion from AWQ checkpoints is implemented only for safetensors checkpoints, found {model_save_name}"
-                        )
-                    if quantize_config.bits != 4:
-                        raise NotImplementedError(
-                            f"Conversion from AWQ checkpoints is supported only for 4 bits models. Found {quantize_config.bits} bits."
-                        )
-                    gptq_layers = set()
-                    non_gptq_params = set()
-                    with safe_open(model_save_name, framework="pt") as f:
-                        for state_dict_key in f.keys():
-                            if (
-                                "qweight" not in state_dict_key
-                                and "qzeros" not in state_dict_key
-                                and "scales" not in state_dict_key
-                            ):
-                                non_gptq_params.add(state_dict_key)
-                                continue
-
-                            # e.g. prefix "model.layers.3.self_attn.k_proj"
-                            prefix, _ = state_dict_key.rsplit(".", 1)
-                            gptq_layers.add(prefix)
-
-                        new_state_dict = {}
-
-                        for state_dict_key in non_gptq_params:
-                            new_state_dict[state_dict_key] = f.get_tensor(state_dict_key)
-
-                        gptq_layers = sorted(gptq_layers)
-                        max_layer_name_length = len(max(gptq_layers, key=len))
-                        pbar = tqdm(gptq_layers)
-                        i = 0
-                        with tctl.threadpool_limits(limits=1):
-                            for gptq_layer_name in pbar:
-                                i += 1
-                                desc = f"Unpacking {gptq_layer_name}"
-                                desc = desc + " " * (max_layer_name_length - len(desc))
-
-                                awq_qweight = f.get_tensor(gptq_layer_name + ".qweight")
-                                awq_qzeros = f.get_tensor(gptq_layer_name + ".qzeros")
-                                awq_scales = f.get_tensor(gptq_layer_name + ".scales")
-
-                                # TODO: add FAST unpacking.
-                                unpacked_qweight, unpacked_qzeros = unpack_awq(
-                                    awq_qweight,
-                                    awq_qzeros,
-                                    awq_scales,
-                                    bits=quantize_config.bits,
-                                    group_size=quantize_config.group_size,
-                                )
-
-                                # TODO: add FAST repacking, this is too slow.
-                                desc = f"Repacking {gptq_layer_name}"
-                                desc = desc + " " * (max_layer_name_length + 12 - len(desc))
-                                pbar.set_description(desc)
-                                gptq_qweight, gptq_qzeros = pack_from_tensors(
-                                    unpacked_qweight,
-                                    unpacked_qzeros,
-                                    awq_scales,
-                                    bits=quantize_config.bits,
-                                    group_size=quantize_config.group_size,
-                                )
-
-                                new_state_dict[gptq_layer_name + ".qweight"] = gptq_qweight
-                                new_state_dict[gptq_layer_name + ".qzeros"] = gptq_qzeros
-                                new_state_dict[gptq_layer_name + ".scales"] = awq_scales
-
-                        safe_save(new_state_dict, model_cache_name)
-                        model_save_name = model_cache_name
 
             if use_marlin:
                 if is_sharded:
