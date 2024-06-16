@@ -612,9 +612,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         model_init_kwargs["torch_dtype"] = torch_dtype
         model_init_kwargs["trust_remote_code"] = trust_remote_code
 
-        config = AutoConfig.from_pretrained(
-            pretrained_model_name_or_path, **model_init_kwargs
-        )
+        config = AutoConfig.from_pretrained(pretrained_model_name_or_path, **model_init_kwargs)
 
         if config.model_type not in SUPPORTED_MODELS:
             raise TypeError(f"{config.model_type} isn't supported yet.")
