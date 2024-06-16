@@ -1,4 +1,3 @@
-from ..nn_modules.fused_gptj_attn import FusedGPTJAttentionForQuantizedModel
 from ._base import BaseGPTQForCausalLM
 
 
@@ -12,8 +11,6 @@ class GPTJGPTQForCausalLM(BaseGPTQForCausalLM):
         ["mlp.fc_in"],
         ["mlp.fc_out"],
     ]
-
-    fused_attn_module_type = FusedGPTJAttentionForQuantizedModel
 
 
 __all__ = ["GPTJGPTQForCausalLM"]

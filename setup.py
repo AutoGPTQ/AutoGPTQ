@@ -118,19 +118,18 @@ if BUILD_CUDA_EXT:
             common_setup_kwargs['version'] += f"+cu{CUDA_VERSION}"
 
 requirements = [
-    "accelerate>=0.29.2",
-    "datasets",
-    "sentencepiece",
-    "numpy",
-    "rouge",
-    "gekko",
-    "torch>=1.13.0",
-    "safetensors>=0.3.1",
-    "transformers>=4.31.0",
-    "peft>=0.5.0",
-    "tqdm",
-    "threadpoolctl",
-    "packaging",
+    "accelerate>=0.31.0",
+    "datasets>=2.20.0",
+    "sentencepiece>=0.2.0",
+    "numpy>=1.26.4",
+    "rouge>=1.0.1",
+    "gekko>=1.1.1",
+    "torch>=2.3.1",
+    "safetensors>=0.4.3",
+    "transformers>=4.41.2",
+    "tqdm>=4.66.4",
+    "threadpoolctl>=3.5.0",
+    "packaging>=24.1",
 ]
 
 extras_require = {
