@@ -1,13 +1,13 @@
 # Never enforce `E501` (line length violations).
 lint.ignore = ["C901", "E501", "E741", "W605"]
-select = ["C", "E", "F", "I", "W"]
+lint.select = ["C", "E", "F", "I", "W"]
 line-length = 119
 
 # Ignore import violations in all `__init__.py` files.
-[per-file-ignores]
+[lint.per-file-ignores]
 "__init__.py" = ["E402", "F401", "F403", "F811"]
 
-[isort]
+[lint.isort]
 lines-after-imports = 2
 known-first-party = ["auto_gptq"]
 
