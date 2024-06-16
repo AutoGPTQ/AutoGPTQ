@@ -790,7 +790,6 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         trainable: bool = False,
         disable_exllama: Optional[bool] = None,
         disable_exllamav2: bool = False,
-        use_tritonv2: bool = False,
         checkpoint_format: Optional[str] = None,
         **kwargs,
     ):
@@ -828,15 +827,9 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         if use_qigen and not QIGEN_AVAILABLE:
             logger.warning("Qigen is not installed, reset use_qigen to False.")
             use_qigen = False
-        if use_triton and use_tritonv2:
-            logging.warn(
-                "Both use_triton and use_tritonv2 are set to True. Defaulting to use_triton"
-            )
-            use_tritonv2 = False
-        if (use_triton or use_tritonv2) and not TRITON_AVAILABLE:
+        if use_triton and not TRITON_AVAILABLE:
             logger.warning("Triton is not installed, reset use_triton to False.")
             use_triton = False
-            use_tritonv2 = False
         if not disable_exllama and not EXLLAMA_KERNELS_AVAILABLE:
             logger.warning(
                 "Exllama kernel is not installed, reset disable_exllama to True. "
@@ -942,7 +935,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             disable_exllama = True
             disable_exllamav2 = True
 
-        elif not (use_triton or use_tritonv2) and trainable:
+        elif not use_triton and trainable:
             logger.warning(
                 "QuantLinear with cuda backend not support trainable mode yet, Switch to the pytorch backend."
             )
@@ -1004,7 +997,6 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                     use_cuda_fp16=use_cuda_fp16,
                     desc_act=quantize_config.desc_act,
                     trainable=trainable,
-                    use_tritonv2=use_tritonv2,
                 )
                 model.tie_weights()
 
@@ -1051,7 +1043,6 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                     bits=quantize_config.bits,
                     disable_exllama=disable_exllama,
                     disable_exllamav2=disable_exllamav2,
-                    use_tritonv2=use_tritonv2,
                 )
 
             # TODO: move this logic in an awq_utils.py file.
@@ -1172,7 +1163,6 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                     disable_exllama=disable_exllama,
                     disable_exllamav2=disable_exllamav2,
                     use_marlin=False,
-                    use_tritonv2=use_tritonv2,  # Get the "original" QuantLinear class
                 )
 
                 # Prepare model for marlin load.
@@ -1234,7 +1224,6 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                 desc_act=quantize_config.desc_act,
                 trainable=trainable,
                 use_qigen=True,
-                use_tritonv2=use_tritonv2,
                 use_marlin=quantize_config.checkpoint_format == CHECKPOINT_FORMAT.MARLIN,
             )
             preprocess_checkpoint_qigen(
@@ -1248,7 +1237,6 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
 
         qlinear_kernel = dynamically_import_QuantLinear(
             use_triton=use_triton,
-            use_tritonv2=use_tritonv2,
             desc_act=quantize_config.desc_act,
             group_size=quantize_config.group_size,
             bits=quantize_config.bits,
@@ -1293,12 +1281,8 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         model.eval()
 
         # == step6: (optional) warmup triton == #
-        if (use_triton or use_tritonv2) and warmup_triton:
-            if use_tritonv2:
-                from ..nn_modules.qlinear.qlinear_tritonv2 import QuantLinear
-            else:
-                from ..nn_modules.qlinear.qlinear_triton import QuantLinear
-
+        if use_triton and warmup_triton:
+            from ..nn_modules.qlinear.qlinear_tritonv2 import QuantLinear
             QuantLinear.warmup(model, seqlen=model.seqlen)
 
 
@@ -1319,7 +1303,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             model,
             True,
             quantize_config,
-            is_triton_backend=use_triton or use_tritonv2,
+            is_triton_backend=use_triton,
             trainable=trainable,
             qlinear_kernel=qlinear_kernel,
         )
@@ -1331,8 +1315,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             logger.warning("triton is not available, skip warmup stage directly.")
             return
 
-        from ..nn_modules.qlinear.qlinear_triton import QuantLinear
-
+        from ..nn_modules.qlinear.qlinear_tritonv2 import QuantLinear
         QuantLinear.warmup(self.model, seqlen=self.model.seqlen)
 
     def enable_trainable_mode(self, enabled: bool = True):
@@ -1356,7 +1339,6 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         disable_exllamav2: bool = False,
         use_marlin: bool = False,
         use_qigen: bool = False,
-        use_tritonv2: bool = False,
     ):
         GeneralQuantLinear.inject_to_model(
             model,

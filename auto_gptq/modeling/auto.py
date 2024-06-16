@@ -110,7 +110,6 @@ class AutoGPTQForCausalLM:
         disable_exllama: Optional[bool] = None,
         disable_exllamav2: bool = False,
         use_marlin: bool = False,
-        use_tritonv2: bool = False,
         **kwargs,
     ) -> BaseGPTQForCausalLM:
         # If disable_exllamav2 is True, we want to fall back on the exllama kernel and not the cuda/cuda_old ones.
@@ -158,7 +157,6 @@ class AutoGPTQForCausalLM:
             disable_exllama=disable_exllama,
             disable_exllamav2=disable_exllamav2,
             use_marlin=use_marlin,
-            use_tritonv2=use_tritonv2,
             **keywords,
         )
 

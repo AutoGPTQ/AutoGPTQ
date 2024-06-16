@@ -16,7 +16,7 @@ from ..nn_modules.qlinear.qlinear_cuda_old import QuantLinear as QuantLinearCuda
 from ..nn_modules.qlinear.qlinear_exllama import QuantLinear as QuantLinearExllama
 from ..nn_modules.qlinear.qlinear_exllama import QuantLinear as QuantLinearExllamaV2
 from ..nn_modules.qlinear.qlinear_qigen import QuantLinear as QuantLinearQigen
-from ..nn_modules.qlinear.qlinear_triton import QuantLinear as QuantLinearTriton
+from ..nn_modules.qlinear.qlinear_tritonv2 import QuantLinear as QuantLinearTriton
 
 
 LinearLayer = Union[

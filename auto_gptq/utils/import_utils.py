@@ -74,16 +74,14 @@ def dynamically_import_QuantLinear(
             )
         from ..nn_modules.qlinear.qlinear_qigen import QuantLinear
     else:
-        if use_triton or use_tritonv2:
+        if use_triton:
             if torch.version.hip:
                 logger.warning(
                     "Running GPTQ triton version on AMD GPUs is untested and may result in errors or wrong predictions. Please use use_triton=False."
                 )
-            if use_tritonv2:
-                logger.debug("Using tritonv2 for GPTQ")
-                from ..nn_modules.qlinear.qlinear_tritonv2 import QuantLinear
-            else:
-                from ..nn_modules.qlinear.qlinear_triton import QuantLinear
+
+            logger.debug("Using tritonv2 for GPTQ")
+            from ..nn_modules.qlinear.qlinear_tritonv2 import QuantLinear
         else:
             # If disable_exllamav2 is True, we want to fall back on the exllama kernel and not the cuda/cuda_old ones.
             if disable_exllama is None:
