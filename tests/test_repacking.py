@@ -88,7 +88,6 @@ class TestRepacking(unittest.TestCase):
             infeatures=k,
             outfeatures=n,
             bias=False,
-            trainable=False,
         )
 
         marlin_linear.pack(linear_module.to("cuda"), scales=copy.deepcopy(cuda_old_linear.scales.data.t()).to("cuda"))

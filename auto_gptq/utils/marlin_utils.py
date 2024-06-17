@@ -124,7 +124,6 @@ def convert_to_marlin(
                 infeatures=module.infeatures,
                 outfeatures=module.outfeatures,
                 bias=module.bias is not None,
-                trainable=False,
             )
 
         # workspace is never in the state_dict, thus we need to allocate it manually.

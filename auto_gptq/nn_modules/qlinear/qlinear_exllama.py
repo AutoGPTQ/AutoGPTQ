@@ -49,14 +49,12 @@ class QuantLinear(nn.Module):
 
     """Linear layer implementation with per-group 4-bit quantization of the weights"""
 
-    def __init__(self, bits, group_size, infeatures, outfeatures, bias, trainable=False, **kwargs):
+    def __init__(self, bits, group_size, infeatures, outfeatures, bias, **kwargs):
         super().__init__()
         if bits != 4:
             raise ValueError(
                 f"Exllama kernel supports only bits=4, requested bits={bits}. Something is wrong in the model initialization."
             )
-        if trainable:
-            raise NotImplementedError("Exllama kernel does not support training.")
 
         self.padding = -outfeatures % 32
         self.outfeatures = outfeatures + self.padding
@@ -65,7 +63,6 @@ class QuantLinear(nn.Module):
         self.infeatures = infeatures
         self.bits = bits
         self.group_size = group_size if group_size != -1 else infeatures
-        self.trainable = trainable
         self.maxq = 2**self.bits - 1
 
         assert infeatures % 32 == 0

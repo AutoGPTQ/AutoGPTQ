@@ -62,7 +62,6 @@ def get_model_and_tokenizer(
 
     model = AutoGPTQForCausalLM.from_quantized(
         model_id,
-        trainable=True,
         disable_exllamav2=True,
         disable_exllama=True,
         **model_kwargs,

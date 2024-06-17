@@ -78,7 +78,6 @@ def make_quant(
     disable_exllamav2: bool = False,
     use_cuda_fp16: bool = True,
     desc_act: bool = False,
-    trainable: bool = False,
 ):
     # If disable_exllamav2 is True, we want to fall back on the exllama kernel and not the cuda/cuda_old ones.
     if disable_exllama is None:
@@ -122,7 +121,6 @@ def make_quant(
                     out_features,
                     bias,
                     use_cuda_fp16=use_cuda_fp16,
-                    trainable=trainable,
                     weight_dtype=submodule.weight.dtype,
                 )
             else:
@@ -132,7 +130,6 @@ def make_quant(
                     in_features,
                     out_features,
                     bias,
-                    trainable=trainable,
                     weight_dtype=submodule.weight.dtype,
                 )
             new_layer.device = ori_layer_device

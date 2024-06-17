@@ -43,7 +43,7 @@ class QuantLinear(nn.Module, TritonModuleMixin):
 
     QUANT_TYPE = "tritonv2"
 
-    def __init__(self, bits, group_size, infeatures, outfeatures, bias, trainable=False, **kwargs):
+    def __init__(self, bits, group_size, infeatures, outfeatures, bias, **kwargs):
         super().__init__()
         if bits not in [2, 4, 8]:
             raise NotImplementedError("Only 2,4,8 bits are supported.")
@@ -85,7 +85,6 @@ class QuantLinear(nn.Module, TritonModuleMixin):
         else:
             self.bias = None
 
-        self.trainable = trainable
 
     def post_init(self):
         pass

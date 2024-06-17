@@ -85,7 +85,6 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         quantized: bool,
         quantize_config: BaseQuantizeConfig,
         is_triton_backend: bool = False,
-        trainable: bool = False,
         qlinear_kernel: nn.Module = None,
     ):
         super().__init__()
@@ -97,7 +96,6 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         self.config = self.model.config
 
         self.is_triton_backend = is_triton_backend
-        self.trainable = trainable
 
         # compat: state to assist in checkpoint_format gptq(v1) to gptq_v2 conversion
         self.qlinear_kernel = qlinear_kernel
@@ -661,7 +659,6 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         use_safetensors: bool = True,
         trust_remote_code: bool = False,
         warmup_triton: bool = False,
-        trainable: bool = False,
         disable_exllama: Optional[bool] = None,
         disable_exllamav2: bool = False,
         format: Optional[str | FORMAT] = None,
@@ -769,18 +766,6 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
 
         model_save_name = resolved_archive_file  # In case a model is sharded, this would be `model.safetensors.index.json` which may later break.
 
-        if (not disable_exllama or not disable_exllamav2) and trainable:
-            logger.warning(
-                "QuantLinear with the exllama backend not does support the trainable mode yet, switching to cuda/cuda_old/triton backend."
-            )
-            disable_exllama = True
-            disable_exllamav2 = True
-
-        elif not use_triton and trainable:
-            logger.warning(
-                "QuantLinear with cuda backend not support trainable mode yet, Switch to the pytorch backend."
-            )
-
         # == step2: convert model to gptq-model (replace Linear with QuantLinear) == #
         def skip(*args, **kwargs):
             pass
@@ -833,7 +818,6 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                 disable_exllamav2=disable_exllamav2,
                 use_cuda_fp16=use_cuda_fp16,
                 desc_act=quantize_config.desc_act,
-                trainable=trainable,
                 use_marlin=quantize_config.format == FORMAT.MARLIN,
             )
             model.tie_weights()
@@ -999,7 +983,6 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             True,
             quantize_config,
             is_triton_backend=use_triton,
-            trainable=trainable,
             qlinear_kernel=qlinear_kernel,
         )
 
@@ -1008,18 +991,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             return
 
         from ..nn_modules.qlinear.qlinear_tritonv2 import QuantLinear
-
         QuantLinear.warmup(self.model, seqlen=self.model.seqlen)
-
-    def enable_trainable_mode(self, enabled: bool = True):
-        if not self.is_triton_backend and enabled:
-            raise NotImplementedError("For now, trainable mode only supports triton backend.")
-        for n, m in self.model.named_modules():
-            if hasattr(m, "trainable"):
-                setattr(m, "trainable", enabled)
-
-    def disable_trainable_mode(self):
-        self.enable_trainable_mode(enabled=False)
 
     def __getattr__(self, item):
         try:

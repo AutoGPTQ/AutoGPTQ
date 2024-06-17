@@ -34,8 +34,6 @@ class GeneralQuantLinear(nn.Linear):
         if hasattr(quant_linear_module, "autogptq_cuda_available"):
             self.autogptq_cuda_available = quant_linear_module.autogptq_cuda_available
 
-        self.trainable = quant_linear_module.trainable
-
         self.forward = quant_linear_module.forward
 
     @classmethod

@@ -32,15 +32,12 @@ class QuantLinear(nn.Module):
         outfeatures,
         bias,
         kernel_switch_threshold=128,
-        trainable=False,
         weight_dtype=torch.float16,
     ):
         super().__init__()
         global _autogptq_cuda_available
         if bits not in [2, 3, 4, 8]:
             raise NotImplementedError("Only 2,3,4,8 bits are supported.")
-        if trainable:
-            _autogptq_cuda_available = False
 
         self.infeatures = infeatures
         self.outfeatures = outfeatures
@@ -99,8 +96,6 @@ class QuantLinear(nn.Module):
             self.autogptq_cuda = autogptq_cuda_64
         if infeatures % 64 != 0 or outfeatures % 64 != 0:
             self.autogptq_cuda_available = False
-
-        self.trainable = trainable
 
     def post_init(self):
         pass
