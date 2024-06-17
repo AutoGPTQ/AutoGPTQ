@@ -10,14 +10,13 @@ import torch
 import torch.nn as nn
 import transformers
 from tqdm import tqdm
-from transformers import AutoConfig
+from transformers import AutoConfig, PretrainedConfig
 from transformers.utils.hub import cached_file
 
 from ..quantization import BaseQuantizeConfig
 from ..utils.import_utils import dynamically_import_QuantLinear
 from ..utils.modeling_utils import recurse_setattr
 from ._const import CPU, CUDA_0, EXLLAMA_DEFAULT_MAX_INPUT_LENGTH, SUPPORTED_MODELS
-
 
 logger = getLogger(__name__)
 handler = logging.StreamHandler()
@@ -528,8 +527,24 @@ def get_checkpoints(
     return False, resolved_archive_file, true_model_basename
 
 
+# return the most stable tensor dtype for quantization while minimizing vram
+def auto_dtype_from_config(config: PretrainedConfig) -> torch.dtype:
+    dtype = getattr(config, "torch_dtype")
+    if not dtype or not isinstance(dtype, torch.dtype):
+        raise ValueError("Your model config.json does not have torch_dtype set. Please check for model " "corruption.")
+
+    if dtype == torch.float32:
+        return torch.bfloat16
+    elif dtype == torch.float16:
+        return torch.float16
+    else:
+        # up/down-cast everything else to bfloat16 if not already in bfloat16
+        return torch.bfloat16
+
+
 __all__ = [
     "get_device",
+    "auto_dtype_from_config",
     "move_to_device",
     "find_layers",
     "get_module_by_name_prefix",

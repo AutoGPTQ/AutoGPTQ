@@ -38,6 +38,7 @@ from ..utils.marlin_utils import (
 from ..version import __version__
 from ._const import CPU, CUDA_0, SUPPORTED_MODELS
 from ._utils import (
+    auto_dtype_from_config,
     autogptq_post_init,
     convert_gptq_v1_to_v2_format,
     convert_gptq_v2_to_v1_format,
@@ -572,7 +573,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         quantize_config: BaseQuantizeConfig,
         max_memory: Optional[dict] = None,
         trust_remote_code: bool = False,
-        torch_dtype: torch.dtype = torch.float16,
+        torch_dtype: [str | torch.dtype] = "auto",
         **model_init_kwargs,
     ):
         """load un-quantized pretrained model to cpu"""
@@ -587,11 +588,17 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         torch.nn.init.uniform_ = skip
         torch.nn.init.normal_ = skip
 
-        # enforce some values despite user specified
-        model_init_kwargs["torch_dtype"] = torch_dtype
         model_init_kwargs["trust_remote_code"] = trust_remote_code
 
         config = AutoConfig.from_pretrained(pretrained_model_name_or_path, **model_init_kwargs)
+
+        if torch_dtype == "auto":
+            torch_dtype = auto_dtype_from_config(config)
+        elif not isinstance(torch_dtype, torch.dtype):
+            raise ValueError(f"torch_dtype value of `{torch_dtype}` is not a torch.dtype instance.")
+
+        # enforce some values despite user specified
+        model_init_kwargs["torch_dtype"] = torch_dtype
 
         if config.model_type not in SUPPORTED_MODELS:
             raise TypeError(f"{config.model_type} isn't supported yet.")
@@ -647,7 +654,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         device: Optional[Union[str, int]] = None,
         use_triton: bool = True,
         use_marlin: bool = True,
-        torch_dtype: Optional[torch.dtype] = None,
+        torch_dtype: [str | torch.dtype] = "auto",
         use_cuda_fp16: bool = True,
         quantize_config: Optional[BaseQuantizeConfig] = None,
         model_basename: Optional[str] = None,
@@ -704,6 +711,11 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             trust_remote_code=trust_remote_code,
             **cached_file_kwargs,
         )
+
+        if torch_dtype == "auto":
+            torch_dtype = auto_dtype_from_config(config)
+        elif not isinstance(torch_dtype, torch.dtype):
+            raise ValueError(f"torch_dtype value of `{torch_dtype}` is not a torch.dtype instance.")
 
         if config.model_type not in SUPPORTED_MODELS:
             raise TypeError(f"{config.model_type} isn't supported yet.")
@@ -776,9 +788,6 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         # == step2: convert model to gptq-model (replace Linear with QuantLinear) == #
         def skip(*args, **kwargs):
             pass
-
-        if torch_dtype is None:
-            torch_dtype = torch.float16
 
         if torch_dtype != torch.float16:
             logger.warning("Overriding use_cuda_fp16 to False since torch_dtype is not torch.float16.")
