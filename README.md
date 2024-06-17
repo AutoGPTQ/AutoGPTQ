@@ -1,25 +1,18 @@
-<h1 align="center">AutoGPTQ</h1>
+<h1 align="center">AutoGPTQ-NEXT</h1>
 <p align="center">An easy-to-use LLM quantization package with user-friendly APIs, based on GPTQ algorithm (weight-only quantization).</p>
 <p align="center">
     <a href="https://github.com/PanQiWei/AutoGPTQ/releases">
-        <img alt="GitHub release" src="https://img.shields.io/github/release/PanQiWei/AutoGPTQ.svg">
+        <img alt="GitHub release" src="https://img.shields.io/github/release/Qubitium/AutoGPTQ.svg">
     </a>
     <a href="https://pypi.org/project/auto-gptq/">
-        <img alt="PyPI - Downloads" src="https://img.shields.io/pypi/dd/auto-gptq">
+        <img alt="PyPI - Downloads" src="https://img.shields.io/pypi/dd/auto-gptq-next">
     </a>
 </p>
-<h4 align="center">
-    <p>
-        <b>English</b> |
-        <a href="https://github.com/PanQiWei/AutoGPTQ/blob/main/README_zh.md">中文</a>
-    </p>
-</h4>
 
 ## News or Update
 
-- 2024-06-XX - (News)   PENDING
+- 2024-06-XX - (News)   🤗 PENDING
 - 2024-02-15 - (News) - AutoGPTQ 0.7.0 is released, with [Marlin](https://github.com/IST-DASLab/marlin) int4*fp16 matrix multiplication kernel support, with the argument `use_marlin=True` when loading models.
-- 2023-08-23 - (News) - 🤗 Transformers, optimum and peft have integrated `auto-gptq`, so now running and training GPTQ models can be more available to everyone! See [this blog](https://huggingface.co/blog/gptq-integration) and it's resources for more details!
 
 *For more histories please turn to [here](docs/NEWS_OR_UPDATE.md)*
 
@@ -47,20 +40,20 @@ For perplexity comparison, you can turn to [here](https://github.com/qwopqwop200
 
 ## Installation
 
-AutoGPTQ is available on Linux only. You can install the latest stable release of AutoGPTQ from pip with pre-built wheels:
+AutoGPTQ-NEXT is available for Linux only. You can install the latest stable release of AutoGPTQ from pip with pre-built wheels:
 
 | CUDA/ROCm version | Installation                                                                                      | Built against PyTorch |
 |-------------------|---------------------------------------------------------------------------------------------------|-----------------------|
-| CUDA 12.1         | `pip install auto-gptq --no-build-isolation`                                                                            | 2.3.1+cu121           |
+| CUDA 12.1         | `pip install auto-gptq-next --no-build-isolation`                                                                            | 2.3.1+cu121           |
 
 
-On NVIDIA systems, AutoGPTQ does not support [Maxwell or lower](https://qiita.com/uyuni/items/733a93b975b524f89f46) GPUs.
+On NVIDIA systems, AutoGPTQ-NEXT does not support [Maxwell or lower](https://qiita.com/uyuni/items/733a93b975b524f89f46) GPUs.
 
 ### Install from source
 
 Clone the source code:
 ```bash
-git clone https://github.com/Qubitium/AutoGPTQ.git && cd AutoGPTQ
+git clone https://github.com/Qubitium/AutoGPTQ-NEXT.git && cd AutoGPTQ
 ```
 
 A few packages are required in order to build from source: `pip install numpy gekko pandas`.
@@ -75,12 +68,12 @@ As a last resort, if the above command fails, you can try `python setup.py insta
 ## Quick Tour
 
 ### Quantization and Inference
-> warning: this is just a showcase of the usage of basic apis in AutoGPTQ, which uses only one sample to quantize a much small model, quality of quantized model using such little samples may not good.
+> warning: this is just a showcase of the usage of basic apis in AutoGPTQ-NEXT, which uses only one sample to quantize a much small model, quality of quantized model using such little samples may not good.
 
 Below is an example for the simplest use of `auto_gptq` to quantize a model and inference after quantization:
 ```python
 from transformers import AutoTokenizer, TextGenerationPipeline
-from auto_gptq import AutoGPTQForCausalLM, BaseQuantizeConfig
+from auto_gptq import AutoGPTQNextForCausalLM, BaseQuantizeConfig
 import logging
 
 logging.basicConfig(
@@ -104,7 +97,7 @@ quantize_config = BaseQuantizeConfig(
 )
 
 # load un-quantized model, by default, the model will always be loaded into CPU memory
-model = AutoGPTQForCausalLM.from_pretrained(pretrained_model_dir, quantize_config)
+model = AutoGPTQNextForCausalLM.from_pretrained(pretrained_model_dir, quantize_config)
 
 # quantize model, the examples should be list of dict whose keys can only be "input_ids" and "attention_mask"
 model.quantize(examples)
@@ -178,7 +171,7 @@ from functools import partial
 import datasets
 from transformers import AutoTokenizer, AutoModelForCausalLM, GenerationConfig
 
-from auto_gptq import AutoGPTQForCausalLM, BaseQuantizeConfig
+from auto_gptq import AutoGPTQNextForCausalLM, BaseQuantizeConfig
 from auto_gptq.eval_tasks import SequenceClassificationTask
 
 
@@ -207,7 +200,7 @@ def ds_refactor_fn(samples):
 
 
 #  model = AutoModelForCausalLM.from_pretrained(MODEL).eval().half().to("cuda:0")
-model = AutoGPTQForCausalLM.from_pretrained(MODEL, BaseQuantizeConfig())
+model = AutoGPTQNextForCausalLM.from_pretrained(MODEL, BaseQuantizeConfig())
 tokenizer = AutoTokenizer.from_pretrained(MODEL)
 
 task = SequenceClassificationTask(
@@ -250,9 +243,9 @@ print(
 </details>
 
 ## Learn More
-[tutorials](docs/tutorial) provide step-by-step guidance to integrate `auto_gptq` with your own project and some best practice principles.
+[tutorials](docs/tutorial) provide step-by-step guidance to integrate `auto_gptq_next` with your own project and some best practice principles.
 
-[examples](examples/README.md) provide plenty of example scripts to use `auto_gptq` in different ways.
+[examples](examples/README.md) provide plenty of example scripts to use `auto_gptq_next` in different ways.
 
 ## Supported Models
 
@@ -288,7 +281,7 @@ pytest tests/ -s
 
 ### Which kernel is used by default?
 
-AutoGPTQ will use Marlin, followed by Exllama v2, Exallama V1, CUDA kernels in that order for maximum inference performance.
+AutoGPTQ-NEXT will use Marlin, Exllama v2, Exallama v1, CUDA kernels in that order for maximum inference performance.
 
 ## Acknowledgement
 - Special thanks **Elias Frantar**, **Saleh Ashkboos**, **Torsten Hoefler** and **Dan Alistarh** for proposing **GPTQ** algorithm and open source the [code](https://github.com/IST-DASLab/gptq), and for releasing [Marlin kernel](https://github.com/IST-DASLab/marlin) for mixed precision computation.
