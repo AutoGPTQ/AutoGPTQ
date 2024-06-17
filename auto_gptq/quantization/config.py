@@ -290,9 +290,6 @@ class BaseQuantizeConfig(PushToHubMixin):
             return cls.from_quant_config(args_from_json, format)
 
     def to_dict(self):
-        # compact: until format PR is pushed 3rd libs, duplicate checkpoint_format
-        self.meta[FORMAT_FIELD_COMPAT] = self.format
-
         # move non-inference required variables to meta
         self.meta["damp_percent"] = self.damp_percent
         self.meta["true_sequential"] = self.true_sequential
@@ -310,4 +307,6 @@ class BaseQuantizeConfig(PushToHubMixin):
             QUANT_METHOD_FIELD: self.quant_method,
             FORMAT_FIELD: self.format,
             META_FIELD: self.meta,
+            # compact: until format PR is pushed 3rd party libs such as sglang/vllm, duplicate checkpoint_format
+            FORMAT_FIELD_COMPAT: self.format,
         }
