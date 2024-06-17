@@ -19,6 +19,7 @@ logger.addHandler(handler)
 logger.setLevel(logging.INFO)
 
 FORMAT_FIELD = "format"
+FORMAT_FIELD_COMPAT = "checkpoint_format"
 FORMAT_FIELD_COMPAT_MARLIN = "is_marlin_format"
 QUANT_METHOD_FIELD = "quant_method"
 QUANT_CONFIG_FILENAME = "quantize_config.json"
@@ -62,7 +63,7 @@ QUANTIZE_BLACK_LIST = {}
 QUANT_CONFIG_ARG_SYNONYMS = {
     "w_bit": "bits",
     "q_group_size": "group_size",
-    "checkpoint_format": "format",
+    FORMAT_FIELD_COMPAT: "format",
 }
 
 
@@ -172,7 +173,7 @@ class BaseQuantizeConfig(PushToHubMixin):
                 raise ValueError(f"Unknown quantization checkpoint format: {format}.")
             if quantize_cfg.get(FORMAT_FIELD):
                 raise ValueError(
-                    "Conflict: quantization checkpoint_format is passed in and also exists in model config."
+                    "Conflict: quantization format is passed in and also exists in model config."
                 )
         # compat: warn if checkpoint_format is missing
         elif quantize_cfg.get(FORMAT_FIELD) is None:
@@ -289,8 +290,11 @@ class BaseQuantizeConfig(PushToHubMixin):
             return cls.from_quant_config(args_from_json, format)
 
     def to_dict(self):
+        # compact: until format PR is pushed 3rd libs, duplicate checkpoint_format
+        self.meta[FORMAT_FIELD_COMPAT] = self.format
+
         # move non-inference required variables to meta
-        self.meta["damp_percent"] = self.damp_percent,
+        self.meta["damp_percent"] = self.damp_percent
         self.meta["true_sequential"] = self.true_sequential
 
         return {
@@ -300,7 +304,7 @@ class BaseQuantizeConfig(PushToHubMixin):
             "static_groups": self.static_groups,
             "sym": self.sym,
             "lm_head": self.lm_head,
-            # TODO: deprecate
+            # TODO: deprecate?
             "model_name_or_path": self.model_name_or_path,
             "model_file_base_name": self.model_file_base_name,
             QUANT_METHOD_FIELD: self.quant_method,

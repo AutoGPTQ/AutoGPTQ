@@ -460,7 +460,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
 
         if format == FORMAT.GPTQ_V2 or (format is None and quantize_config.format == FORMAT.GPTQ_V2):
             logger.warning(
-                f"Using 'checkpoint_format = {FORMAT.GPTQ_V2}': the serialized model is only supported by AutoGPTQ version >= {MIN_VERSION_WITH_V2}."
+                f"Using 'format = {FORMAT.GPTQ_V2}': the serialized model is only supported by AutoGPTQ version >= {MIN_VERSION_WITH_V2}."
             )
 
         if format is not None and quantize_config.format != format:
@@ -471,7 +471,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             if format == FORMAT.GPTQ_V2:
                 if quantize_config.format != FORMAT.GPTQ:
                     raise NotImplementedError(
-                        f"Asked to serialize a model with `checkpoint_format={format}` but the model format is {quantize_config.format}. This is not supported. Please open an issue at https://github.com/AutoGPTQ/AutoGPTQ/issues."
+                        f"Asked to serialize a model with `format={format}` but the model format is {quantize_config.format}. This is not supported. Please open an issue at https://github.com/AutoGPTQ/AutoGPTQ/issues."
                     )
 
                 model = convert_gptq_v1_to_v2_format(
@@ -484,7 +484,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             elif format == FORMAT.GPTQ:
                 if quantize_config.format != FORMAT.GPTQ_V2:
                     raise NotImplementedError(
-                        f"Asked to serialize a model with `checkpoint_format={format}` but the model format is {quantize_config.format}. This is not supported. Please open an issue at https://github.com/AutoGPTQ/AutoGPTQ/issues."
+                        f"Asked to serialize a model with `format={format}` but the model format is {quantize_config.format}. This is not supported. Please open an issue at https://github.com/AutoGPTQ/AutoGPTQ/issues."
                     )
 
                 model = convert_gptq_v2_to_v1_format(
@@ -958,10 +958,10 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             # validate sym=False v1 loading needs to be protected for models produced with new v2 format codebase
             if not quantize_config.sym and not quantize_config.is_quantized_or_packed_by_v2():
                 raise ValueError(
-                    f"Loading of a sym=False model with checkpoint_format={FORMAT.GPTQ} is only supported if produced by autogptq version >= {MIN_VERSION_WITH_V2}"
+                    f"Loading of a sym=False model with format={FORMAT.GPTQ} is only supported if produced by autogptq version >= {MIN_VERSION_WITH_V2}"
                 )
 
-            logger.info(f"Compatibility: converting `checkpoint_format` from `{FORMAT.GPTQ}` to `{FORMAT.GPTQ_V2}`.")
+            logger.info(f"Compatibility: converting `format` from `{FORMAT.GPTQ}` to `{FORMAT.GPTQ_V2}`.")
 
             model = convert_gptq_v1_to_v2_format(
                 model,
