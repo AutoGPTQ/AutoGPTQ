@@ -617,12 +617,9 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                 no_split_module_classes=[cls.layer_type],
                 dtype=model_init_kwargs["torch_dtype"],
             )
-            model_init_kwargs["low_cpu_mem_usage"] = True
-
             del model
         else:
             model_init_kwargs["device_map"] = None
-            model_init_kwargs["low_cpu_mem_usage"] = False
 
         torch.cuda.empty_cache()
 
@@ -649,7 +646,6 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         device_map: Optional[Union[str, Dict[str, Union[int, str]]]] = None,
         max_memory: Optional[dict] = None,
         device: Optional[Union[str, int]] = None,
-        low_cpu_mem_usage: bool = False,
         use_triton: bool = True,
         use_marlin: bool = True,
         torch_dtype: Optional[torch.dtype] = None,
@@ -770,7 +766,9 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                     "There are security risks when loading tensors from .bin files. Make sure you are loading model only from a trusted source."
                 )
             else:
-                raise RuntimeError("Loading of unsafe .bin files are not allowed by default. Pass allow_unsafe_loading=True to bypass.")
+                raise RuntimeError(
+                    "Loading of unsafe .bin files are not allowed by default. Pass allow_unsafe_loading=True to bypass."
+                )
 
         quantize_config.model_file_base_name = true_model_basename
 
@@ -794,8 +792,6 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         transformers.modeling_utils._init_weights = False
 
         init_contexts = [no_init_weights()]
-        if low_cpu_mem_usage:
-            init_contexts.append(accelerate.init_empty_weights(include_buffers=False))
 
         with ContextManagers(init_contexts):
             model = AutoModelForCausalLM.from_config(
@@ -864,17 +860,6 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                 model,
                 max_memory=max_memory,
                 no_split_module_classes=[cls.layer_type],
-            )
-
-        if low_cpu_mem_usage:
-            make_sure_no_tensor_in_meta_device(
-                model,
-                use_triton,
-                quantize_config.desc_act,
-                quantize_config.group_size,
-                bits=quantize_config.bits,
-                disable_exllama=disable_exllama,
-                disable_exllamav2=disable_exllamav2,
             )
 
         if use_marlin:

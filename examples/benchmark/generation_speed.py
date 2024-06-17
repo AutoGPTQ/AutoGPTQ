@@ -168,7 +168,6 @@ def load_model_tokenizer(
         model = AutoGPTQForCausalLM.from_quantized(
             model_name_or_path,
             max_memory=max_memory,
-            low_cpu_mem_usage=True,
             use_triton=use_triton,
             use_cuda_fp16=True,
             quantize_config=quantize_config,

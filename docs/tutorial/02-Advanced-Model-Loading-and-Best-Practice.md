@@ -12,7 +12,6 @@ In previous chapter, you learned how to load model into CPU or single GPU with t
 However, the default settings above may not meet many users' demands, for they want to have more control of model loading.
 
 Luckily, in AutoGPTQ, we provide some advanced arguments that users can tweak to manually config model loading strategy:
-- `low_cpu_mem_usage`: `bool` type argument, defaults to False, can be used both in `.from_pretrained` and `.from_quantized`, one can enable it when there is a limitation of CPU memory(by default model will be initialized in CPU) or want to load model faster.
 - `max_memory`: an optional `List[Dict[Union[str, int], str]]` type argument, can be used both in `.from_pretrained` and `.from_quantized`.
 - `device_map`: an optional `Union[str, Dict[str, Union[int, str]]]` type argument, currently only be supported in `.from_quantized`.
 

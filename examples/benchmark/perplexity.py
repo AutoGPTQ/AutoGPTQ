@@ -85,7 +85,6 @@ if __name__ == "__main__":
 
         model = AutoGPTQForCausalLM.from_quantized(
             args.model_name,
-            low_cpu_mem_usage=True,
             device_map="auto",
             max_memory=max_memory,
             model_basename=args.model_basename,
@@ -98,7 +97,6 @@ if __name__ == "__main__":
 
         model = AutoModelForCausalLM.from_pretrained(
             args.model_name,
-            low_cpu_mem_usage=True,
             device_map="auto",
             max_memory=max_memory,
             torch_dtype=torch.float16,
