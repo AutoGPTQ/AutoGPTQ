@@ -289,12 +289,13 @@ class BaseQuantizeConfig(PushToHubMixin):
             return cls.from_quant_config(args_from_json, format)
 
     def to_dict(self):
+        # move non-inference required variables to meta
+        self.meta["damp_percent"] = self.damp_percent,
+        self.meta["true_sequential"] = self.true_sequential
+
         return {
             "bits": self.bits,
             "group_size": self.group_size,
-            # TODO: move to meta since damp and true_sequential does not participate in inference
-            "damp_percent": self.damp_percent,
-            "true_sequential": self.true_sequential,
             "desc_act": self.desc_act,
             "static_groups": self.static_groups,
             "sym": self.sym,
