@@ -9,34 +9,35 @@ os.environ["CC"] = "g++"
 os.environ["CXX"] = "g++"
 
 common_setup_kwargs = {
-    "version": "0.8.0.dev1",
+    "version": "0.9.0.dev0",
     "name": "auto_gptq",
-    "author": "PanQiWei",
+    "author": "Qubitium",
     "description": "An easy-to-use LLMs quantization package with user-friendly apis, based on GPTQ algorithm.",
     "long_description": (Path(__file__).parent / "README.md").read_text(encoding="UTF-8"),
     "long_description_content_type": "text/markdown",
-    "url": "https://github.com/PanQiWei/AutoGPTQ",
+    "url": "https://github.com/Qubitium/AutoGPTQ",
     "keywords": ["gptq", "quantization", "large-language-models", "transformers"],
-    "platforms": ["windows", "linux"],
+    "platforms": ["linux"],
     "classifiers": [
         "Environment :: GPU :: NVIDIA CUDA :: 11.7",
         "Environment :: GPU :: NVIDIA CUDA :: 11.8",
         "Environment :: GPU :: NVIDIA CUDA :: 12",
+        "Environment :: GPU :: NVIDIA CUDA :: 12.1",
         "License :: OSI Approved :: MIT License",
-        "Natural Language :: Chinese (Simplified)",
         "Natural Language :: English",
         "Programming Language :: Python :: 3.8",
         "Programming Language :: Python :: 3.9",
         "Programming Language :: Python :: 3.10",
         "Programming Language :: Python :: 3.11",
+        "Programming Language :: Python :: 3.12",
         "Programming Language :: C++",
     ],
 }
 
 
 PYPI_RELEASE = os.environ.get("PYPI_RELEASE", None)
-BUILD_CUDA_EXT = int(os.environ.get("BUILD_CUDA_EXT", "1")) == 1
-COMPILE_MARLIN = int(os.environ.get("COMPILE_MARLIN", "1")) == 1
+BUILD_CUDA_EXT = True
+COMPILE_MARLIN = True
 UNSUPPORTED_COMPUTE_CAPABILITIES = ["3.5", "3.7", "5.0", "5.2", "5.3"]
 
 
@@ -75,53 +76,41 @@ if BUILD_CUDA_EXT:
         )
         sys.exit(1)
 
-    CUDA_VERSION = None
-    ROCM_VERSION = os.environ.get("ROCM_VERSION", None)
-    if ROCM_VERSION and not torch.version.hip:
+    default_cuda_version = torch.version.cuda
+    CUDA_VERSION = "".join(os.environ.get("CUDA_VERSION", default_cuda_version).split("."))
+
+    if not CUDA_VERSION:
         print(
-            f"Trying to compile auto-gptq for ROCm, but PyTorch {torch.__version__} "
-            "is installed without ROCm support."
+            f"Trying to compile auto-gptq for CUDA, but Pytorch {torch.__version__} "
+            "is installed without CUDA support."
         )
         sys.exit(1)
 
-    if not ROCM_VERSION:
-        default_cuda_version = torch.version.cuda
-        CUDA_VERSION = "".join(os.environ.get("CUDA_VERSION", default_cuda_version).split("."))
+    torch_cuda_arch_list = os.environ.get("TORCH_CUDA_ARCH_LIST", None)
+    if torch_cuda_arch_list is not None:
+        torch_cuda_arch_list = torch_cuda_arch_list.replace(" ", ";")
+        archs = torch_cuda_arch_list.split(";")
 
-    if ROCM_VERSION:
-        common_setup_kwargs["version"] += f"+rocm{ROCM_VERSION}"
-    else:
-        if not CUDA_VERSION:
-            print(
-                f"Trying to compile auto-gptq for CUDA, but Pytorch {torch.__version__} "
-                "is installed without CUDA support."
+        requested_but_unsupported_archs = {arch for arch in archs if arch in UNSUPPORTED_COMPUTE_CAPABILITIES}
+        if len(requested_but_unsupported_archs) > 0:
+            raise ValueError(
+                f"Trying to compile AutoGPTQ for CUDA compute capabilities {torch_cuda_arch_list}, but AutoGPTQ does not support the compute capabilities {requested_but_unsupported_archs} (AutoGPTQ requires Pascal or higher). Please fix your environment variable TORCH_CUDA_ARCH_LIST (Reference: https://github.com/pytorch/pytorch/blob/v2.2.2/setup.py#L135-L139)."
             )
-            sys.exit(1)
+    else:
+        local_arch_list = detect_local_sm_architectures()
+        local_but_unsupported_archs = {
+            arch for arch in local_arch_list if arch in UNSUPPORTED_COMPUTE_CAPABILITIES
+        }
+        if len(local_but_unsupported_archs) > 0:
+            raise ValueError(
+                f"PyTorch detected the compute capabilities {local_arch_list} for the NVIDIA GPUs on the current machine, but AutoGPTQ can not be built for compute capabilities {local_but_unsupported_archs} (AutoGPTQ requires Pascal or higher). Please set the environment variable TORCH_CUDA_ARCH_LIST (Reference: https://github.com/pytorch/pytorch/blob/v2.2.2/setup.py#L135-L139) with your necessary architectures."
+            )
 
-        torch_cuda_arch_list = os.environ.get("TORCH_CUDA_ARCH_LIST", None)
-        if torch_cuda_arch_list is not None:
-            torch_cuda_arch_list = torch_cuda_arch_list.replace(" ", ";")
-            archs = torch_cuda_arch_list.split(";")
+    # For the PyPI release, the version is simply x.x.x to comply with PEP 440.
+    if not PYPI_RELEASE:
+        common_setup_kwargs["version"] += f"+cu{CUDA_VERSION}"
 
-            requested_but_unsupported_archs = {arch for arch in archs if arch in UNSUPPORTED_COMPUTE_CAPABILITIES}
-            if len(requested_but_unsupported_archs) > 0:
-                raise ValueError(
-                    f"Trying to compile AutoGPTQ for CUDA compute capabilities {torch_cuda_arch_list}, but AutoGPTQ does not support the compute capabilities {requested_but_unsupported_archs} (AutoGPTQ requires Pascal or higher). Please fix your environment variable TORCH_CUDA_ARCH_LIST (Reference: https://github.com/pytorch/pytorch/blob/v2.2.2/setup.py#L135-L139)."
-                )
-        else:
-            local_arch_list = detect_local_sm_architectures()
-            local_but_unsupported_archs = {
-                arch for arch in local_arch_list if arch in UNSUPPORTED_COMPUTE_CAPABILITIES
-            }
-            if len(local_but_unsupported_archs) > 0:
-                raise ValueError(
-                    f"PyTorch detected the compute capabilities {local_arch_list} for the NVIDIA GPUs on the current machine, but AutoGPTQ can not be built for compute capabilities {local_but_unsupported_archs} (AutoGPTQ requires Pascal or higher). Please set the environment variable TORCH_CUDA_ARCH_LIST (Reference: https://github.com/pytorch/pytorch/blob/v2.2.2/setup.py#L135-L139) with your necessary architectures."
-                )
-
-        # For the PyPI release, the version is simply x.x.x to comply with PEP 440.
-        if not PYPI_RELEASE:
-            common_setup_kwargs["version"] += f"+cu{CUDA_VERSION}"
-
+# TODO clean unused pkg
 requirements = [
     "accelerate>=0.31.0",
     "datasets>=2.20.0",
@@ -135,10 +124,10 @@ requirements = [
     "tqdm>=4.66.4",
     "threadpoolctl>=3.5.0",
     "packaging>=24.1",
+    "triton>=2.3.1",
 ]
 
 extras_require = {
-    "triton": ["triton>=2.3.1"],
     "test": ["pytest>=8.2.2", "parameterized"],
     "quality": ["ruff==0.4.9"],
 }
@@ -147,17 +136,17 @@ include_dirs = ["autogptq_cuda"]
 
 additional_setup_kwargs = {}
 if BUILD_CUDA_EXT:
+    from distutils.sysconfig import get_python_lib
+
     from torch.utils import cpp_extension
 
-    if not ROCM_VERSION:
-        from distutils.sysconfig import get_python_lib
+    conda_cuda_include_dir = os.path.join(get_python_lib(), "nvidia/cuda_runtime/include")
 
-        conda_cuda_include_dir = os.path.join(get_python_lib(), "nvidia/cuda_runtime/include")
+    print("conda_cuda_include_dir", conda_cuda_include_dir)
+    if os.path.isdir(conda_cuda_include_dir):
+        include_dirs.append(conda_cuda_include_dir)
+        print(f"appending conda cuda include dir {conda_cuda_include_dir}")
 
-        print("conda_cuda_include_dir", conda_cuda_include_dir)
-        if os.path.isdir(conda_cuda_include_dir):
-            include_dirs.append(conda_cuda_include_dir)
-            print(f"appending conda cuda include dir {conda_cuda_include_dir}")
     extensions = [
         cpp_extension.CUDAExtension(
             "autogptq_cuda_64",
@@ -176,7 +165,7 @@ if BUILD_CUDA_EXT:
     ]
 
     # Marlin is not ROCm-compatible, CUDA only
-    if not ROCM_VERSION and COMPILE_MARLIN:
+    if COMPILE_MARLIN:
         extensions.append(
             cpp_extension.CUDAExtension(
                 "autogptq_marlin_cuda",

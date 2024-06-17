@@ -10,12 +10,8 @@ from tqdm import tqdm
 from ..nn_modules.qlinear.qlinear_marlin import QuantLinear as MarlinQuantLinear
 from ..nn_modules.qlinear.qlinear_marlin import _get_perms, unpack_qzeros
 from ..quantization import FORMAT, QUANT_METHOD, BaseQuantizeConfig
-from .import_utils import MARLIN_AVAILABLE, MARLIN_EXCEPTION
 from .modeling_utils import recurse_getattr, recurse_setattr
 
-
-if MARLIN_AVAILABLE:
-    import autogptq_marlin_cuda
 
 logger = getLogger(__name__)
 
@@ -100,8 +96,6 @@ def _validate_marlin_device_support() -> bool:
 
 # Adapted from https://github.com/rib-2/marlin/tree/conversion
 def _validate_marlin_compatibility(cfg: BaseQuantizeConfig):
-    if not MARLIN_AVAILABLE:
-        return f"AutoGPTQ is not compiled with the Marlin kernel, with the following error: {MARLIN_EXCEPTION}"
     if cfg.bits != 4:
         return f"The quantized model uses a bitwidth different than 4 (found {cfg.bits})"
     if cfg.group_size != 128 and cfg.group_size != -1:
@@ -154,6 +148,7 @@ def convert_to_marlin(
 
         # Dequantize the weight.
         if repack:
+            import autogptq_marlin_cuda
             marlin_repacked_weight = autogptq_marlin_cuda.gptq_repack(module.qweight)
 
             if strict:

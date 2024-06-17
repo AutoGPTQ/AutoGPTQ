@@ -4,45 +4,6 @@ from typing import Optional
 import torch
 
 
-try:
-    import triton  # noqa: F401
-
-    TRITON_AVAILABLE = True
-except ImportError:
-    TRITON_AVAILABLE = False
-
-try:
-    import autogptq_cuda_64  # noqa: F401
-
-    AUTOGPTQ_CUDA_AVAILABLE = True
-except Exception:
-    AUTOGPTQ_CUDA_AVAILABLE = False
-
-
-try:
-    import exllama_kernels  # noqa: F401
-
-    EXLLAMA_KERNELS_AVAILABLE = True
-except Exception:
-    EXLLAMA_KERNELS_AVAILABLE = False
-
-try:
-    import exllamav2_kernels  # noqa: F401
-
-    EXLLAMAV2_KERNELS_AVAILABLE = True
-except Exception:
-    EXLLAMAV2_KERNELS_AVAILABLE = False
-
-try:
-    import autogptq_marlin_cuda  # noqa: F401
-
-    MARLIN_AVAILABLE = True
-    MARLIN_EXCEPTION = None
-except Exception as e:
-    MARLIN_AVAILABLE = False
-    MARLIN_EXCEPTION = e
-
-
 logger = getLogger(__name__)
 
 
@@ -72,9 +33,9 @@ def dynamically_import_QuantLinear(
                 disable_exllama = True
         if bits == 4 and use_marlin:
             from ..nn_modules.qlinear.qlinear_marlin import QuantLinear
-        elif bits == 4 and not disable_exllamav2 and EXLLAMAV2_KERNELS_AVAILABLE:
+        elif bits == 4 and not disable_exllamav2:
             from ..nn_modules.qlinear.qlinear_exllamav2 import QuantLinear
-        elif bits == 4 and not disable_exllama and EXLLAMA_KERNELS_AVAILABLE:
+        elif bits == 4 and not disable_exllama:
             from ..nn_modules.qlinear.qlinear_exllama import QuantLinear
         elif not desc_act or group_size == -1:
             from ..nn_modules.qlinear.qlinear_cuda_old import QuantLinear
