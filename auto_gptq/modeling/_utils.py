@@ -528,7 +528,11 @@ def get_checkpoints(
 
 
 # return the most stable tensor dtype for quantization while minimizing vram
-def auto_dtype_from_config(config: PretrainedConfig) -> torch.dtype:
+def auto_dtype_from_config(config: PretrainedConfig, quant_inference: bool = False) -> torch.dtype:
+    # all the gptq inference kernels are float16 only
+    if quant_inference:
+        return torch.float16
+
     dtype = getattr(config, "torch_dtype")
     if not dtype or not isinstance(dtype, torch.dtype):
         raise ValueError("Your model config.json does not have torch_dtype set. Please check for model " "corruption.")
