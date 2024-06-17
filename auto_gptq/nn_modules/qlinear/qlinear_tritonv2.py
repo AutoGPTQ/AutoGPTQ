@@ -85,7 +85,6 @@ class QuantLinear(nn.Module, TritonModuleMixin):
         else:
             self.bias = None
 
-
     def post_init(self):
         pass
 

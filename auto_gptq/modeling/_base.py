@@ -662,6 +662,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         disable_exllama: Optional[bool] = None,
         disable_exllamav2: bool = False,
         format: Optional[str | FORMAT] = None,
+        allow_unsafe_loading: Optional[bool] = False,
         **kwargs,
     ):
         """load quantized model from local disk"""
@@ -761,6 +762,15 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             possible_model_basenames=possible_model_basenames,
             **cached_file_kwargs,
         )
+
+        # bin files have security issues: disable loading by default
+        if ".bin" in resolved_archive_file:
+            if allow_unsafe_loading:
+                logger.warning(
+                    "There are security risks when loading tensors from .bin files. Make sure you are loading model only from a trusted source."
+                )
+            else:
+                raise RuntimeError("Loading of unsafe .bin files are not allowed by default. Pass allow_unsafe_loading=True to bypass.")
 
         quantize_config.model_file_base_name = true_model_basename
 
@@ -991,6 +1001,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             return
 
         from ..nn_modules.qlinear.qlinear_tritonv2 import QuantLinear
+
         QuantLinear.warmup(self.model, seqlen=self.model.seqlen)
 
     def __getattr__(self, item):

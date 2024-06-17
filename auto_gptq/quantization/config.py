@@ -172,9 +172,7 @@ class BaseQuantizeConfig(PushToHubMixin):
             if format not in valid_formats:
                 raise ValueError(f"Unknown quantization checkpoint format: {format}.")
             if quantize_cfg.get(FORMAT_FIELD):
-                raise ValueError(
-                    "Conflict: quantization format is passed in and also exists in model config."
-                )
+                raise ValueError("Conflict: quantization format is passed in and also exists in model config.")
         # compat: warn if checkpoint_format is missing
         elif quantize_cfg.get(FORMAT_FIELD) is None:
             format_auto_inferred = True

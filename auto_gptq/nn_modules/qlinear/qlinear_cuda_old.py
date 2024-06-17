@@ -100,7 +100,6 @@ class QuantLinear(nn.Module):
         if infeatures % 64 != 0 or outfeatures % 64 != 0:
             self.autogptq_cuda_available = False
 
-
     def post_init(self):
         pass
 
