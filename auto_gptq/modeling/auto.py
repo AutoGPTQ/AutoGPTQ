@@ -6,7 +6,9 @@ from ._utils import check_and_get_model_type
 from .baichuan import BaiChuanGPTQForCausalLM
 from .bloom import BloomGPTQForCausalLM
 from .codegen import CodeGenGPTQForCausalLM
+from .cohere import CohereGPTQForCausalLM
 from .decilm import DeciLMGPTQForCausalLM
+from .gemma import GemmaGPTQForCausalLM
 from .gpt2 import GPT2GPTQForCausalLM
 from .gpt_bigcode import GPTBigCodeGPTQForCausalLM
 from .gpt_neox import GPTNeoXGPTQForCausalLM
@@ -17,11 +19,14 @@ from .longllama import LongLlamaGPTQForCausalLM
 from .mistral import MistralGPTQForCausalLM
 from .mixtral import MixtralGPTQForCausalLM
 from .moss import MOSSGPTQForCausalLM
+from .mpt import MPTGPTQForCausalLM
 from .opt import OPTGPTQForCausalLM
+from .phi import PhiGPTQForCausalLM
 from .qwen import QwenGPTQForCausalLM
 from .qwen2 import Qwen2GPTQForCausalLM
 from .rw import RWGPTQForCausalLM
 from .stablelmepoch import StableLMEpochGPTQForCausalLM
+from .starcoder2 import Starcoder2GPTQForCausalLM
 from .xverse import XverseGPTQForCausalLM
 from .yi import YiGPTQForCausalLM
 
@@ -36,6 +41,7 @@ GPTQ_CAUSAL_LM_MODEL_MAP = {
     "moss": MOSSGPTQForCausalLM,
     "gpt_bigcode": GPTBigCodeGPTQForCausalLM,
     "codegen": CodeGenGPTQForCausalLM,
+    "cohere": CohereGPTQForCausalLM,
     "RefinedWebModel": RWGPTQForCausalLM,
     "RefinedWeb": RWGPTQForCausalLM,
     "falcon": RWGPTQForCausalLM,
@@ -47,9 +53,13 @@ GPTQ_CAUSAL_LM_MODEL_MAP = {
     "xverse": XverseGPTQForCausalLM,
     "deci": DeciLMGPTQForCausalLM,
     "stablelm_epoch": StableLMEpochGPTQForCausalLM,
+    "starcoder2": Starcoder2GPTQForCausalLM,
     "mixtral": MixtralGPTQForCausalLM,
     "qwen2": Qwen2GPTQForCausalLM,
     "longllama": LongLlamaGPTQForCausalLM,
+    "gemma": GemmaGPTQForCausalLM,
+    "phi": PhiGPTQForCausalLM,
+    "mpt": MPTGPTQForCausalLM,
 }
 
 
@@ -88,8 +98,8 @@ class AutoGPTQForCausalLM:
         device: Optional[Union[str, int]] = None,
         low_cpu_mem_usage: bool = False,
         use_triton: bool = False,
-        inject_fused_attention: bool = True,
-        inject_fused_mlp: bool = True,
+        inject_fused_attention: bool = False,
+        inject_fused_mlp: bool = False,
         use_cuda_fp16: bool = True,
         quantize_config: Optional[BaseQuantizeConfig] = None,
         model_basename: Optional[str] = None,
@@ -100,6 +110,7 @@ class AutoGPTQForCausalLM:
         disable_exllama: Optional[bool] = None,
         disable_exllamav2: bool = False,
         use_marlin: bool = False,
+        use_tritonv2: bool = False,
         **kwargs,
     ) -> BaseGPTQForCausalLM:
         # If disable_exllamav2 is True, we want to fall back on the exllama kernel and not the cuda/cuda_old ones.
@@ -149,6 +160,7 @@ class AutoGPTQForCausalLM:
             disable_exllama=disable_exllama,
             disable_exllamav2=disable_exllamav2,
             use_marlin=use_marlin,
+            use_tritonv2=use_tritonv2,
             **keywords,
         )
 

@@ -1,13 +1,10 @@
 import copy
-import json
 import logging
 import os
-from dataclasses import dataclass, field, fields
 from os.path import isdir, join
 from typing import Dict, List, Optional, Union
 
 import accelerate
-import huggingface_hub
 import torch
 import torch.nn as nn
 import transformers
@@ -22,14 +19,20 @@ from transformers.utils.generic import ContextManagers
 from transformers.utils.hub import (
     CommitOperationAdd,
     PushToHubMixin,
-    cached_file,
     create_commit,
     create_repo,
 )
 
 from ..nn_modules._fused_base import FusedBaseAttentionModule, FusedBaseMLPModule
 from ..nn_modules.qlinear import GeneralQuantLinear
-from ..quantization import GPTQ
+from ..quantization import GPTQ, BaseQuantizeConfig
+from ..quantization.config import (
+    CHECKPOINT_FORMAT,
+    CHECKPOINT_FORMAT_FIELD,
+    QUANT_METHOD_FIELD,
+    QUANTIZE_BLACK_LIST,
+)
+from ..utils.accelerate_utils import load_checkpoint_in_model
 from ..utils.data_utils import collate_data
 from ..utils.import_utils import (
     AUTOGPTQ_CUDA_AVAILABLE,
@@ -68,133 +71,18 @@ logger = logging.getLogger(__name__)
 handler = logging.StreamHandler()
 formatter = logging.Formatter("%(levelname)s - %(message)s")
 handler.setFormatter(formatter)
+logger.propagate = False
 logger.addHandler(handler)
 logger.setLevel(logging.INFO)
 
-SYNONYMS = {
-    "w_bit": "bits",
-    "q_group_size": "group_size",
-}
 
-
-@dataclass
-class BaseQuantizeConfig(PushToHubMixin):
-    bits: int = field(default=4, metadata={"choices": [2, 3, 4, 8]})
-    group_size: int = field(default=-1)
-    damp_percent: float = field(default=0.01)
-    desc_act: bool = field(default=True)
-    static_groups: bool = field(default=False)
-    sym: bool = field(default=True)
-    true_sequential: bool = field(default=True)
-    is_marlin_format: bool = field(default=False)
-    model_name_or_path: Optional[str] = field(default=None)
-    model_file_base_name: Optional[str] = field(default=None)
-    awq_gemm_checkpoint: Optional[bool] = field(default=False)
-
-    def __post_init__(self):
-        fields_info = fields(self)
-
-        if self.bits not in fields_info[0].metadata["choices"]:
-            raise ValueError(f"only support quantize to {fields_info[0].metadata['choices']} bits.")
-        if self.group_size != -1 and self.group_size <= 0:
-            raise ValueError("unless equal to -1, group_size must greater then 0.")
-        if not (0 < self.damp_percent < 1):
-            raise ValueError("damp_percent must between 0 and 1.")
-
-    def save_pretrained(self, save_dir: str, **kwargs):
-        with open(join(save_dir, "quantize_config.json"), "w", encoding="utf-8") as f:
-            json.dump(self.to_dict(), f, indent=2)
-
-    @classmethod
-    def from_pretrained(cls, save_dir: str, **kwargs):
-        # Parameters related to loading from Hugging Face Hub
-        cache_dir = kwargs.pop("cache_dir", None)
-        force_download = kwargs.pop("force_download", False)
-        resume_download = kwargs.pop("resume_download", False)
-        proxies = kwargs.pop("proxies", None)
-        local_files_only = kwargs.pop("local_files_only", False)
-        use_auth_token = kwargs.pop("use_auth_token", None)
-        revision = kwargs.pop("revision", None)
-        subfolder = kwargs.pop("subfolder", None)
-        commit_hash = kwargs.pop("_commit_hash", None)
-
-        transformers_config = False
-        for quantize_config_filename in [
-            "quantize_config.json",
-            "quant_config.json",
-            "config.json",
-        ]:
-            if os.path.isdir(save_dir):  # Local
-                resolved_config_file = join(save_dir, quantize_config_filename)
-            else:  # Remote
-                resolved_config_file = cached_file(
-                    save_dir,
-                    quantize_config_filename,
-                    cache_dir=cache_dir,
-                    force_download=force_download,
-                    resume_download=resume_download,
-                    proxies=proxies,
-                    use_auth_token=use_auth_token,
-                    revision=revision,
-                    local_files_only=local_files_only,
-                    subfolder=subfolder,
-                    _raise_exceptions_for_missing_entries=False,
-                    _raise_exceptions_for_connection_errors=False,
-                    _commit_hash=commit_hash,
-                )
-            if resolved_config_file is not None:
-                if quantize_config_filename == "config.json":
-                    transformers_config = True
-                break
-
-        if resolved_config_file is None:
-            raise ValueError(
-                "No quantize_config.json, quant_config.json or config.json file was found in the model repository."
-            )
-
-        field_names = [field.name for field in fields(cls)]
-        with open(resolved_config_file, "r", encoding="utf-8") as f:
-            args_from_json = json.load(f)
-
-            if transformers_config:
-                args_from_json = args_from_json["quantization_config"]
-
-            filtered_args = {"awq_gemm_checkpoint": False}
-            for key, val in args_from_json.items():
-                if key == "version" and val == "GEMM":
-                    filtered_args["awq_gemm_checkpoint"] = True
-                elif key in field_names:
-                    filtered_args[key] = val
-                elif key in SYNONYMS and SYNONYMS[key] in field_names:
-                    filtered_args[SYNONYMS[key]] = val
-                else:
-                    logger.warning(f"ignoring unknown parameter in {quantize_config_filename}: {key}.")
-
-            if filtered_args["awq_gemm_checkpoint"]:
-                # AWQ does not reorder the rows.
-                filtered_args["desc_act"] = False
-
-            if "sym" not in args_from_json:
-                logger.warning(
-                    f"The quantization configuration {quantize_config_filename} does not contain an entry `sym` (symetric quantization). This may result in silent errors."
-                )
-
-            return cls(**filtered_args)
-
-    def to_dict(self):
-        return {
-            "bits": self.bits,
-            "group_size": self.group_size,
-            "damp_percent": self.damp_percent,
-            "desc_act": self.desc_act,
-            "static_groups": self.static_groups,
-            "sym": self.sym,
-            "true_sequential": self.true_sequential,
-            "model_name_or_path": self.model_name_or_path,
-            "model_file_base_name": self.model_file_base_name,
-            "is_marlin_format": self.is_marlin_format,
-            "quant_method": "gptq",
-        }
+def nested_move_to_device(v, device):
+    if isinstance(v, torch.Tensor):
+        return move_to_device(v, device)
+    elif isinstance(v, (list, tuple)):
+        return type(v)([nested_move_to_device(e, device) for e in v])
+    else:
+        return v
 
 
 class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
@@ -295,6 +183,27 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
     ):
         if self.quantized:
             raise EnvironmentError("can't execute quantize because the model is quantized.")
+
+        if self.quantize_config.quant_method in QUANTIZE_BLACK_LIST:
+            raise ValueError(f"Unsupported quantization operation for quant method: {self.quantize_config.quant_method}")
+
+        # alert users to limit threads so packing performance does not regress by up to ~100x
+        thread_warning = """If you have not already done so, please inject the following code at the very top of your 
+quantization script so the packing stage is optimized for speed. Using too many cores may reduce packing performance.
+----
+import os
+import math
+max_threads = str(min(8, os.cpu_count()))
+os.environ['OMP_NUM_THREADS'] = max_threads
+os.environ['OPENBLAS_NUM_THREADS'] = max_threads
+os.environ['MKL_NUM_THREADS'] = max_threads
+os.environ['VECLIB_MAXIMUM_THREADS'] = max_threads
+os.environ['NUMEXPR_NUM_THREADS'] = max_threads
+os.environ['NUMEXPR_MAX_THREADS'] = max_threads
+----
+"""
+        logger.warning(thread_warning)
+
         if use_triton and not TRITON_AVAILABLE:
             logger.warning("triton is not installed, reset use_triton to False")
             use_triton = False
@@ -316,60 +225,45 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
 
         examples = self._prepare_examples_for_quantization(examples, batch_size)
 
-        def nested_move_to_device(v, device):
-            if isinstance(v, torch.Tensor):
-                return move_to_device(v, device)
-            elif isinstance(v, (list, tuple)):
-                return type(v)([nested_move_to_device(e, device) for e in v])
-            else:
-                return v
-
-        class LayerHijacker(nn.Module):
-            """hijack layer's forward pass to cache data"""
-
-            def __init__(self, m, device):
-                super().__init__()
-                self.module = m
-                self.data_device = device if cache_examples_on_gpu else CPU
-
-            def forward(self, inp=None, **kwargs):
-                if inp is None:  # some models use all key-value arguments in forward pass call
-                    for kwarg_name in ["hidden_states"]:
-                        if kwarg_name in kwargs:
-                            inp = kwargs[kwarg_name]
-                            break
-                layer_inputs.append(move_to_device(inp, self.data_device))
-
-                if kwargs["attention_mask"] is not None:
-                    attention_masks.append(kwargs["attention_mask"].to(self.data_device))
-                else:
-                    attention_masks.append(None)
-
-                pos_ids = kwargs.get("position_ids", None)
-                if pos_ids is not None:
-                    position_ids.append(move_to_device(pos_ids, self.data_device))
-                one_kwargs = {}
-                for (
-                    k,
-                    v,
-                ) in kwargs.items():  # make sure other arguments also be captured
-                    if k not in ["hidden_states", "attention_mask", "position_ids"]:
-                        one_kwargs[k] = nested_move_to_device(v, self.data_device)
-                layer_input_kwargs.append(one_kwargs)
-                raise ValueError
-
         forward_pass_use_cache = self.model.config.use_cache
         self.model.config.use_cache = False
 
         num_batches = len(examples)
         layers = get_module_by_name_prefix(self.model, self.layers_block_name)
 
+        cur_layer_device = get_device(layers[0])
+        data_device = cur_layer_device if cache_examples_on_gpu else CPU
+        def store_input_hook(_, args, kwargs):
+            # Positional arguments.
+            layer_input = []
+            for inp in args:
+                layer_input.append(move_to_device(inp, data_device))
+            layer_inputs.append(layer_input)
+
+            # Keyword arguments.
+            if kwargs["attention_mask"] is not None:
+                attention_masks.append(kwargs["attention_mask"].to(data_device))
+            else:
+                attention_masks.append(None)
+
+            pos_ids = kwargs.get("position_ids", None)
+            if pos_ids is not None:
+                position_ids.append(move_to_device(pos_ids, data_device))
+            one_kwargs = {}
+            for (
+                k,
+                v,
+            ) in kwargs.items():  # make sure other arguments also be captured
+                if k not in ["hidden_states", "attention_mask", "position_ids"]:
+                    one_kwargs[k] = nested_move_to_device(v, data_device)
+            layer_input_kwargs.append(one_kwargs)
+            raise ValueError
+
         force_layer_back_to_cpu = False
         if get_device(layers[0]) == CPU:
             layers[0] = layers[0].to(CUDA_0)
             force_layer_back_to_cpu = True
 
-        cur_layer_device = get_device(layers[0])
         ori_outside_layer_module_devices = {}
         for module_name in self.outside_layer_modules:
             module = get_module_by_name_prefix(self.model, module_name)
@@ -381,8 +275,8 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             if module is not None:
                 move_to_device(module, cur_layer_device)
 
-        # get inputs for first layer
-        layers[0] = LayerHijacker(layers[0], cur_layer_device)
+        # TODO: make this optional, backporting https://github.com/huggingface/optimum/blob/main/optimum/gptq/quantizer.py
+        handle = layers[0].register_forward_pre_hook(store_input_hook, with_kwargs=True)
         for example in examples:
             for k, v in example.items():
                 if len(v.shape) == 1:
@@ -392,7 +286,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                 self.model(**example)
             except ValueError:
                 pass
-        layers[0] = layers[0].module
+        handle.remove()
 
         move_to_device(layers[0], CPU if force_layer_back_to_cpu else cur_layer_device)
         for module_name in self.outside_layer_modules:
@@ -439,7 +333,10 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                 for name in subset:
                     handles.append(subset[name].register_forward_hook(add_batch(name)))
                 for j in range(num_batches):
-                    layer_input = move_to_device(layer_inputs[j], cur_layer_device)
+                    layer_input = []
+                    for k, layer_inp in enumerate(layer_inputs[j]):
+                        layer_input.append(move_to_device(layer_inp, cur_layer_device))
+
                     layer_attention_mask = move_to_device(attention_masks[j], cur_layer_device)
                     additional_layer_inputs = {"attention_mask": layer_attention_mask}
                     layer_position_ids = (
@@ -449,7 +346,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                         additional_layer_inputs["position_ids"] = layer_position_ids
                     for k, v in layer_input_kwargs[j].items():
                         additional_layer_inputs[k] = nested_move_to_device(v, cur_layer_device)
-                    layer(layer_input, **additional_layer_inputs)
+                    layer(*layer_input, **additional_layer_inputs)
                 for h in handles:
                     h.remove()
 
@@ -470,7 +367,10 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                     gptq[name].free()
 
             for j in range(num_batches):
-                layer_input = move_to_device(layer_inputs[j], cur_layer_device)
+                layer_input = []
+                for k, layer_inp in enumerate(layer_inputs[j]):
+                    layer_input.append(move_to_device(layer_inp, cur_layer_device))
+
                 layer_attention_mask = move_to_device(attention_masks[j], cur_layer_device)
                 additional_layer_inputs = {"attention_mask": layer_attention_mask}
                 layer_position_ids = None if not position_ids else move_to_device(position_ids[j], cur_layer_device)
@@ -479,16 +379,16 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                 for k, v in layer_input_kwargs[j].items():
                     additional_layer_inputs[k] = nested_move_to_device(v, cur_layer_device)
                 layer_output = move_to_device(
-                    layer(layer_input, **additional_layer_inputs)[0],
+                    layer(*layer_input, **additional_layer_inputs)[0],
                     cur_layer_device if cache_examples_on_gpu else CPU,
                 )
-                layer_outputs.append(layer_output)
+                layer_outputs.append([layer_output])
 
             layers[i] = move_to_device(layer, CPU if force_layer_back_to_cpu else cur_layer_device)
             del layer
             del gptq
             del layer_inputs
-            layer_inputs, layer_outputs = layer_outputs, []
+            layer_inputs, layer_outputs = layer_outputs, []  # TODO: is it really OK to cache only the first positional argument?
             torch.cuda.empty_cache()
 
         pack_model(
@@ -501,6 +401,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             desc_act=self.quantize_config.desc_act,
             warmup_triton=autotune_warmup_after_quantized,
             force_layer_back_to_cpu=force_layer_back_to_cpu,
+            use_marlin=self.quantize_config.checkpoint_format == CHECKPOINT_FORMAT.MARLIN,
         )
         if device_map:
             self.model = remove_hook_from_module(self.model, recurse=True)
@@ -676,7 +577,8 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             safetensors_metadata["gptq_group_size"] = str(self.quantize_config.group_size)
             safetensors_metadata["gptq_desc_act"] = str(self.quantize_config.desc_act)
             safetensors_metadata["gptq_damp_percent"] = str(self.quantize_config.damp_percent)
-            safetensors_metadata["gptq_is_marlin_format"] = str(self.quantize_config.is_marlin_format)
+            safetensors_metadata["gptq_" + CHECKPOINT_FORMAT_FIELD] = self.quantize_config.checkpoint_format
+            safetensors_metadata["gptq_" + QUANT_METHOD_FIELD] = self.quantize_config.quant_method
 
             safe_save(state_dict, join(save_dir, model_save_name), safetensors_metadata)
         else:
@@ -812,8 +714,8 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         use_qigen: bool = False,
         use_marlin: bool = False,
         torch_dtype: Optional[torch.dtype] = None,
-        inject_fused_attention: bool = True,
-        inject_fused_mlp: bool = True,
+        inject_fused_attention: bool = False,
+        inject_fused_mlp: bool = False,
         use_cuda_fp16: bool = True,
         quantize_config: Optional[BaseQuantizeConfig] = None,
         model_basename: Optional[str] = None,
@@ -823,6 +725,8 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         trainable: bool = False,
         disable_exllama: Optional[bool] = None,
         disable_exllamav2: bool = False,
+        use_tritonv2: bool = False,
+        checkpoint_format: Optional[str] = None,
         **kwargs,
     ):
         """load quantized model from local disk"""
@@ -859,9 +763,15 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         if use_qigen and not QIGEN_AVAILABLE:
             logger.warning("Qigen is not installed, reset use_qigen to False.")
             use_qigen = False
-        if use_triton and not TRITON_AVAILABLE:
+        if use_triton and use_tritonv2:
+            logging.warn(
+                "Both use_triton and use_tritonv2 are set to True. Defaulting to use_triton"
+            )
+            use_tritonv2 = False
+        if (use_triton or use_tritonv2) and not TRITON_AVAILABLE:
             logger.warning("Triton is not installed, reset use_triton to False.")
             use_triton = False
+            use_tritonv2 = False
         if not disable_exllama and not EXLLAMA_KERNELS_AVAILABLE:
             logger.warning(
                 "Exllama kernel is not installed, reset disable_exllama to True. "
@@ -914,20 +824,29 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             raise TypeError(f"{config.model_type} isn't supported yet.")
 
         if quantize_config is None:
-            quantize_config = BaseQuantizeConfig.from_pretrained(model_name_or_path, **cached_file_kwargs, **kwargs)
+            quantize_config = BaseQuantizeConfig.from_pretrained(model_name_or_path, checkpoint_format=checkpoint_format, **cached_file_kwargs, **kwargs)
+        else:
+            if not isinstance(quantize_config, BaseQuantizeConfig):
+                quantize_config = BaseQuantizeConfig.from_quant_config(quantize_config, checkpoint_format)
+
+        if quantize_config.checkpoint_format == CHECKPOINT_FORMAT.MARLIN:
+            # format marlin requires marlin kernel
+            use_marlin = True
+
+        marlin_compatible, marlin_optimized = _validate_marlin_device_support()
+        if use_marlin and (not MARLIN_AVAILABLE or not marlin_compatible):
+            raise TypeError("use_marlin is true but Marlin is not availble due to cuda/device support.")
+        elif use_marlin and not marlin_optimized:
+            logger.info(
+                "use_marlin is true and your gpu device is supported but not optimized for Marlin."
+            )
 
         if not use_marlin and MARLIN_AVAILABLE:
             unsupported_reason = _validate_marlin_compatibility(quantize_config)
-            if unsupported_reason is None and _validate_marlin_device_support():
+            if unsupported_reason is None and marlin_compatible:
                 logger.info(
                     "You passed a model that is compatible with the Marlin int4*fp16 GPTQ kernel but use_marlin is False. We recommend using `use_marlin=True` to use the optimized Marlin kernels for inference. Example: `model = AutoGPTQForCausalLM.from_quantized(..., use_marlin=True)`."
                 )
-
-        if hasattr(quantize_config, "is_marlin_format") and quantize_config.is_marlin_format and not use_marlin:
-            raise ValueError(
-                "You passed a GPTQ model saved in int4*fp16 GPTQ Marlin kernel format but are loading with use_marlin=False. "
-                "Please use `use_marlin=True` to load this model. Example: `model = AutoGPTQForCausalLM.from_quantized(..., use_marlin=True)`."
-            )
 
         if model_basename is None:
             if quantize_config.model_file_base_name:
@@ -949,7 +868,6 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             extensions += [".bin", ".pt"]
 
         model_name_or_path = str(model_name_or_path)
-        is_local = isdir(model_name_or_path)
 
         # Retrieve (and if necessary download) the quantized checkpoint(s).
         is_sharded, resolved_archive_file, true_model_basename = get_checkpoints(model_name_or_path=model_name_or_path, extensions=extensions, possible_model_basenames=possible_model_basenames, **cached_file_kwargs)
@@ -965,7 +883,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             disable_exllama = True
             disable_exllamav2 = True
 
-        elif not use_triton and trainable:
+        elif not (use_triton or use_tritonv2) and trainable:
             logger.warning(
                 "QuantLinear with cuda backend not support trainable mode yet, Switch to the pytorch backend."
             )
@@ -1022,6 +940,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                     use_cuda_fp16=use_cuda_fp16,
                     desc_act=quantize_config.desc_act,
                     trainable=trainable,
+                    use_tritonv2=use_tritonv2,
                 )
                 model.tie_weights()
 
@@ -1068,47 +987,27 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                     bits=quantize_config.bits,
                     disable_exllama=disable_exllama,
                     disable_exllamav2=disable_exllamav2,
+                    use_tritonv2=use_tritonv2,
                 )
 
             # TODO: move this logic in an awq_utils.py file.
-            if quantize_config.awq_gemm_checkpoint:
+            if quantize_config.checkpoint_format == CHECKPOINT_FORMAT.AWQ_GEMM:
                 if is_sharded:
                     raise ValueError("The loading of sharded checkpoints with AWQ checkpoints is currently not supported. Please raise an issue in AutoGPTQ repository.")
 
                 if use_marlin:
                     raise ValueError(
-                        "Tried to load an AWQ kernel with use_marlin=True. This is currently not supported. Please open an issue in AutoGPTQ repository."
+                        "Tried to load an AWQ model with use_marlin=True. This is currently not supported. Please open an issue in AutoGPTQ repository."
                     )
 
-                if is_local:
-                    is_cached = os.path.isfile(os.path.join(model_name_or_path, "autogptq_model.safetensors"))
-                else:
-                    namespace, subfolder = model_name_or_path.split("/")
-                    assets_path = huggingface_hub.cached_assets_path(
-                        library_name="autogptq",
-                        namespace=namespace,
-                        subfolder=subfolder,
-                    )
-                    weight_path = os.path.join(assets_path, "autogptq_model.safetensors")
-
-                    is_cached = os.path.isfile(weight_path)
+                model_cache_name, is_cached = quantize_config.get_cache_file_path()
 
                 if is_cached:
-                    if is_local:
-                        model_save_name = os.path.join(model_name_or_path, "autogptq_model.safetensors")
-                    else:
-                        namespace, subfolder = model_name_or_path.split("/")
-                        assets_path = huggingface_hub.cached_assets_path(
-                            library_name="autogptq",
-                            namespace=namespace,
-                            subfolder=subfolder,
-                        )
-                        model_save_name = os.path.join(assets_path, "autogptq_model.safetensors")
-
+                    model_save_name = model_cache_name
                     logger.info(f"Loading an AWQ model, detected a cached repacked weight at {model_save_name}.")
                 else:
                     logger.info(
-                        "Loading an AWQ model. This requires repacking the weights, and no repacking cached weight was found. Grab a coffee!"
+                        "Loading an AWQ model. This requires repacking the weights, and no cached repacked checkpoint was found. Grab a coffee!"
                     )
 
                     if "safetensors" not in model_save_name:
@@ -1178,27 +1077,15 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                             new_state_dict[gptq_layer_name + ".qzeros"] = gptq_qzeros
                             new_state_dict[gptq_layer_name + ".scales"] = awq_scales
 
-                    # Cache the converted model.
-                    if is_local:
-                        model_save_name = os.path.join(model_name_or_path, "autogptq_model.safetensors")
-                        safe_save(new_state_dict, model_save_name)
-                    else:
-                        namespace, subfolder = model_name_or_path.split("/")
-                        assets_path = huggingface_hub.cached_assets_path(
-                            library_name="autogptq",
-                            namespace=namespace,
-                            subfolder=subfolder,
-                        )
-                        model_save_name = os.path.join(assets_path, "autogptq_model.safetensors")
-
-                        safe_save(new_state_dict, model_save_name)
+                        safe_save(new_state_dict, model_cache_name)
+                        model_save_name = model_cache_name
 
             if use_marlin:
                 if is_sharded:
                     raise ValueError("The loading of sharded checkpoints with Marlin is currently not supported. Please raise an issue in AutoGPTQ repository.")
                 if torch.version.hip:
                     raise ValueError("Can not use Marlin int4*fp16 kernel with AMD ROCm version of PyTorch as the kernel is not compatible. Please do not use `use_marlin=True` when using ROCm devices.")
-                if not torch.cuda.get_device_capability()[0] >= 8:
+                if not _validate_marlin_device_support():
                     raise ValueError(f'Can not use Marlin int4*fp16 kernel with a device of compute capability {torch.cuda.get_device_capability()}, the minimum compute capability is 8.0 for Marlin kernel. Please do not use `use_marlin=True`, or please upgrade your GPU ("The more you buy, the more you save." - Taiwanese proverb).')
 
                 # Validate the model can run in Marlin.
@@ -1219,7 +1106,8 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                     bits=quantize_config.bits,
                     disable_exllama=disable_exllama,
                     disable_exllamav2=disable_exllamav2,
-                    disable_marlin=True,  # Get the "original" QuantLienar class
+                    use_marlin=False,
+                    use_tritonv2=use_tritonv2,  # Get the "original" QuantLienar class
                 )
 
                 # Prepare model for marlin load.
@@ -1227,7 +1115,6 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                 #   If stub has cached marlin version   --> load from the cached versin
                 #   Otherwise                           --> convert to marlin, cache, load from cache
                 model, model_save_name = prepare_model_for_marlin_load(
-                    model_name_or_path=model_name_or_path,
                     model=model,
                     quantize_config=quantize_config,
                     quant_linear_class=quant_linear_class,
@@ -1243,7 +1130,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                     inject_fused_attention = False
                     inject_fused_mlp = False
 
-            accelerate.utils.modeling.load_checkpoint_in_model(
+            load_checkpoint_in_model(
                 model,
                 dtype=torch_dtype,  # This is very hacky but works due to https://github.com/huggingface/accelerate/blob/bd72a5f1a80d5146554458823f8aeda0a9db5297/src/accelerate/utils/modeling.py#L292
                 checkpoint=model_save_name,
@@ -1289,6 +1176,8 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                 desc_act=quantize_config.desc_act,
                 trainable=trainable,
                 use_qigen=True,
+                use_tritonv2=use_tritonv2,
+                use_marlin=quantize_config.checkpoint_format == CHECKPOINT_FORMAT.MARLIN,
             )
             preprocess_checkpoint_qigen(
                 model,
@@ -1327,6 +1216,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                     bits=quantize_config.bits,
                     disable_exllama=disable_exllama,
                     disable_exllamav2=disable_exllamav2,
+                    use_tritonv2=use_tritonv2,
                 )
         if inject_fused_mlp:
             if cls.fused_mlp_module_type is None:
@@ -1341,8 +1231,11 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         model.eval()
 
         # == step6: (optional) warmup triton == #
-        if use_triton and warmup_triton:
-            from ..nn_modules.qlinear.qlinear_triton import QuantLinear
+        if (use_triton or use_tritonv2) and warmup_triton:
+            if use_tritonv2:
+                from ..nn_modules.qlinear.qlinear_tritonv2 import QuantLinear
+            else:
+                from ..nn_modules.qlinear.qlinear_triton import QuantLinear
 
             QuantLinear.warmup(model, seqlen=model.seqlen)
 
@@ -1366,9 +1259,9 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             model,
             True,
             quantize_config,
-            is_triton_backend=use_triton,
+            is_triton_backend=use_triton or use_tritonv2,
             injected_fused_attention=inject_fused_attention,
-            injected_fused_mlp=inject_fused_mlp and use_triton,
+            injected_fused_mlp=inject_fused_mlp and (use_triton or use_tritonv2),
             trainable=trainable,
         )
 
@@ -1407,10 +1300,13 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         disable_exllamav2: bool = False,
         use_marlin: bool = False,
         use_qigen: bool = False,
+        use_tritonv2: bool = False,
     ):
         GeneralQuantLinear.inject_to_model(
             model,
-            dynamically_import_QuantLinear(use_triton, desc_act, group_size, bits=bits, disable_exllama=disable_exllama, disable_exllamav2=disable_exllamav2, disable_marlin=not use_marlin, use_qigen=use_qigen),
+            dynamically_import_QuantLinear(use_triton, desc_act, group_size, bits=bits, disable_exllama=disable_exllama,
+                                           disable_exllamav2=disable_exllamav2,
+                                           use_marlin=use_marlin, use_qigen=use_qigen),
         )
 
     def __getattr__(self, item):
