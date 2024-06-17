@@ -47,7 +47,6 @@ from ._utils import (
     get_module_by_name_prefix,
     get_module_by_name_suffix,
     make_quant,
-    make_sure_no_tensor_in_meta_device,
     move_to_device,
     pack_model,
     simple_dispatch_model,
