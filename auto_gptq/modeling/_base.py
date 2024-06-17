@@ -922,7 +922,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             #   If stub is marlin serialized         --> load from directly
             #   If stub has cached marlin version   --> load from the cached version
             #   Otherwise                           --> convert to marlin, cache, load from cache
-            model, model_save_name = prepare_model_for_marlin_load(
+            model = prepare_model_for_marlin_load(
                 model=model,
                 quantize_config=quantize_config,
                 quant_linear_class=quant_linear_class,

@@ -98,9 +98,7 @@ if BUILD_CUDA_EXT:
             )
     else:
         local_arch_list = detect_local_sm_architectures()
-        local_but_unsupported_archs = {
-            arch for arch in local_arch_list if arch in UNSUPPORTED_COMPUTE_CAPABILITIES
-        }
+        local_but_unsupported_archs = {arch for arch in local_arch_list if arch in UNSUPPORTED_COMPUTE_CAPABILITIES}
         if len(local_but_unsupported_archs) > 0:
             raise ValueError(
                 f"PyTorch detected the compute capabilities {local_arch_list} for the NVIDIA GPUs on the current machine, but AutoGPTQ can not be built for compute capabilities {local_but_unsupported_archs} (AutoGPTQ requires Pascal or higher). Please set the environment variable TORCH_CUDA_ARCH_LIST (Reference: https://github.com/pytorch/pytorch/blob/v2.2.2/setup.py#L135-L139) with your necessary architectures."

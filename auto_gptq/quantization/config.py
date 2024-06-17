@@ -288,29 +288,6 @@ class BaseQuantizeConfig(PushToHubMixin):
 
             return cls.from_quant_config(args_from_json, format)
 
-    def get_cache_file_path(self, quant_method: QUANT_METHOD = None, format: FORMAT = None):
-        """
-        Gets The Cached Weight Path.
-        If remote:   $HF_HOME/assets/autogptq/{model_name_or_path}/_{quant-method}_{checkpoint_format}.safetensors
-        If local:    {model_name_or_path}/autogptq_model_{quant-method}_{checkpoint_format}.safetensors
-        """
-
-        use_quant_method = quant_method if quant_method else self.quant_method
-        use_format = format if format else self.format
-
-        cache_file_name = f"autogptq_model_v2_{use_quant_method}_{use_format}.safetensors"
-
-        if os.path.isdir(self.model_name_or_path):
-            cache_file_name = os.path.join(self.model_name_or_path, cache_file_name)
-        else:
-            namespace, subfolder = self.model_name_or_path.split("/")
-            assets_path = huggingface_hub.cached_assets_path(
-                library_name="auto_gptq", namespace=namespace, subfolder=subfolder
-            )
-            cache_file_name = os.path.join(assets_path, cache_file_name)
-
-        return cache_file_name, os.path.isfile(cache_file_name)
-
     def to_dict(self):
         return {
             "bits": self.bits,

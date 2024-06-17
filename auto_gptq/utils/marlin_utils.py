@@ -30,56 +30,40 @@ def prepare_model_for_marlin_load(
         logger.info(f"Loading a GPTQ model, detected Marlin serialized format at {model_save_name}.")
         model = convert_to_marlin(model, quant_linear_class, quantize_config, repack=False)
     else:
-        model_save_name, is_cached = quantize_config.get_cache_file_path(
-            quant_method=QUANT_METHOD.GPTQ, format=FORMAT.MARLIN
+        # Loading the GPTQ checkpoint to do the conversion.
+        # TODO: Avoid loading the model with wrong QuantLinear, and directly use
+        # Marlin ones. The repacking can be done directly on the safetensors, just
+        # as for AWQ checkpoints.
+        accelerate.utils.modeling.load_checkpoint_in_model(
+            model,
+            dtype=torch_dtype,  # This is very hacky but works due to https://github.com/huggingface/accelerate/blob/bd72a5f1a80d5146554458823f8aeda0a9db5297/src/accelerate/utils/modeling.py#L292
+            checkpoint=current_model_save_name,
+            device_map=device_map,
+            offload_state_dict=True,
+            offload_buffers=True,
         )
+        # Convert model to marlin, repacking weights into Marlin format.
+        model = convert_to_marlin(model, quant_linear_class, quantize_config, repack=True)
 
-        # If GPTQ model has Marlin version cached locally, load from the cached version (no repacking needed).
-        if is_cached:
-            logger.info(
-                f"Loading a GPTQ model, detected a cached repacked weight for Marlin kernel at {model_save_name}."
-            )
-            model = convert_to_marlin(model, quant_linear_class, quantize_config, repack=False)
+        # Safetensors is unable to save tied weights, so we untie them here. Reference: https://github.com/huggingface/safetensors/issues/202
+        tied_params = find_tied_parameters(model)
 
-        # Otherwise, convert the model to Marlin format first and cache locally.
-        else:
-            # Loading the GPTQ checkpoint to do the conversion.
-            # TODO: Avoid loading the model with wrong QuantLinear, and directly use
-            # Marlin ones. The repacking can be done directly on the safetensors, just
-            # as for AWQ checkpoints.
-            accelerate.utils.modeling.load_checkpoint_in_model(
-                model,
-                dtype=torch_dtype,  # This is very hacky but works due to https://github.com/huggingface/accelerate/blob/bd72a5f1a80d5146554458823f8aeda0a9db5297/src/accelerate/utils/modeling.py#L292
-                checkpoint=current_model_save_name,
-                device_map=device_map,
-                offload_state_dict=True,
-                offload_buffers=True,
-            )
-            # Convert model to marlin, repacking weights into Marlin format.
-            model = convert_to_marlin(model, quant_linear_class, quantize_config, repack=True)
+        for weight_group in tied_params:
+            for param_name in weight_group:
+                if isinstance(recurse_getattr(model, param_name), torch.nn.Parameter):
+                    recurse_setattr(
+                        model,
+                        param_name,
+                        torch.nn.Parameter(recurse_getattr(model, param_name).clone()),
+                    )
+                else:
+                    recurse_setattr(
+                        model,
+                        param_name,
+                        recurse_getattr(model, param_name).clone(),
+                    )
 
-            # Safetensors is unable to save tied weights, so we untie them here. Reference: https://github.com/huggingface/safetensors/issues/202
-            tied_params = find_tied_parameters(model)
-
-            for weight_group in tied_params:
-                for param_name in weight_group:
-                    if isinstance(recurse_getattr(model, param_name), torch.nn.Parameter):
-                        recurse_setattr(
-                            model,
-                            param_name,
-                            torch.nn.Parameter(recurse_getattr(model, param_name).clone()),
-                        )
-                    else:
-                        recurse_setattr(
-                            model,
-                            param_name,
-                            recurse_getattr(model, param_name).clone(),
-                        )
-
-            # Cache the converted model.
-            safe_save(model.state_dict(), model_save_name)
-
-    return model, model_save_name
+    return model
 
 
 # Validate marlin support
@@ -149,6 +133,7 @@ def convert_to_marlin(
         # Dequantize the weight.
         if repack:
             import autogptq_marlin_cuda
+
             marlin_repacked_weight = autogptq_marlin_cuda.gptq_repack(module.qweight)
 
             if strict:
