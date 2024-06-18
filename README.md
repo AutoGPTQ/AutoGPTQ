@@ -18,7 +18,7 @@
 
 ## How is AutoGPTQ-NEXT different from AutoGPTQ?
 
-AutoGPTQ-NEXT is an updated version of AugtoGPTQ with latest bug fixes applied, new features, better/latest model support, and an guranteed from the ModelCloud.ai team and that we, along with the open-source ML community, will take every effort to bring the library up-to-date with latest advancements, model support, and bug fixes.
+AutoGPTQ-NEXT is an opinionated fork of AugtoGPTQ with latest bug fixes applied, new features, better/latest model support, and an guranteed from the ModelCloud.ai team and that we, along with the open-source ML community, will take every effort to bring the library up-to-date with latest advancements, model support, and bug fixes.
 
 ## Mission Statement
 
