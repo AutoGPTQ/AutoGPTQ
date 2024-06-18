@@ -1,8 +1,8 @@
 import copy
 import unittest
 
-import autogptq_marlin_cuda
 import torch
+import autogptq_next_marlin_cuda
 import torch.nn as nn
 
 from auto_gptq_next.nn_modules.qlinear.qlinear_cuda_old import QuantLinear as CudaOldQuantLinear
@@ -103,7 +103,7 @@ class TestRepacking(unittest.TestCase):
         reldiff = (res_cuda_old - res_marlin).abs() / (res_cuda_old.abs() + 1e-12)
         self.assertTrue(torch.mean(reldiff) < 4e-3)
 
-        weight_repacked = autogptq_marlin_cuda.gptq_repack(cuda_old_linear.qweight)
+        weight_repacked = autogptq_next_marlin_cuda.gptq_repack(cuda_old_linear.qweight)
         self.assertTrue(torch.allclose(weight_repacked, marlin_linear.B))
 
         _, _scale_perm, _scale_perm_single = _get_perms()

@@ -142,17 +142,17 @@ if BUILD_CUDA_EXT:
 
     extensions = [
         cpp_extension.CUDAExtension(
-            "autogptq_cuda_64",
+            "autogptq_next_cuda_64",
             [
-                "autogptq_extension/cuda_64/autogptq_cuda_64.cpp",
-                "autogptq_extension/cuda_64/autogptq_cuda_kernel_64.cu",
+                "autogptq_next_ext/cuda_64/autogptq_next_cuda_64.cpp",
+                "autogptq_next_ext/cuda_64/autogptq_next_cuda_kernel_64.cu",
             ],
         ),
         cpp_extension.CUDAExtension(
-            "autogptq_cuda_256",
+            "autogptq_next_cuda_256",
             [
-                "autogptq_extension/cuda_256/autogptq_cuda_256.cpp",
-                "autogptq_extension/cuda_256/autogptq_cuda_kernel_256.cu",
+                "autogptq_next_ext/cuda_256/autogptq_next_cuda_256.cpp",
+                "autogptq_next_ext/cuda_256/autogptq_next_cuda_kernel_256.cu",
             ],
         ),
     ]
@@ -161,11 +161,11 @@ if BUILD_CUDA_EXT:
     if COMPILE_MARLIN:
         extensions.append(
             cpp_extension.CUDAExtension(
-                "autogptq_marlin_cuda",
+                "autogptq_next_marlin_cuda",
                 [
-                    "autogptq_extension/marlin/marlin_cuda.cpp",
-                    "autogptq_extension/marlin/marlin_cuda_kernel.cu",
-                    "autogptq_extension/marlin/marlin_repack.cu",
+                    "autogptq_next_ext/marlin/marlin_cuda.cpp",
+                    "autogptq_next_ext/marlin/marlin_cuda_kernel.cu",
+                    "autogptq_next_ext/marlin/marlin_repack.cu",
                 ],
             )
         )
@@ -176,11 +176,11 @@ if BUILD_CUDA_EXT:
         cpp_extension.CUDAExtension(
             "exllama_kernels",
             [
-                "autogptq_extension/exllama/exllama_ext.cpp",
-                "autogptq_extension/exllama/cuda_buffers.cu",
-                "autogptq_extension/exllama/cuda_func/column_remap.cu",
-                "autogptq_extension/exllama/cuda_func/q4_matmul.cu",
-                "autogptq_extension/exllama/cuda_func/q4_matrix.cu",
+                "autogptq_next_ext/exllama/exllama_ext.cpp",
+                "autogptq_next_ext/exllama/cuda_buffers.cu",
+                "autogptq_next_ext/exllama/cuda_func/column_remap.cu",
+                "autogptq_next_ext/exllama/cuda_func/q4_matmul.cu",
+                "autogptq_next_ext/exllama/cuda_func/q4_matrix.cu",
             ],
             extra_link_args=extra_link_args,
         )
@@ -189,9 +189,9 @@ if BUILD_CUDA_EXT:
         cpp_extension.CUDAExtension(
             "exllamav2_kernels",
             [
-                "autogptq_extension/exllamav2/ext.cpp",
-                "autogptq_extension/exllamav2/cuda/q_matrix.cu",
-                "autogptq_extension/exllamav2/cuda/q_gemm.cu",
+                "autogptq_next_ext/exllamav2/ext.cpp",
+                "autogptq_next_ext/exllamav2/cuda/q_matrix.cu",
+                "autogptq_next_ext/exllamav2/cuda/q_gemm.cu",
             ],
             extra_link_args=extra_link_args,
         )

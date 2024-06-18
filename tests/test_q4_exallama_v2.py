@@ -16,7 +16,7 @@ from .test_q4_cuda import get_diff
 from transformers import AutoTokenizer  # noqa: E402
 
 from auto_gptq_next import AutoGPTQForCausalLM  # noqa: E402
-from auto_gptq_next.modeling._utils import autogptq_post_init  # noqa: E402
+from auto_gptq_next.models._utils import autogptq_post_init  # noqa: E402
 
 
 class TestsQ4ExllamaV2(unittest.TestCase):

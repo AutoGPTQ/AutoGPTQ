@@ -15,8 +15,8 @@ from .test_q4_cuda import get_diff
 from transformers import AutoTokenizer  # noqa: E402
 
 from auto_gptq_next import AutoGPTQForCausalLM, exllama_set_max_input_length  # noqa: E402
-from auto_gptq_next.modeling._const import EXLLAMA_DEFAULT_MAX_INPUT_LENGTH  # noqa: E402
-from auto_gptq_next.modeling._utils import autogptq_post_init  # noqa: E402
+from auto_gptq_next.models._const import EXLLAMA_DEFAULT_MAX_INPUT_LENGTH  # noqa: E402
+from auto_gptq_next.models._utils import autogptq_post_init  # noqa: E402
 
 
 CUDA_OLD_REFERENCE = torch.Tensor(

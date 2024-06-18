@@ -133,7 +133,7 @@ For more advanced features of model quantization, please reference to [this scri
 <summary>Below is an example to extend `auto_gptq_next` to support `OPT` model, as you will see, it's very easy:</summary>
 
 ```python
-from auto_gptq_next.modeling import BaseGPTQForCausalLM
+from auto_gptq_next.models import BaseGPTQForCausalLM
 
 
 class OPTGPTQForCausalLM(BaseGPTQForCausalLM):
