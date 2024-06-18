@@ -43,6 +43,19 @@ We want AutoGPTQ-NEXT to be highy focused on GPTQ based quantization and target 
 * Store quant loss stat and apply diffs to new quant for quality control.
 * Alert users of non-optimal calibration data.
 
+## Model Support 
+
+| Model            |    |              |    |              |    |                  |    |
+|------------------|----|--------------|----|--------------|----|------------------|----|
+| baichuan         | ✅ | gpt_bigcode  | ✅ | mixtral     | ✅ | RefinedWebModel  | ✅ |
+| bloom            | ✅ | gpt_neox     | ✅ | moss        | ✅ | stablelm_epoch   | ✅ |
+| chatglm          | ✅ | gpt2         | ✅ | mpt         | ✅ | starcoder2       | ✅ |
+| codegen          | ✅ | gptj         | ✅ | opt         | ✅ | xverse           | ✅ |
+| cohere           | ✅ | internlm     | ✅ | phi         | ✅ | Yi               | ✅ |
+| deci             | ✅ | llama        | ✅ | qwen        | ✅ |                  |    |
+| falcon           | ✅ | longllama    | ✅ | qwen2       | ✅ |                  |    |
+| gemma            | ✅ | mistral      | ✅ | RefinedWeb  | ✅ |                  |    |
+
 
 ## Platform Support
 AutoGPTQ-NEXT is currently Linux only and requires Torch/Cuda capable GPU from NVIDIA. WSL on Windows should work as well. ROCM/AMD support will be re-added in a furture version after everything on ROCM has been validated. Only fully validated features will be re-added from the original AutoGPTQ repo. 
@@ -56,13 +69,13 @@ AutoGPTQ-NEXT is available for Linux only. You can install the latest stable rel
 | CUDA 12.1         | `pip install auto-gptq-next --no-build-isolation`                                                                            | 2.3.1+cu121           |
 
 
-On NVIDIA systems, AutoGPTQ-NEXT does not support [Maxwell or lower](https://qiita.com/uyuni/items/733a93b975b524f89f46) GPUs.
+AutoGPTQ-NEXT does not support [Maxwell or lower](https://qiita.com/uyuni/items/733a93b975b524f89f46) GPUs.
 
 ### Install from source
 
 Clone repo:
 ```bash
-git clone https://github.com/Qubitium/AutoGPTQ-NEXT.git && cd AutoGPTQ
+git clone https://github.com/Qubitium/AutoGPTQ-NEXT.git && cd AutoGPTQ-NEXT
 ```
 
 Compile:
@@ -75,44 +88,36 @@ pip install -vvv --no-build-isolation -e .
 > warning: this is just a showcase of the usage of basic apis in AutoGPTQ-NEXT, which uses only one sample to quantize a much small model, quality of quantized model using such little samples may not good.
 
 Below is an example for the simplest use of `auto_gptq_next` to quantize a model and inference after quantization:
-```python
-from transformers import AutoTokenizer, TextGenerationPipeline
+```py
+from transformers import AutoTokenizer
 from auto_gptq_next import AutoGPTQNextForCausalLM, BaseQuantizeConfig
-import logging
-
-logging.basicConfig(
-    format="%(asctime)s %(levelname)s [%(name)s] %(message)s", level=logging.INFO, datefmt="%Y-%m-%d %H:%M:%S"
-)
 
 pretrained_model_dir = "facebook/opt-125m"
-quantized_model_dir = "opt-125m-4bit"
+quant_output_dir = "opt-125m-4bit"
 
 tokenizer = AutoTokenizer.from_pretrained(pretrained_model_dir, use_fast=True)
 examples = [
     tokenizer(
-        "The world is a wonderful"
+        "The world is a wonderful place full of beauty and love."
     )
 ]
 
-quantize_config = BaseQuantizeConfig(
+quant_config = BaseQuantizeConfig(
     bits=4,  # 4-bit
     group_size=128,  # 128 is good balance between quality and performance
 )
 
 # load un-quantized model, by default, the model will always be loaded into CPU memory
-model = AutoGPTQNextForCausalLM.from_pretrained(pretrained_model_dir, quantize_config)
+model = AutoGPTQNextForCausalLM.from_pretrained(pretrained_model_dir, quant_config)
 
 # quantize model, the examples should be list of dict whose keys can only be "input_ids" and "attention_mask"
 model.quantize(examples)
 
 # save quantized model
-model.save_quantized(quantized_model_dir)
-
-# save quantized model
-model.save_quantized(quantized_model_dir)
+model.save_quantized(quant_output_dir)
 
 # load quantized model to the first GPU
-model = AutoGPTQForCausalLM.from_quantized(quantized_model_dir, device="cuda:0")
+model = AutoGPTQNextForCausalLM.from_quantized(quant_output_dir, device="cuda:0")
 
 # download quantized model from Hugging Face Hub and load to the first GPU
 # model = AutoGPTQForCausalLM.from_quantized(repo_id, device="cuda:0")
@@ -121,30 +126,27 @@ model = AutoGPTQForCausalLM.from_quantized(quantized_model_dir, device="cuda:0")
 print(tokenizer.decode(model.generate(**tokenizer("auto_gptq_next is", return_tensors="pt").to(model.device))[0]))
 
 # or you can also use pipeline
-pipeline = TextGenerationPipeline(model=model, tokenizer=tokenizer)
-print(pipeline("auto-gptq is")[0]["generated_text"])
+# pipeline = TextGenerationPipeline(model=model, tokenizer=tokenizer)
+# print(pipeline("auto-gptq is")[0]["generated_text"])
 ```
 
 For more advanced features of model quantization, please reference to [this script](examples/quantization/quant_with_alpaca.py)
 
-### Customize Model
-<details>
+### How to Add Support for a New Model
+Below is an example to add support for `OPT` model. Use this as guide for future model support PRs:
 
-<summary>Below is an example to extend `auto_gptq_next` to support `OPT` model, as you will see, it's very easy:</summary>
-
-```python
+```py
 from auto_gptq_next.models import BaseGPTQForCausalLM
 
-
 class OPTGPTQForCausalLM(BaseGPTQForCausalLM):
-    # chained attribute name of transformer layer block
+    # name of transformer layer block
     layers_block_name = "model.decoder.layers"
-    # chained attribute names of other nn modules that in the same level as the transformer layer block
+    # names of other nn modules that in the same level as the transformer layer block
     outside_layer_modules = [
         "model.decoder.embed_tokens", "model.decoder.embed_positions", "model.decoder.project_out",
         "model.decoder.project_in", "model.decoder.final_layer_norm"
     ]
-    # chained attribute names of linear layers in transformer layer module
+    # names of linear layers in transformer layer module
     # normally, there are four sub lists, for each one the modules in it can be seen as one operation,
     # and the order should be the order when they are truly executed, in this case (and usually in most cases),
     # they are: attention q_k_v projection, attention output projection, MLP project input, MLP project output
@@ -174,10 +176,8 @@ from functools import partial
 
 import datasets
 from transformers import AutoTokenizer, AutoModelForCausalLM, GenerationConfig
-
 from auto_gptq_next import AutoGPTQNextForCausalLM, BaseQuantizeConfig
 from auto_gptq_next.eval_tasks import SequenceClassificationTask
-
 
 MODEL = "EleutherAI/gpt-j-6b"
 DATASET = "cardiffnlp/tweet_sentiment_multilingual"
@@ -188,7 +188,6 @@ ID2LABEL = {
     2: "positive"
 }
 LABELS = list(ID2LABEL.values())
-
 
 def ds_refactor_fn(samples):
     text_data = samples["text"]
@@ -201,7 +200,6 @@ def ds_refactor_fn(samples):
         new_samples["label"].append(ID2LABEL[label])
 
     return new_samples
-
 
 #  model = AutoModelForCausalLM.from_pretrained(MODEL).eval().half().to("cuda:0")
 model = AutoGPTQNextForCausalLM.from_pretrained(MODEL, BaseQuantizeConfig())
@@ -251,19 +249,6 @@ print(
 [tutorials](docs/tutorial) provide step-by-step guidance to integrate `auto_gptq_next` with your own project and some best practice principles.
 
 [examples](examples/README.md) provide plenty of example scripts to use `auto_gptq_next` in different ways.
-
-## Supported Models
-
-| Model            |    |              |    |              |    |                  |    |
-|------------------|----|--------------|----|--------------|----|------------------|----|
-| baichuan         | ✅ | gpt_bigcode  | ✅ | mixtral     | ✅ | RefinedWebModel  | ✅ |
-| bloom            | ✅ | gpt_neox     | ✅ | moss        | ✅ | stablelm_epoch   | ✅ |
-| chatglm          | ✅ | gpt2         | ✅ | mpt         | ✅ | starcoder2       | ✅ |
-| codegen          | ✅ | gptj         | ✅ | opt         | ✅ | xverse           | ✅ |
-| cohere           | ✅ | internlm     | ✅ | phi         | ✅ | Yi               | ✅ |
-| deci             | ✅ | llama        | ✅ | qwen        | ✅ |                  |    |
-| falcon           | ✅ | longllama    | ✅ | qwen2       | ✅ |                  |    |
-| gemma            | ✅ | mistral      | ✅ | RefinedWeb  | ✅ |                  |    |
 
 ## Supported Evaluation Tasks
 
