@@ -28,11 +28,9 @@ We want AutoGPTQ-NEXT to be highy focused on GPTQ based quantization and target 
 
 * `Sym=False` Support. AutoGPTQ main has broken `sym=false`.
 * `lm_head` module quantized inference support for further vram reduction.
-* PENDING `lm_head` quantization will be added soon with support from Intel/Autoround.
 * ChatGLM Model Support.
 * Better defaults resulting in faster inference.
 * Better default PPL with tweaked internal code (Result may vary depending on calibration set and gpu usage).
-* PENDING: DBRX Model Support.
 * Removed non-working, partially working, or fully deprecated features: Peft, ROCM, AWQ Gemm execution via GPTQ kernels, Triton v1 (replaced by v2).
 * Fixed Packing Performance regression on high core-count systems.
 * Thousands of lines of refractor/cleanup. 
