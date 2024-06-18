@@ -13,9 +13,6 @@
 
 - 2024-06-XX - (News)   🤗 PENDING
 
-*For more histories please turn to [here](docs/NEWS_OR_UPDATE.md)*
-
-
 ## How is AutoGPTQ-NEXT different from AutoGPTQ?
 
 AutoGPTQ-NEXT is an opinionated fork of AugtoGPTQ with latest bug fixes applied, new features, better/latest model support, and an guranteed from the ModelCloud.ai team and that we, along with the open-source ML community, will take every effort to bring the library up-to-date with latest advancements, model support, and bug fixes.
@@ -50,7 +47,7 @@ We want AutoGPTQ-NEXT to be highy focused on GPTQ based quantization and target 
 ## Platform Support
 AutoGPTQ-NEXT is currently Linux only and requires Torch/Cuda capable GPU from NVIDIA. WSL on Windows should work as well. ROCM/AMD support will be re-added in a furture version after everything on ROCM has been validated. Only fully validated features will be re-added from the original AutoGPTQ repo. 
 
-## Installation
+## Install
 
 AutoGPTQ-NEXT is available for Linux only. You can install the latest stable release of AutoGPTQ from pip with pre-built wheels:
 
@@ -73,9 +70,8 @@ Compile:
 pip install -vvv --no-build-isolation -e .
 ```
 
-## Quick Tour
-
 ### Quantization and Inference
+
 > warning: this is just a showcase of the usage of basic apis in AutoGPTQ-NEXT, which uses only one sample to quantize a much small model, quality of quantized model using such little samples may not good.
 
 Below is an example for the simplest use of `auto_gptq_next` to quantize a model and inference after quantization:
@@ -164,6 +160,7 @@ After this, you can use `OPTGPTQForCausalLM.from_pretrained` and other methods a
 </details>
 
 ### Evaluation on Downstream Tasks
+
 You can use tasks defined in `auto_gptq_next.eval_tasks` to evaluate model's performance on specific down-stream task before and after quantization.
 
 The predefined tasks support all causal-language-models implemented in [🤗 transformers](https://github.com/huggingface/transformers) and in this project.
@@ -250,6 +247,7 @@ print(
 </details>
 
 ## Learn More
+
 [tutorials](docs/tutorial) provide step-by-step guidance to integrate `auto_gptq_next` with your own project and some best practice principles.
 
 [examples](examples/README.md) provide plenty of example scripts to use `auto_gptq_next` in different ways.
@@ -268,17 +266,17 @@ print(
 | gemma            | ✅ | mistral      | ✅ | RefinedWeb  | ✅ |                  |    |
 
 ## Supported Evaluation Tasks
-Currently, `auto_gptq_next` supports: `LanguageModelingTask`, `SequenceClassificationTask` and `TextSummarizationTask`; more Tasks will come soon!
 
-## FAQ
+Currently, `auto_gptq_next` supports: `LanguageModelingTask`, `SequenceClassificationTask` and `TextSummarizationTask`; more Tasks will come soon!
 
 ### Which kernel is used by default?
 
 AutoGPTQ-NEXT will use Marlin, Exllama v2, Exallama v1, Triton/CUDA kernels in that order for maximum inference performance.
 
 ## Acknowledgement
-* **PanQiWei** and **FXMarty** for their creation and support of AutoGPTQ
-* **Elias Frantar**, **Saleh Ashkboos**, **Torsten Hoefler** and **Dan Alistarh** for proposing **GPTQ** algorithm and open source the [code](https://github.com/IST-DASLab/gptq), and for releasing [Marlin kernel](https://github.com/IST-DASLab/marlin) for mixed precision computation.
-* **qwopqwop200**, for quantization code in this project adapted from [GPTQ-for-LLaMa](https://github.com/qwopqwop200/GPTQ-for-LLaMa/tree/cuda).
-* **turboderp**, for releasing high performance [Exllama](https://github.com/turboderp/exllama) and [Exllama v2](https://github.com/turboderp/exllamav2) libraries used in this project.
-* **FPGAMiner**, for triton kernels used in GPTQ-for-LLaMa which is adpated into this project.
+
+* **PanQiWei** and **FXMarty** for their creation and support of AutoGPTQ of which this project is based upon.
+* **Elias Frantar**, **Saleh Ashkboos**, **Torsten Hoefler** and **Dan Alistarh** for **GPTQ**/**Marlin** algorithm and [code](https://github.com/IST-DASLab/gptq) [Marlin kernel](https://github.com/IST-DASLab/marlin).
+* **qwopqwop200**, for quantization code used in this project adapted from [GPTQ-for-LLaMa](https://github.com/qwopqwop200/GPTQ-for-LLaMa/tree/cuda).
+* **turboderp**, for releasing [Exllama](https://github.com/turboderp/exllama) and [Exllama v2](https://github.com/turboderp/exllamav2) kernels adapted for use in this project.
+* **FPGAMiner**, for triton kernels used in GPTQ-for-LLaMa which is adapted into this project.
