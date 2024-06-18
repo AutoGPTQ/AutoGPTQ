@@ -31,12 +31,23 @@ We want AutoGPTQ-NEXT to be highy focused on GPTQ based quantization and target 
 * PENDING `lm_head` quantization will be added soon with support from Intel/Autoround.
 * ChatGLM Model Support.
 * Better defaults resulting in faster inference.
-* Better default PPL without with tweaked internal code (Result may vary depending on calibration set and gpu usage).
+* Better default PPL with tweaked internal code (Result may vary depending on calibration set and gpu usage).
 * PENDING: DBRX Model Support.
 * Removed non-working, partially working, or fully deprecated features: Peft, ROCM, AWQ Gemm execution via GPTQ kernels, Triton v1 (replaced by v2).
 * Fixed Packing Performance regression on high core-count systems.
 * Thousands of lines of refractor/cleanup. 
 * Complete tests with every feature and model tested. Everything that does not pass tests will be removed from repo. We want quality over quantity.
+
+## Roadmap (Target Date: June/July 2024):
+
+* DBRX support.
+* `lm_head` quantization support by integrating with Intel/Autoround.
+* Customizable callback in Per-Layer quantization.
+* Add Qbits (cpu inference) support from Intel/Qbits.
+* Add back ROCM/AMD support once verything is validated.
+* Store quant loss stat and apply diffs to new quant for quality control.
+* Alert users of non-optimal calibration data.
+
 
 ## Platform Support
 AutoGPTQ-NEXT is currently Linux only and requires Torch/Cuda capable GPU from NVIDIA. WSL on Windows should work as well. ROCM/AMD support will be re-added in a furture version after everything on ROCM has been validated. Only fully validated features will be re-added from the original AutoGPTQ repo. 
