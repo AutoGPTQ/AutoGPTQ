@@ -33,7 +33,7 @@ We want AutoGPTQ-NEXT to be highy focused on GPTQ based quantization and target 
 * Thousands of lines of refractor/cleanup. 
 * Complete tests with every feature and model tested. Everything that does not pass tests will be removed from repo. We want quality over quantity.
 
-## Roadmap (Target Date: June/July 2024):
+## Roadmap (Target Date: July 2024):
 
 * DBRX support.
 * `lm_head` quantization support by integrating with Intel/Autoround.
