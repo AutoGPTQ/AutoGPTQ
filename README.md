@@ -16,33 +16,11 @@
 
 *For more histories please turn to [here](docs/NEWS_OR_UPDATE.md)*
 
-## Performance Comparison
-
-### Inference Speed
-> The result is generated using [this script](examples/benchmark/generation_speed.py), batch size of input is 1, decode strategy is beam search and enforce the model to generate 512 tokens, speed metric is tokens/s (the larger, the better).
->
-> The quantized model is loaded using the setup that can gain the fastest inference speed.
-
-| model         | GPU           | num_beams | fp16  | gptq-int4 |
-|---------------|---------------|-----------|-------|-----------|
-| llama-7b      | 1xA100-40G    | 1         | 18.87 | 25.53     |
-| llama-7b      | 1xA100-40G    | 4         | 68.79 | 91.30     |
-| moss-moon 16b | 1xA100-40G    | 1         | 12.48 | 15.25     |
-| moss-moon 16b | 1xA100-40G    | 4         | OOM   | 42.67     |
-| moss-moon 16b | 2xA100-40G    | 1         | 06.83 | 06.78     |
-| moss-moon 16b | 2xA100-40G    | 4         | 13.10 | 10.80     |
-| gpt-j 6b      | 1xRTX3060-12G | 1         | OOM   | 29.55     |
-| gpt-j 6b      | 1xRTX3060-12G | 4         | OOM   | 47.36     |
-
-
-### Perplexity
-For perplexity comparison, you can turn to [here](https://github.com/qwopqwop200/GPTQ-for-LLaMa#result) and [here](https://github.com/qwopqwop200/GPTQ-for-LLaMa#gptq-vs-bitsandbytes)
-
 ## Installation
 
 AutoGPTQ-NEXT is available for Linux only. You can install the latest stable release of AutoGPTQ from pip with pre-built wheels:
 
-| CUDA/ROCm version | Installation                                                                                      | Built against PyTorch |
+| CUDA version | Installation                                                                                      | Built against PyTorch |
 |-------------------|---------------------------------------------------------------------------------------------------|-----------------------|
 | CUDA 12.1         | `pip install auto-gptq-next --no-build-isolation`                                                                            | 2.3.1+cu121           |
 
@@ -86,14 +64,13 @@ quantized_model_dir = "opt-125m-4bit"
 tokenizer = AutoTokenizer.from_pretrained(pretrained_model_dir, use_fast=True)
 examples = [
     tokenizer(
-        "auto-gptq is an easy-to-use model quantization library with user-friendly apis, based on GPTQ algorithm."
+        "The world is a wonderful"
     )
 ]
 
 quantize_config = BaseQuantizeConfig(
-    bits=4,  # quantize model to 4-bit
-    group_size=128,  # it is recommended to set the value to 128
-    desc_act=False,  # set to False can significantly speed up inference but the perplexity may slightly bad
+    bits=4,  # 4-bit
+    group_size=128,  # 128 is good balance between quality and performance
 )
 
 # load un-quantized model, by default, the model will always be loaded into CPU memory
@@ -105,14 +82,14 @@ model.quantize(examples)
 # save quantized model
 model.save_quantized(quantized_model_dir)
 
-# save quantized model using safetensors
-model.save_quantized(quantized_model_dir, use_safetensors=True)
+# save quantized model
+model.save_quantized(quantized_model_dir)
 
 # load quantized model to the first GPU
 model = AutoGPTQForCausalLM.from_quantized(quantized_model_dir, device="cuda:0")
 
 # download quantized model from Hugging Face Hub and load to the first GPU
-# model = AutoGPTQForCausalLM.from_quantized(repo_id, device="cuda:0", use_safetensors=True, use_triton=False)
+# model = AutoGPTQForCausalLM.from_quantized(repo_id, device="cuda:0")
 
 # inference with model.generate
 print(tokenizer.decode(model.generate(**tokenizer("auto_gptq_next is", return_tensors="pt").to(model.device))[0]))
@@ -268,14 +245,6 @@ print(
 
 ## Supported Evaluation Tasks
 Currently, `auto_gptq_next` supports: `LanguageModelingTask`, `SequenceClassificationTask` and `TextSummarizationTask`; more Tasks will come soon!
-
-## Running tests
-
-Tests can be run with:
-
-```
-pytest tests/ -s
-```
 
 ## FAQ
 
