@@ -256,18 +256,16 @@ print(
 
 ## Supported Models
 
-| Model            |     | Model    |     | Model           |    |
-|------------------|-----|----------|-----|-----------------|----|
-| Baichuan         | ✅ | Gpt2      | ✅ | Phi             | ✅ |
-| Bloom            | ✅ | Gptj      | ✅ | Qwen            | ✅ |
-| Chatglm          | ✅ | Internlm  | ✅ | Qwen2           | ✅ |
-| Codegen          | ✅ | Llama     | ✅ | RefinedWeb      | ✅ |
-| Cohere           | ✅ | Longllama | ✅ | RefinedWebModel | ✅ |
-| Deci             | ✅ | Mistral   | ✅ | Stablelm_epoch  | ✅ |
-| Falcon           | ✅ | Mixtral   | ✅ | Starcoder2      | ✅ |
-| Gemma            | ✅ | Moss      | ✅ | Xverse          | ✅ |
-| Gpt_bigcode      | ✅ | Mpt       | ✅ | Yi              | ✅ |
-| Gpt_neox         | ✅ | Opt       | ✅ |                 |    |
+| Model            |    |              |    |              |    |                  |    |
+|------------------|----|--------------|----|--------------|----|------------------|----|
+| baichuan         | ✅ | gpt_bigcode  | ✅ | mixtral     | ✅ | RefinedWebModel  | ✅ |
+| bloom            | ✅ | gpt_neox     | ✅ | moss        | ✅ | stablelm_epoch   | ✅ |
+| chatglm          | ✅ | gpt2         | ✅ | mpt         | ✅ | starcoder2       | ✅ |
+| codegen          | ✅ | gptj         | ✅ | opt         | ✅ | xverse           | ✅ |
+| cohere           | ✅ | internlm     | ✅ | phi         | ✅ | Yi               | ✅ |
+| deci             | ✅ | llama        | ✅ | qwen        | ✅ |                  |    |
+| falcon           | ✅ | longllama    | ✅ | qwen2       | ✅ |                  |    |
+| gemma            | ✅ | mistral      | ✅ | RefinedWeb  | ✅ |                  |    |
 
 ## Supported Evaluation Tasks
 Currently, `auto_gptq_next` supports: `LanguageModelingTask`, `SequenceClassificationTask` and `TextSummarizationTask`; more Tasks will come soon!
