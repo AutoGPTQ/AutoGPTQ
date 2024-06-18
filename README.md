@@ -256,37 +256,18 @@ print(
 
 ## Supported Models
 
-| Model            |     |
-|------------------|-----|
-| Baichuan         | ✅ |
-| Bloom            | ✅ |
-| Chatglm          | ✅ |
-| Codegen          | ✅ |
-| Cohere           | ✅ |
-| Deci             | ✅ |
-| Falcon           | ✅ |
-| Gemma            | ✅ |
-| Gpt_bigcode      | ✅ |
-| Gpt_neox         | ✅ |
-| Gpt2             | ✅ |
-| Gptj             | ✅ |
-| Internlm         | ✅ |
-| Llama            | ✅ |
-| Longllama        | ✅ |
-| Mistral          | ✅ |
-| Mixtral          | ✅ |
-| Moss             | ✅ |
-| Mpt              | ✅ |
-| Opt              | ✅ |
-| Phi              | ✅ |
-| Qwen             | ✅ |
-| Qwen2            | ✅ |
-| RefinedWeb       | ✅ |
-| RefinedWebModel  | ✅ |
-| Stablelm_epoch   | ✅ |
-| Starcoder2       | ✅ |
-| Xverse           | ✅ |
-| Yi               | ✅ |
+| Model            |     | Model    |     | Model           |    |
+|------------------|-----|----------|-----|-----------------|----|
+| Baichuan         | ✅ | Gpt2      | ✅ | Phi             | ✅ |
+| Bloom            | ✅ | Gptj      | ✅ | Qwen            | ✅ |
+| Chatglm          | ✅ | Internlm  | ✅ | Qwen2           | ✅ |
+| Codegen          | ✅ | Llama     | ✅ | RefinedWeb      | ✅ |
+| Cohere           | ✅ | Longllama | ✅ | RefinedWebModel | ✅ |
+| Deci             | ✅ | Mistral   | ✅ | Stablelm_epoch  | ✅ |
+| Falcon           | ✅ | Mixtral   | ✅ | Starcoder2      | ✅ |
+| Gemma            | ✅ | Moss      | ✅ | Xverse          | ✅ |
+| Gpt_bigcode      | ✅ | Mpt       | ✅ | Yi              | ✅ |
+| Gpt_neox         | ✅ | Opt       | ✅ |                 |    |
 
 ## Supported Evaluation Tasks
 Currently, `auto_gptq_next` supports: `LanguageModelingTask`, `SequenceClassificationTask` and `TextSummarizationTask`; more Tasks will come soon!
