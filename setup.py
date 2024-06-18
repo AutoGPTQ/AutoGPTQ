@@ -4,7 +4,6 @@ from pathlib import Path
 
 from setuptools import find_packages, setup
 
-
 os.environ["CC"] = "g++"
 os.environ["CXX"] = "g++"
 
@@ -23,6 +22,9 @@ common_setup_kwargs = {
         "Environment :: GPU :: NVIDIA CUDA :: 11.8",
         "Environment :: GPU :: NVIDIA CUDA :: 12",
         "Environment :: GPU :: NVIDIA CUDA :: 12.1",
+        "Environment :: GPU :: NVIDIA CUDA :: 12.2",
+        "Environment :: GPU :: NVIDIA CUDA :: 12.3",
+        "Environment :: GPU :: NVIDIA CUDA :: 12.4",
         "License :: OSI Approved :: MIT License",
         "Natural Language :: English",
         "Programming Language :: Python :: 3.8",
@@ -68,20 +70,13 @@ def detect_local_sm_architectures():
 
 
 if BUILD_CUDA_EXT:
-    try:
-        import torch
-    except Exception as e:
-        print(
-            f"Building PyTorch CUDA extension requires PyTorch being installed, please install PyTorch first: {e}.\n NOTE: This issue may be raised due to pip build isolation system (ignoring local packages). Please use `--no-build-isolation` when installing with pip, and refer to https://github.com/AutoGPTQ/AutoGPTQ/pull/620 for more details."
-        )
-        sys.exit(1)
-
+    import torch
     default_cuda_version = torch.version.cuda
     CUDA_VERSION = "".join(os.environ.get("CUDA_VERSION", default_cuda_version).split("."))
 
     if not CUDA_VERSION:
         print(
-            f"Trying to compile auto-gptq for CUDA, but Pytorch {torch.__version__} "
+            f"Trying to compile AutoGPTQ-NEXT for CUDA, but Pytorch {torch.__version__} "
             "is installed without CUDA support."
         )
         sys.exit(1)
@@ -94,7 +89,7 @@ if BUILD_CUDA_EXT:
         requested_but_unsupported_archs = {arch for arch in archs if arch in UNSUPPORTED_COMPUTE_CAPABILITIES}
         if len(requested_but_unsupported_archs) > 0:
             raise ValueError(
-                f"Trying to compile AutoGPTQ for CUDA compute capabilities {torch_cuda_arch_list}, but AutoGPTQ does not support the compute capabilities {requested_but_unsupported_archs} (AutoGPTQ requires Pascal or higher). Please fix your environment variable TORCH_CUDA_ARCH_LIST (Reference: https://github.com/pytorch/pytorch/blob/v2.2.2/setup.py#L135-L139)."
+                f"Trying to compile AutoGPTQ-NEXT for CUDA compute capabilities {torch_cuda_arch_list}, but AutoGPTQ does not support the compute capabilities {requested_but_unsupported_archs} (AutoGPTQ requires Pascal or higher). Please fix your environment variable TORCH_CUDA_ARCH_LIST (Reference: https://github.com/pytorch/pytorch/blob/v2.2.2/setup.py#L135-L139)."
             )
     else:
         local_arch_list = detect_local_sm_architectures()
