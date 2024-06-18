@@ -17,6 +17,3 @@ class OPTGPTQForCausalLM(BaseGPTQForCausalLM):
         ["fc1"],
         ["fc2"],
     ]
-
-
-__all__ = ["OPTGPTQForCausalLM"]

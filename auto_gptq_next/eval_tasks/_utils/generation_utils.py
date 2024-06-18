@@ -32,5 +32,3 @@ def postprocess_generation_ids(
 
     return outputs
 
-
-__all__ = ["postprocess_generation_ids"]

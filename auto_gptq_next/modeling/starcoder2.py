@@ -11,6 +11,3 @@ class Starcoder2GPTQForCausalLM(BaseGPTQForCausalLM):
         ["mlp.c_fc"],
         ["mlp.c_proj"],
     ]
-
-
-__all__ = ["Starcoder2GPTQForCausalLM"]

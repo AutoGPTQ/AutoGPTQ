@@ -11,6 +11,3 @@ class GPT2GPTQForCausalLM(BaseGPTQForCausalLM):
         ["mlp.c_fc"],
         ["mlp.c_proj"],
     ]
-
-
-__all__ = ["GPT2GPTQForCausalLM"]

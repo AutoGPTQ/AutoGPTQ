@@ -11,6 +11,3 @@ class YiGPTQForCausalLM(BaseGPTQForCausalLM):
         ["mlp.up_proj", "mlp.gate_proj"],
         ["mlp.down_proj"],
     ]
-
-
-__all__ = ["YiGPTQForCausalLM"]

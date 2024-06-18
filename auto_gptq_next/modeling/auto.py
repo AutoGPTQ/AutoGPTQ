@@ -156,5 +156,3 @@ class AutoGPTQForCausalLM:
             **keywords,
         )
 
-
-__all__ = ["AutoGPTQForCausalLM"]

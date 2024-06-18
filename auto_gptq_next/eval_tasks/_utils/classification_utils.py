@@ -40,5 +40,3 @@ def get_closest_label(pred: Sequence, classes: List[Sequence]) -> int:
             min_edit_distance = edit_distance
     return min_id
 
-
-__all__ = ["levenshtein_distance", "get_closest_label"]

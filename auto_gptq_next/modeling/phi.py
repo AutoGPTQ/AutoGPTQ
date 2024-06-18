@@ -13,6 +13,3 @@ class PhiGPTQForCausalLM(BaseGPTQForCausalLM):
         ["mlp.fc1"],
         ["mlp.fc2"],
     ]
-
-
-__all__ = ["PhiGPTQForCausalLM"]

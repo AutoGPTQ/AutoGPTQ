@@ -11,6 +11,3 @@ class GPTBigCodeGPTQForCausalLM(BaseGPTQForCausalLM):
         ["mlp.c_fc"],
         ["mlp.c_proj"],
     ]
-
-
-__all__ = ["GPTBigCodeGPTQForCausalLM"]

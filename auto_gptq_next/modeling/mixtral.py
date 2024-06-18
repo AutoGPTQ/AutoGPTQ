@@ -37,6 +37,3 @@ class MixtralGPTQForCausalLM(BaseGPTQForCausalLM):
             "block_sparse_moe.experts.7.w2",
         ],
     ]
-
-
-__all__ = ["MixtralGPTQForCausalLM"]

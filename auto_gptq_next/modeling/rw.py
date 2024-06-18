@@ -11,6 +11,3 @@ class RWGPTQForCausalLM(BaseGPTQForCausalLM):
         ["mlp.dense_h_to_4h"],
         ["mlp.dense_4h_to_h"],
     ]
-
-
-__all__ = ["RWGPTQForCausalLM"]

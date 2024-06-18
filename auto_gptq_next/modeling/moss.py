@@ -11,6 +11,3 @@ class MOSSGPTQForCausalLM(BaseGPTQForCausalLM):
         ["mlp.fc_in"],
         ["mlp.fc_out"],
     ]
-
-
-__all__ = ["MOSSGPTQForCausalLM"]

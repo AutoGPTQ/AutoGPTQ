@@ -99,5 +99,3 @@ class SequenceClassificationTask(BaseTask):
         generation_config.pad_token_id = self.tokenizer.pad_token_id
         return super().run(generation_config=generation_config)
 
-
-__all__ = ["SequenceClassificationTask"]

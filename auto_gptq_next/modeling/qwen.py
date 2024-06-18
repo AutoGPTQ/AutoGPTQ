@@ -16,6 +16,3 @@ class QwenGPTQForCausalLM(BaseGPTQForCausalLM):
         ["mlp.w1", "mlp.w2"],
         ["mlp.c_proj"],
     ]
-
-
-__all__ = ["QwenGPTQForCausalLM"]

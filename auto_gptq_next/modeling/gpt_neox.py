@@ -12,6 +12,3 @@ class GPTNeoXGPTQForCausalLM(BaseGPTQForCausalLM):
         ["mlp.dense_4h_to_h"],
     ]
     lm_head_name = "embed_out"
-
-
-__all__ = ["GPTNeoXGPTQForCausalLM"]
