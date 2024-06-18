@@ -241,47 +241,43 @@ print(
 </details>
 
 ## Learn More
-[tutorials](docs/tutorial) provide step-by-step guidance to integrate `auto_gptq_next_next` with your own project and some best practice principles.
+[tutorials](docs/tutorial) provide step-by-step guidance to integrate `auto_gptq_next` with your own project and some best practice principles.
 
-[examples](examples/README.md) provide plenty of example scripts to use `auto_gptq_next_next` in different ways.
+[examples](examples/README.md) provide plenty of example scripts to use `auto_gptq_next` in different ways.
 
 ## Supported Models
 
-> you can use `model.config.model_type` to compare with the table below to check whether the model you use is supported by `auto_gptq_next`.
->
-> for example, model_type of `WizardLM`, `vicuna` and `gpt4all` are all `llama`, hence they are all supported by `auto_gptq_next`.
-
-| model type       | quantization | inference | 
-|------------------|--------------|-----------|
-| baichuan         | ✅          |  ✅       |
-| bloom            | ✅          |  ✅       |
-| chatglm          | ✅          |  ✅       |
-| codegen          | ✅          |  ✅       |
-| cohere           | ✅          |  ✅       |
-| deci             | ✅          |  ✅       |
-| falcon           | ✅          |  ✅       |
-| gemma            | ✅          |  ✅       |
-| gpt_bigcode      | ✅          |  ✅       |
-| gpt_neox         | ✅          |  ✅       |
-| gpt2             | ✅          |  ✅       |
-| gptj             | ✅          |  ✅       |
-| internlm         | ✅          |  ✅       |
-| llama            | ✅          |  ✅       |
-| longllama        | ✅          |  ✅       |
-| mistral          | ✅          |  ✅       |
-| mixtral          | ✅          |  ✅       |
-| moss             | ✅          |  ✅       |
-| mpt              | ✅          |  ✅       |
-| opt              | ✅          |  ✅       |
-| phi              | ✅          |  ✅       |
-| qwen             | ✅          |  ✅       |
-| qwen2            | ✅          |  ✅       |
-| RefinedWeb       | ✅          |  ✅       |
-| RefinedWebModel  | ✅          |  ✅       |
-| stablelm_epoch   | ✅          |  ✅       |
-| starcoder2       | ✅          |  ✅       |
-| xverse           | ✅          |  ✅       |
-| Yi               | ✅          |  ✅       |
+| Model            |     |
+|------------------|-----|
+| Baichuan         | ✅ |
+| Bloom            | ✅ |
+| Chatglm          | ✅ |
+| Codegen          | ✅ |
+| Cohere           | ✅ |
+| Deci             | ✅ |
+| Falcon           | ✅ |
+| Gemma            | ✅ |
+| Gpt_bigcode      | ✅ |
+| Gpt_neox         | ✅ |
+| Gpt2             | ✅ |
+| Gptj             | ✅ |
+| Internlm         | ✅ |
+| Llama            | ✅ |
+| Longllama        | ✅ |
+| Mistral          | ✅ |
+| Mixtral          | ✅ |
+| Moss             | ✅ |
+| Mpt              | ✅ |
+| Opt              | ✅ |
+| Phi              | ✅ |
+| Qwen             | ✅ |
+| Qwen2            | ✅ |
+| RefinedWeb       | ✅ |
+| RefinedWebModel  | ✅ |
+| Stablelm_epoch   | ✅ |
+| Starcoder2       | ✅ |
+| Xverse           | ✅ |
+| Yi               | ✅ |
 
 ## Supported Evaluation Tasks
 Currently, `auto_gptq_next` supports: `LanguageModelingTask`, `SequenceClassificationTask` and `TextSummarizationTask`; more Tasks will come soon!
