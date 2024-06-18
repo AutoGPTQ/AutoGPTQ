@@ -70,10 +70,10 @@ As a last resort, if the above command fails, you can try `python setup.py insta
 ### Quantization and Inference
 > warning: this is just a showcase of the usage of basic apis in AutoGPTQ-NEXT, which uses only one sample to quantize a much small model, quality of quantized model using such little samples may not good.
 
-Below is an example for the simplest use of `auto_gptq` to quantize a model and inference after quantization:
+Below is an example for the simplest use of `auto_gptq_next` to quantize a model and inference after quantization:
 ```python
 from transformers import AutoTokenizer, TextGenerationPipeline
-from auto_gptq import AutoGPTQNextForCausalLM, BaseQuantizeConfig
+from auto_gptq_next import AutoGPTQNextForCausalLM, BaseQuantizeConfig
 import logging
 
 logging.basicConfig(
@@ -115,7 +115,7 @@ model = AutoGPTQForCausalLM.from_quantized(quantized_model_dir, device="cuda:0")
 # model = AutoGPTQForCausalLM.from_quantized(repo_id, device="cuda:0", use_safetensors=True, use_triton=False)
 
 # inference with model.generate
-print(tokenizer.decode(model.generate(**tokenizer("auto_gptq is", return_tensors="pt").to(model.device))[0]))
+print(tokenizer.decode(model.generate(**tokenizer("auto_gptq_next is", return_tensors="pt").to(model.device))[0]))
 
 # or you can also use pipeline
 pipeline = TextGenerationPipeline(model=model, tokenizer=tokenizer)
@@ -127,10 +127,10 @@ For more advanced features of model quantization, please reference to [this scri
 ### Customize Model
 <details>
 
-<summary>Below is an example to extend `auto_gptq` to support `OPT` model, as you will see, it's very easy:</summary>
+<summary>Below is an example to extend `auto_gptq_next` to support `OPT` model, as you will see, it's very easy:</summary>
 
 ```python
-from auto_gptq.modeling import BaseGPTQForCausalLM
+from auto_gptq_next.modeling import BaseGPTQForCausalLM
 
 
 class OPTGPTQForCausalLM(BaseGPTQForCausalLM):
@@ -157,7 +157,7 @@ After this, you can use `OPTGPTQForCausalLM.from_pretrained` and other methods a
 </details>
 
 ### Evaluation on Downstream Tasks
-You can use tasks defined in `auto_gptq.eval_tasks` to evaluate model's performance on specific down-stream task before and after quantization.
+You can use tasks defined in `auto_gptq_next.eval_tasks` to evaluate model's performance on specific down-stream task before and after quantization.
 
 The predefined tasks support all causal-language-models implemented in [🤗 transformers](https://github.com/huggingface/transformers) and in this project.
 
@@ -171,8 +171,8 @@ from functools import partial
 import datasets
 from transformers import AutoTokenizer, AutoModelForCausalLM, GenerationConfig
 
-from auto_gptq import AutoGPTQNextForCausalLM, BaseQuantizeConfig
-from auto_gptq.eval_tasks import SequenceClassificationTask
+from auto_gptq_next import AutoGPTQNextForCausalLM, BaseQuantizeConfig
+from auto_gptq_next.eval_tasks import SequenceClassificationTask
 
 
 MODEL = "EleutherAI/gpt-j-6b"
@@ -243,15 +243,15 @@ print(
 </details>
 
 ## Learn More
-[tutorials](docs/tutorial) provide step-by-step guidance to integrate `auto_gptq_next` with your own project and some best practice principles.
+[tutorials](docs/tutorial) provide step-by-step guidance to integrate `auto_gptq_next_next` with your own project and some best practice principles.
 
-[examples](examples/README.md) provide plenty of example scripts to use `auto_gptq_next` in different ways.
+[examples](examples/README.md) provide plenty of example scripts to use `auto_gptq_next_next` in different ways.
 
 ## Supported Models
 
-> you can use `model.config.model_type` to compare with the table below to check whether the model you use is supported by `auto_gptq`.
+> you can use `model.config.model_type` to compare with the table below to check whether the model you use is supported by `auto_gptq_next`.
 >
-> for example, model_type of `WizardLM`, `vicuna` and `gpt4all` are all `llama`, hence they are all supported by `auto_gptq`.
+> for example, model_type of `WizardLM`, `vicuna` and `gpt4all` are all `llama`, hence they are all supported by `auto_gptq_next`.
 
 | model type                         | quantization | inference | 
 |------------------------------------|--------------|-----------|
@@ -267,7 +267,7 @@ print(
 | falcon(RefinedWebModel/RefinedWeb) | ✅            | ✅         |
 
 ## Supported Evaluation Tasks
-Currently, `auto_gptq` supports: `LanguageModelingTask`, `SequenceClassificationTask` and `TextSummarizationTask`; more Tasks will come soon!
+Currently, `auto_gptq_next` supports: `LanguageModelingTask`, `SequenceClassificationTask` and `TextSummarizationTask`; more Tasks will come soon!
 
 ## Running tests
 

@@ -4,7 +4,7 @@ Welcome to the tutorial of AutoGPTQ, in this chapter, you will learn advanced mo
 ## Arguments Introduction
 In previous chapter, you learned how to load model into CPU or single GPU with the two basic apis:
 - `.from_pretrained`: by default, load the whole pretrained model into CPU.
-- `.from_quantized`: by default, `auto_gptq` will automatically find the suitable way to load the quantized model.
+- `.from_quantized`: by default, `auto_gptq_next` will automatically find the suitable way to load the quantized model.
   - if there is only single GPU and model can fit into it, will load the whole model into that GPU;
   - if there are multiple GPUs and model can fit into them, will evenly split model and load into those GPUs;
   - if model can't fit into GPU(s), will use CPU offloading.

@@ -1,6 +1,6 @@
 # Examples
 
-To run example scripts in this folder, one must first install `auto_gptq` as described in [this](../README.md)
+To run example scripts in this folder, one must first install `auto_gptq_next` as described in [this](../README.md)
 
 ## Quantization
 > Commands in this chapter should be run under `quantization` folder.
@@ -66,7 +66,7 @@ Use `--help` flag to see detailed descriptions for more command arguments.
 > Commands in this chapter should be run under `benchmark` folder.
 
 ### Generation Speed
-`generation_speed.py` script gives an example of how to benchmark the generations speed of pretrained and quantized models that `auto_gptq` supports, this benchmarks model generation speed in tokens/s metric.
+`generation_speed.py` script gives an example of how to benchmark the generations speed of pretrained and quantized models that `auto_gptq_next` supports, this benchmarks model generation speed in tokens/s metric.
 
 To execute this script, using command like this:
 ```shell

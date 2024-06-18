@@ -3,8 +3,8 @@ import os
 import tempfile
 import unittest
 
-from auto_gptq import AutoGPTQForCausalLM
-from auto_gptq.quantization import FORMAT, FORMAT_FIELD, QUANT_CONFIG_FILENAME
+from auto_gptq_next import AutoGPTQForCausalLM
+from auto_gptq_next.quantization import FORMAT, FORMAT_FIELD, QUANT_CONFIG_FILENAME
 
 
 class TestSerialization(unittest.TestCase):

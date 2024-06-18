@@ -9,7 +9,7 @@ line-length = 119
 
 [lint.isort]
 lines-after-imports = 2
-known-first-party = ["auto_gptq"]
+known-first-party = ["auto_gptq_next"]
 
 [format]
 # Like Black, use double quotes for strings.

@@ -2,7 +2,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-from auto_gptq import AutoGPTQForCausalLM, BaseQuantizeConfig
+from auto_gptq_next import AutoGPTQForCausalLM, BaseQuantizeConfig
 
 
 pretrained_model_dir = "facebook/opt-125m"

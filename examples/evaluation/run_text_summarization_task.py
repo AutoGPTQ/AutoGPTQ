@@ -5,8 +5,8 @@ import datasets
 import torch
 from transformers import AutoTokenizer, GenerationConfig
 
-from auto_gptq import AutoGPTQForCausalLM, BaseQuantizeConfig
-from auto_gptq.eval_tasks import TextSummarizationTask
+from auto_gptq_next import AutoGPTQForCausalLM, BaseQuantizeConfig
+from auto_gptq_next.eval_tasks import TextSummarizationTask
 
 
 os.system("pip install py7zr")

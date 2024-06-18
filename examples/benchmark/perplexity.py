@@ -4,7 +4,7 @@ import os
 import torch
 from transformers import AutoTokenizer
 
-from auto_gptq.utils import Perplexity
+from auto_gptq_next.utils import Perplexity
 
 
 if __name__ == "__main__":
@@ -81,7 +81,7 @@ if __name__ == "__main__":
         )
 
     if args.is_quantized:
-        from auto_gptq import AutoGPTQForCausalLM
+        from auto_gptq_next import AutoGPTQForCausalLM
 
         model = AutoGPTQForCausalLM.from_quantized(
             args.model_name,

@@ -7,7 +7,7 @@ import torch
 from datasets import Dataset
 from transformers import AutoTokenizer, TextGenerationPipeline
 
-from auto_gptq import AutoGPTQForCausalLM, BaseQuantizeConfig
+from auto_gptq_next import AutoGPTQForCausalLM, BaseQuantizeConfig
 
 
 def load_data(data_path, tokenizer, n_samples):

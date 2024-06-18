@@ -4,7 +4,7 @@ on:
   push:
     branches: [ main ]
     paths:
-      - "auto_gptq/**.py"
+      - "auto_gptq_next/**.py"
       - "tests/**.py"
       - "examples/**.py"
       - "setup.py"
@@ -12,7 +12,7 @@ on:
   pull_request:
     branches: [ main ]
     paths:
-      - "auto_gptq/**.py"
+      - "auto_gptq_next/**.py"
       - "tests/**.py"
       - "examples/**.py"
       - "setup.py"
@@ -121,4 +121,4 @@ jobs:
       
       - name: Check style with ruff
         run: |
-          ruff auto_gptq examples tests setup.py
+          ruff auto_gptq_next examples tests setup.py

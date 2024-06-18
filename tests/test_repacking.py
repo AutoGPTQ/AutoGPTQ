@@ -5,9 +5,9 @@ import autogptq_marlin_cuda
 import torch
 import torch.nn as nn
 
-from auto_gptq.nn_modules.qlinear.qlinear_cuda_old import QuantLinear as CudaOldQuantLinear
-from auto_gptq.nn_modules.qlinear.qlinear_marlin import QuantLinear as MarlinQuantLinear
-from auto_gptq.nn_modules.qlinear.qlinear_marlin import _get_perms, dequantize_weight
+from auto_gptq_next.nn_modules.qlinear.qlinear_cuda_old import QuantLinear as CudaOldQuantLinear
+from auto_gptq_next.nn_modules.qlinear.qlinear_marlin import QuantLinear as MarlinQuantLinear
+from auto_gptq_next.nn_modules.qlinear.qlinear_marlin import _get_perms, dequantize_weight
 
 
 def gen_quant4(k, n, groupsize=-1):

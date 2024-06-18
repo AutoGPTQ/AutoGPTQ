@@ -5,7 +5,7 @@ import torch
 from datasets import load_dataset
 from transformers import TextGenerationPipeline
 
-from auto_gptq import AutoGPTQForCausalLM, BaseQuantizeConfig
+from auto_gptq_next import AutoGPTQForCausalLM, BaseQuantizeConfig
 
 
 pretrained_model_dir = "gpt2-xl"

@@ -3,10 +3,10 @@ import unittest  # noqa: E402
 import torch  # noqa: E402
 from parameterized import parameterized  # noqa: E402
 
-from auto_gptq.nn_modules.qlinear.qlinear_exllama import QuantLinear  # noqa: E402
-from auto_gptq.nn_modules.qlinear.qlinear_marlin import QuantLinear as MarlinQuantLinear  # noqa: E402
-from auto_gptq.nn_modules.qlinear.qlinear_tritonv2 import QuantLinear as TritonV2QuantLinear  # noqa: E402
-from auto_gptq.utils.import_utils import dynamically_import_QuantLinear  # noqa: E402
+from auto_gptq_next.nn_modules.qlinear.qlinear_exllama import QuantLinear  # noqa: E402
+from auto_gptq_next.nn_modules.qlinear.qlinear_marlin import QuantLinear as MarlinQuantLinear  # noqa: E402
+from auto_gptq_next.nn_modules.qlinear.qlinear_tritonv2 import QuantLinear as TritonV2QuantLinear  # noqa: E402
+from auto_gptq_next.utils.import_utils import dynamically_import_QuantLinear  # noqa: E402
 
 
 try:
@@ -16,9 +16,9 @@ except ImportError as e:
 
 from transformers import AutoTokenizer  # noqa: E402
 
-from auto_gptq import AutoGPTQForCausalLM, exllama_set_max_input_length  # noqa: E402
-from auto_gptq.modeling._const import EXLLAMA_DEFAULT_MAX_INPUT_LENGTH  # noqa: E402
-from auto_gptq.modeling._utils import autogptq_post_init  # noqa: E402
+from auto_gptq_next import AutoGPTQForCausalLM, exllama_set_max_input_length  # noqa: E402
+from auto_gptq_next.modeling._const import EXLLAMA_DEFAULT_MAX_INPUT_LENGTH  # noqa: E402
+from auto_gptq_next.modeling._utils import autogptq_post_init  # noqa: E402
 
 
 def get_diff(a, ref):
@@ -1891,7 +1891,7 @@ class TestsQ4CUDA(unittest.TestCase):
 
 class TestsQ4ExllamaV2(unittest.TestCase):
     def test_exllamav2(self):
-        from auto_gptq.nn_modules.qlinear.qlinear_exllamav2 import QuantLinear
+        from auto_gptq_next.nn_modules.qlinear.qlinear_exllamav2 import QuantLinear
 
         group_size = 128
 

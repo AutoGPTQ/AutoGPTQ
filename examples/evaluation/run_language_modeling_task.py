@@ -4,8 +4,8 @@ import datasets
 import torch
 from transformers import AutoTokenizer
 
-from auto_gptq import AutoGPTQForCausalLM, BaseQuantizeConfig
-from auto_gptq.eval_tasks import LanguageModelingTask
+from auto_gptq_next import AutoGPTQForCausalLM, BaseQuantizeConfig
+from auto_gptq_next.eval_tasks import LanguageModelingTask
 
 
 DATASET = "tatsu-lab/alpaca"
