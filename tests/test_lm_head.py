@@ -3,9 +3,8 @@ import unittest
 
 import numpy
 import torch
-from transformers import AutoTokenizer
-
 from auto_gptq_next import AutoGPTQForCausalLM
+from transformers import AutoTokenizer
 
 
 class TestLmHead(unittest.TestCase):

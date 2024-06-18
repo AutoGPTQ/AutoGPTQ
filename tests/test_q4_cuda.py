@@ -1,19 +1,16 @@
 import unittest  # noqa: E402
 
 import torch  # noqa: E402
-from parameterized import parameterized  # noqa: E402
-
 from auto_gptq_next.utils.import_utils import dynamically_import_QuantLinear  # noqa: E402
-
+from parameterized import parameterized  # noqa: E402
 
 try:
     from exllama_kernels import prepare_buffers, set_tuning_params  # noqa: E402
 except ImportError as e:
     print(f"[WARNING] Could not load exllama_kernels: {e}")
 
-from transformers import AutoTokenizer  # noqa: E402
-
 from auto_gptq_next import AutoGPTQForCausalLM  # noqa: E402
+from transformers import AutoTokenizer  # noqa: E402
 
 
 def get_diff(a, ref):

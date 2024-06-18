@@ -1,8 +1,7 @@
 import unittest
 
-from transformers import AutoTokenizer
-
 from auto_gptq_next import AutoGPTQForCausalLM
+from transformers import AutoTokenizer
 
 
 class TestShardedLoading(unittest.TestCase):

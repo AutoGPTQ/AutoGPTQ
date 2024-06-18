@@ -1,14 +1,11 @@
 import json
 import logging
-import os
 from dataclasses import dataclass, field, fields
 from os.path import isdir, join
 from typing import Any, Dict, Optional, Tuple
 
-import huggingface_hub
 from packaging import version
 from transformers.utils.hub import PushToHubMixin, cached_file
-
 
 logger = logging.getLogger(__name__)
 handler = logging.StreamHandler()

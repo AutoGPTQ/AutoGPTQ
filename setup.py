@@ -122,7 +122,7 @@ requirements = [
 
 extras_require = {
     "test": ["pytest>=8.2.2", "parameterized"],
-    "quality": ["ruff==0.4.9"],
+    "quality": ["ruff==0.4.9", "isort==5.13.2"],
 }
 
 include_dirs = ["autogptq_cuda"]

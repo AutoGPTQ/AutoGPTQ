@@ -1,6 +1,5 @@
 from torch import device
 
-
 CPU = device("cpu")
 CUDA_0 = device("cuda:0")
 

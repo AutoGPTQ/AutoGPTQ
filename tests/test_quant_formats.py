@@ -5,12 +5,11 @@ import tempfile  # noqa: E402
 import unittest  # noqa: E402
 
 import torch.cuda  # noqa: E402
-from parameterized import parameterized  # noqa: E402
-from transformers import AutoTokenizer  # noqa: E402
-
 from auto_gptq_next import AutoGPTQForCausalLM, __version__  # noqa: E402
 from auto_gptq_next.quantization import FORMAT, QUANT_CONFIG_FILENAME, BaseQuantizeConfig  # noqa: E402
 from auto_gptq_next.quantization.config import META_FIELD_QUANTIZER, META_QUANTIZER_AUTOGPTQ
+from parameterized import parameterized  # noqa: E402
+from transformers import AutoTokenizer  # noqa: E402
 
 
 class TestQuantization(unittest.TestCase):

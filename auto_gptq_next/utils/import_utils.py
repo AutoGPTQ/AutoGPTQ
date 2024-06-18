@@ -3,7 +3,6 @@ from typing import Optional
 
 import torch
 
-
 logger = getLogger(__name__)
 
 

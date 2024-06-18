@@ -4,14 +4,12 @@ from logging import getLogger
 import accelerate
 import torch
 from accelerate.utils import find_tied_parameters
-from safetensors.torch import save_file as safe_save
 from tqdm import tqdm
 
 from ..nn_modules.qlinear.qlinear_marlin import QuantLinear as MarlinQuantLinear
 from ..nn_modules.qlinear.qlinear_marlin import _get_perms, unpack_qzeros
-from ..quantization import FORMAT, QUANT_METHOD, BaseQuantizeConfig
+from ..quantization import FORMAT, BaseQuantizeConfig
 from .modeling_utils import recurse_getattr, recurse_setattr
-
 
 logger = getLogger(__name__)
 

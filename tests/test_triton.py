@@ -3,10 +3,8 @@ import unittest
 
 import torch
 import torch.utils.benchmark as benchmark
-from transformers import AutoTokenizer
-
 from auto_gptq_next import AutoGPTQForCausalLM
-
+from transformers import AutoTokenizer
 
 MODEL_ID = "TheBloke/Llama-7B-GPTQ"
 DATASET_ID = "timdettmers/openassistant-guanaco"

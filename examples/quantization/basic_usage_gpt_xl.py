@@ -2,11 +2,9 @@ import random
 
 import numpy as np
 import torch
+from auto_gptq_next import AutoGPTQForCausalLM, BaseQuantizeConfig
 from datasets import load_dataset
 from transformers import TextGenerationPipeline
-
-from auto_gptq_next import AutoGPTQForCausalLM, BaseQuantizeConfig
-
 
 pretrained_model_dir = "gpt2-xl"
 quantized_model_dir = "gpt2-large-4bit-128g"

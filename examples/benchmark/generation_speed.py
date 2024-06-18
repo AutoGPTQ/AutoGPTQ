@@ -7,13 +7,11 @@ from itertools import chain
 from typing import Dict, List, Optional
 
 import torch
+from auto_gptq_next import AutoGPTQForCausalLM, BaseQuantizeConfig
 from datasets import Dataset
 from tqdm import tqdm
 from transformers import AutoTokenizer, GenerationConfig
 from transformers.generation.logits_process import LogitsProcessor
-
-from auto_gptq_next import AutoGPTQForCausalLM, BaseQuantizeConfig
-
 
 logger = logging.getLogger(__name__)
 

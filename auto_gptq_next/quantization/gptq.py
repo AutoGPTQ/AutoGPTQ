@@ -9,7 +9,6 @@ import transformers
 
 from .quantizer import Quantizer
 
-
 logger = getLogger(__name__)
 
 torch.backends.cuda.matmul.allow_tf32 = False

@@ -1,7 +1,5 @@
-from transformers import AutoTokenizer, TextGenerationPipeline
-
 from auto_gptq_next import AutoGPTQForCausalLM, BaseQuantizeConfig
-
+from transformers import AutoTokenizer, TextGenerationPipeline
 
 pretrained_model_dir = "facebook/opt-125m"
 quantized_model_dir = "opt-125m-4bit-128g"

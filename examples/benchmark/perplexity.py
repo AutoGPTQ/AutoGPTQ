@@ -2,10 +2,8 @@ import argparse
 import os
 
 import torch
-from transformers import AutoTokenizer
-
 from auto_gptq_next.utils import Perplexity
-
+from transformers import AutoTokenizer
 
 if __name__ == "__main__":
     """

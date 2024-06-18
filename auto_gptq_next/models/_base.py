@@ -14,45 +14,20 @@ from tqdm import tqdm
 from transformers import AutoConfig, AutoModelForCausalLM, PreTrainedModel
 from transformers.modeling_utils import no_init_weights
 from transformers.utils.generic import ContextManagers
-from transformers.utils.hub import (
-    PushToHubMixin,
-)
+from transformers.utils.hub import PushToHubMixin
 
 from ..quantization import GPTQ, BaseQuantizeConfig
-from ..quantization.config import (
-    FORMAT,
-    META_FIELD_QUANTIZER,
-    META_QUANTIZER_AUTOGPTQ,
-    MIN_VERSION_WITH_V2,
-    QUANTIZE_BLACK_LIST,
-)
+from ..quantization.config import (FORMAT, META_FIELD_QUANTIZER, META_QUANTIZER_AUTOGPTQ,
+                                   MIN_VERSION_WITH_V2, QUANTIZE_BLACK_LIST)
 from ..utils.data_utils import collate_data
-from ..utils.import_utils import (
-    dynamically_import_QuantLinear,
-)
-from ..utils.marlin_utils import (
-    _validate_marlin_compatibility,
-    _validate_marlin_device_support,
-    prepare_model_for_marlin_load,
-)
+from ..utils.import_utils import dynamically_import_QuantLinear
+from ..utils.marlin_utils import (_validate_marlin_compatibility,
+                                  _validate_marlin_device_support, prepare_model_for_marlin_load)
 from ..version import __version__
 from ._const import CPU, CUDA_0, SUPPORTED_MODELS
-from ._utils import (
-    auto_dtype_from_config,
-    autogptq_post_init,
-    convert_gptq_v1_to_v2_format,
-    convert_gptq_v2_to_v1_format,
-    find_layers,
-    get_checkpoints,
-    get_device,
-    get_module_by_name_prefix,
-    get_module_by_name_suffix,
-    make_quant,
-    move_to_device,
-    pack_model,
-    simple_dispatch_model,
-)
-
+from ._utils import (auto_dtype_from_config, autogptq_post_init, convert_gptq_v1_to_v2_format,
+                     convert_gptq_v2_to_v1_format, find_layers, get_checkpoints, get_device, get_module_by_name_prefix,
+                     get_module_by_name_suffix, make_quant, move_to_device, pack_model, simple_dispatch_model)
 
 logger = logging.getLogger(__name__)
 handler = logging.StreamHandler()
