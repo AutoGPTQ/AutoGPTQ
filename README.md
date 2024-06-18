@@ -1,5 +1,5 @@
 <h1 align="center">AutoGPTQ-NEXT</h1>
-<p align="center">An easy-to-use LLM quantization package with user-friendly APIs, based on GPTQ algorithm (weight-only quantization).</p>
+<p align="center">An easy-to-use LLM quantization and inference toolkit based on GPTQ algorithm (weight-only quantization).</p>
 <p align="center">
     <a href="https://github.com/Qubitium/AutoGPTQ/releases">
         <img alt="GitHub release" src="https://img.shields.io/github/release/Qubitium/AutoGPTQ.svg">
@@ -276,9 +276,11 @@ Currently, `auto_gptq_next` supports: `LanguageModelingTask`, `SequenceClassific
 
 ### Which kernel is used by default?
 
-AutoGPTQ-NEXT will use Marlin, Exllama v2, Exallama v1, CUDA kernels in that order for maximum inference performance.
+AutoGPTQ-NEXT will use Marlin, Exllama v2, Exallama v1, Triton/CUDA kernels in that order for maximum inference performance.
 
 ## Acknowledgement
-- Special thanks **Elias Frantar**, **Saleh Ashkboos**, **Torsten Hoefler** and **Dan Alistarh** for proposing **GPTQ** algorithm and open source the [code](https://github.com/IST-DASLab/gptq), and for releasing [Marlin kernel](https://github.com/IST-DASLab/marlin) for mixed precision computation.
-- Special thanks **qwopqwop200**, for code in this project that relevant to quantization are mainly referenced from [GPTQ-for-LLaMa](https://github.com/qwopqwop200/GPTQ-for-LLaMa/tree/cuda).
-- Special thanks to **turboderp**, for releasing [Exllama](https://github.com/turboderp/exllama) and [Exllama v2](https://github.com/turboderp/exllamav2) libraries with efficient mixed precision kernels.
+* **PanQiWei** and **FXMarty** for their creation and support of AutoGPTQ
+* **Elias Frantar**, **Saleh Ashkboos**, **Torsten Hoefler** and **Dan Alistarh** for proposing **GPTQ** algorithm and open source the [code](https://github.com/IST-DASLab/gptq), and for releasing [Marlin kernel](https://github.com/IST-DASLab/marlin) for mixed precision computation.
+* **qwopqwop200**, for quantization code in this project adapted from [GPTQ-for-LLaMa](https://github.com/qwopqwop200/GPTQ-for-LLaMa/tree/cuda).
+* **turboderp**, for releasing high performance [Exllama](https://github.com/turboderp/exllama) and [Exllama v2](https://github.com/turboderp/exllamav2) libraries used in this project.
+* **FPGAMiner**, for triton kernels used in GPTQ-for-LLaMa which is adpated into this project.
