@@ -9,8 +9,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-20.04]
-        pyver: ["3.8", "3.9", "3.10", "3.11"]
+        os: [ubuntu-22.04]
+        pyver: ["3.8", "3.9", "3.10", "3.11", "3.12"]
         cuda: ["11.8"]  # wheel for 12.1 are built in build_wheels_pypi.yml
     defaults:
       run:
