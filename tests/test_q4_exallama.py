@@ -9,7 +9,7 @@ try:
 except ImportError as e:
     print(f"[WARNING] Could not load exllama_kernels: {e}")
 
-from auto_gptq_next import AutoGPTQNextForCausalLM, exllama_set_max_input_length  # noqa: E402
+from auto_gptq_next import AutoGPTQNext, exllama_set_max_input_length  # noqa: E402
 from auto_gptq_next.models._const import EXLLAMA_DEFAULT_MAX_INPUT_LENGTH  # noqa: E402
 from auto_gptq_next.models._utils import autogptq_next_post_init  # noqa: E402
 from transformers import AutoTokenizer  # noqa: E402
@@ -1120,7 +1120,7 @@ class TestsQ4Exllama(unittest.TestCase):
         revision = "actorder"
         model_basename = "vicuna-13B-1.1-GPTQ-4bit-128g.latest"
 
-        model_q = AutoGPTQNextForCausalLM.from_quantized(
+        model_q = AutoGPTQNext.from_quantized(
             model_id,
             revision=revision,
             device="cuda:0",
@@ -1159,7 +1159,7 @@ class TestsQ4Exllama(unittest.TestCase):
         reference_output = "<s> I am in Paris and I am going to the Louvre Museum. What time does it open and what is the best way to get there?\nThe Louvre Museum in Paris is open from 9:00 AM to 6:00 PM every day except for Tuesdays. The best way to get"
 
         model_id = "TheBloke/WizardLM-7B-uncensored-GPTQ"
-        model_q = AutoGPTQNextForCausalLM.from_quantized(
+        model_q = AutoGPTQNext.from_quantized(
             model_id,
             device="cuda:0",
             use_triton=False,
@@ -1187,7 +1187,7 @@ class TestsQ4Exllama(unittest.TestCase):
         revision = "actorder"
         model_basename = "vicuna-13B-1.1-GPTQ-4bit-128g.latest"
 
-        model_q = AutoGPTQNextForCausalLM.from_quantized(
+        model_q = AutoGPTQNext.from_quantized(
             model_id,
             revision=revision,
             device="cuda:0",

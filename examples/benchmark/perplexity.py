@@ -79,9 +79,9 @@ if __name__ == "__main__":
         )
 
     if args.is_quantized:
-        from auto_gptq_next import AutoGPTQNextForCausalLM
+        from auto_gptq_next import AutoGPTQNext
 
-        model = AutoGPTQNextForCausalLM.from_quantized(
+        model = AutoGPTQNext.from_quantized(
             args.model_name,
             device_map="auto",
             max_memory=max_memory,

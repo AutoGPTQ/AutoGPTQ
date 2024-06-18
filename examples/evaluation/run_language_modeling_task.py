@@ -2,7 +2,7 @@ from argparse import ArgumentParser
 
 import datasets
 import torch
-from auto_gptq_next import AutoGPTQNextForCausalLM, BaseQuantizeConfig
+from auto_gptq_next import AutoGPTQNext, BaseQuantizeConfig
 from auto_gptq_next.eval_tasks import LanguageModelingTask
 from transformers import AutoTokenizer
 
@@ -45,7 +45,7 @@ def main():
 
     tokenizer = AutoTokenizer.from_pretrained(args.base_model_dir)
 
-    model = AutoGPTQNextForCausalLM.from_pretrained(args.base_model_dir, BaseQuantizeConfig())
+    model = AutoGPTQNext.from_pretrained(args.base_model_dir, BaseQuantizeConfig())
     model.to("cuda:0")
 
     task = LanguageModelingTask(
@@ -70,7 +70,7 @@ def main():
     del model
     torch.cuda.empty_cache()
 
-    model = AutoGPTQNextForCausalLM.from_quantized(args.quantized_model_dir, device="cuda:0", use_triton=args.use_triton)
+    model = AutoGPTQNext.from_quantized(args.quantized_model_dir, device="cuda:0", use_triton=args.use_triton)
     task.model = model
     task.device = model.device
     print(f"eval result for quantized model: {task.run()}")

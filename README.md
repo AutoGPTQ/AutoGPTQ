@@ -88,9 +88,10 @@ pip install -vvv --no-build-isolation -e .
 > warning: this is just a showcase of the usage of basic apis in AutoGPTQ-NEXT, which uses only one sample to quantize a much small model, quality of quantized model using such little samples may not good.
 
 Below is an example for the simplest use of `auto_gptq_next` to quantize a model and inference after quantization:
+
 ```py
 from transformers import AutoTokenizer
-from auto_gptq_next import AutoGPTQNextForCausalLM, BaseQuantizeConfig
+from auto_gptq_next import AutoGPTQNext, BaseQuantizeConfig
 
 pretrained_model_dir = "facebook/opt-125m"
 quant_output_dir = "opt-125m-4bit"
@@ -108,7 +109,7 @@ quant_config = BaseQuantizeConfig(
 )
 
 # load un-quantized model, by default, the model will always be loaded into CPU memory
-model = AutoGPTQNextForCausalLM.from_pretrained(pretrained_model_dir, quant_config)
+model = AutoGPTQNext.from_pretrained(pretrained_model_dir, quant_config)
 
 # quantize model, the examples should be list of dict whose keys can only be "input_ids" and "attention_mask"
 model.quantize(examples)
@@ -117,7 +118,7 @@ model.quantize(examples)
 model.save_quantized(quant_output_dir)
 
 # load quantized model to the first GPU
-model = AutoGPTQNextForCausalLM.from_quantized(quant_output_dir, device="cuda:0")
+model = AutoGPTQNext.from_quantized(quant_output_dir, device="cuda:0")
 
 # download quantized model from Hugging Face Hub and load to the first GPU
 # model = AutoGPTQForCausalLM.from_quantized(repo_id, device="cuda:0")
@@ -176,7 +177,7 @@ from functools import partial
 
 import datasets
 from transformers import AutoTokenizer, AutoModelForCausalLM, GenerationConfig
-from auto_gptq_next import AutoGPTQNextForCausalLM, BaseQuantizeConfig
+from auto_gptq_next import AutoGPTQNext, BaseQuantizeConfig
 from auto_gptq_next.eval_tasks import SequenceClassificationTask
 
 MODEL = "EleutherAI/gpt-j-6b"
@@ -188,6 +189,7 @@ ID2LABEL = {
     2: "positive"
 }
 LABELS = list(ID2LABEL.values())
+
 
 def ds_refactor_fn(samples):
     text_data = samples["text"]
@@ -201,31 +203,32 @@ def ds_refactor_fn(samples):
 
     return new_samples
 
+
 #  model = AutoModelForCausalLM.from_pretrained(MODEL).eval().half().to("cuda:0")
-model = AutoGPTQNextForCausalLM.from_pretrained(MODEL, BaseQuantizeConfig())
+model = AutoGPTQNext.from_pretrained(MODEL, BaseQuantizeConfig())
 tokenizer = AutoTokenizer.from_pretrained(MODEL)
 
 task = SequenceClassificationTask(
-        model=model,
-        tokenizer=tokenizer,
-        classes=LABELS,
-        data_name_or_path=DATASET,
-        prompt_col_name="prompt",
-        label_col_name="label",
-        **{
-            "num_samples": 1000,  # how many samples will be sampled to evaluation
-            "sample_max_len": 1024,  # max tokens for each sample
-            "block_max_len": 2048,  # max tokens for each data block
-            # function to load dataset, one must only accept data_name_or_path as input
-            # and return datasets.Dataset
-            "load_fn": partial(datasets.load_dataset, name="english"),
-            # function to preprocess dataset, which is used for datasets.Dataset.map,
-            # must return Dict[str, list] with only two keys: [prompt_col_name, label_col_name]
-            "preprocess_fn": ds_refactor_fn,
-            # truncate label when sample's length exceed sample_max_len
-            "truncate_prompt": False
-        }
-    )
+    model=model,
+    tokenizer=tokenizer,
+    classes=LABELS,
+    data_name_or_path=DATASET,
+    prompt_col_name="prompt",
+    label_col_name="label",
+    **{
+        "num_samples": 1000,  # how many samples will be sampled to evaluation
+        "sample_max_len": 1024,  # max tokens for each sample
+        "block_max_len": 2048,  # max tokens for each data block
+        # function to load dataset, one must only accept data_name_or_path as input
+        # and return datasets.Dataset
+        "load_fn": partial(datasets.load_dataset, name="english"),
+        # function to preprocess dataset, which is used for datasets.Dataset.map,
+        # must return Dict[str, list] with only two keys: [prompt_col_name, label_col_name]
+        "preprocess_fn": ds_refactor_fn,
+        # truncate label when sample's length exceed sample_max_len
+        "truncate_prompt": False
+    }
+)
 
 # note that max_new_tokens will be automatically specified internally based on given classes
 print(task.run())

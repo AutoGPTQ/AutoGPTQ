@@ -8,7 +8,7 @@ try:
 except ImportError as e:
     print(f"[WARNING] Could not load exllama_kernels: {e}")
 
-from auto_gptq_next import AutoGPTQNextForCausalLM  # noqa: E402
+from auto_gptq_next import AutoGPTQNext  # noqa: E402
 from transformers import AutoTokenizer  # noqa: E402
 
 
@@ -21,7 +21,7 @@ class TestsQ4Triton(unittest.TestCase):
 
         model_id = "TheBloke/WizardLM-7B-uncensored-GPTQ"
 
-        model_q = AutoGPTQNextForCausalLM.from_quantized(
+        model_q = AutoGPTQNext.from_quantized(
             model_id,
             device="cuda:0",
             use_triton=True,
@@ -60,7 +60,7 @@ class TestsQ4Triton(unittest.TestCase):
         revision = "actorder"
         model_basename = "vicuna-13B-1.1-GPTQ-4bit-128g.latest"
 
-        model_q = AutoGPTQNextForCausalLM.from_quantized(
+        model_q = AutoGPTQNext.from_quantized(
             model_id,
             revision=revision,
             device="cuda:0",

@@ -1,5 +1,5 @@
 from ._base import BaseGPTQForCausalLM, BaseQuantizeConfig
-from .auto import GPTQ_CAUSAL_LM_MODEL_MAP, AutoGPTQNextForCausalLM
+from .auto import GPTQ_CAUSAL_LM_MODEL_MAP, AutoGPTQNext
 from .baichuan import BaiChuanGPTQForCausalLM
 from .bloom import BloomGPTQForCausalLM
 from .chatglm import ChatGLMForCausalLM

@@ -64,7 +64,7 @@ GPTQ_CAUSAL_LM_MODEL_MAP = {
 }
 
 
-class AutoGPTQNextForCausalLM:
+class AutoGPTQNext:
     def __init__(self):
         raise EnvironmentError(
             "AutoGPTQModelForCausalLM is designed to be instantiated\n"

@@ -7,7 +7,7 @@ from itertools import chain
 from typing import Dict, List, Optional
 
 import torch
-from auto_gptq_next import AutoGPTQNextForCausalLM, BaseQuantizeConfig
+from auto_gptq_next import AutoGPTQNext, BaseQuantizeConfig
 from datasets import Dataset
 from tqdm import tqdm
 from transformers import AutoTokenizer, GenerationConfig
@@ -156,14 +156,14 @@ def load_model_tokenizer(
         tokenizer.pad_token_id = tokenizer.eos_token_id
 
     if from_pretrained:
-        model = AutoGPTQNextForCausalLM.from_pretrained(
+        model = AutoGPTQNext.from_pretrained(
             pretrained_model_name_or_path=model_name_or_path,
             quantize_config=BaseQuantizeConfig(),
             max_memory=max_memory,
             trust_remote_code=trust_remote_code,
         )
     else:
-        model = AutoGPTQNextForCausalLM.from_quantized(
+        model = AutoGPTQNext.from_quantized(
             model_name_or_path,
             max_memory=max_memory,
             use_triton=use_triton,

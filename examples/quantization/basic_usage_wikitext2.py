@@ -1,7 +1,7 @@
 import numpy as np
 import torch
 import torch.nn as nn
-from auto_gptq_next import AutoGPTQNextForCausalLM, BaseQuantizeConfig
+from auto_gptq_next import AutoGPTQNext, BaseQuantizeConfig
 
 pretrained_model_dir = "facebook/opt-125m"
 quantized_model_dir = "opt-125m-4bit-128g"
@@ -142,7 +142,7 @@ def main():
     )
 
     # load un-quantized model, the model will always be force loaded into cpu
-    model = AutoGPTQNextForCausalLM.from_pretrained(pretrained_model_dir, quantize_config)
+    model = AutoGPTQNext.from_pretrained(pretrained_model_dir, quantize_config)
 
     # quantize model, the examples should be list of dict whose keys can only be "input_ids" and "attention_mask"
     # with value under torch.LongTensor type.
@@ -155,7 +155,7 @@ def main():
     model.save_quantized(quantized_model_dir, use_safetensors=True)
 
     # load quantized model, currently only support cpu or single gpu
-    model = AutoGPTQNextForCausalLM.from_quantized(quantized_model_dir, device="cuda:0", use_triton=False)
+    model = AutoGPTQNext.from_quantized(quantized_model_dir, device="cuda:0", use_triton=False)
 
     opt_eval(model.model, testenc, "cuda:0")
 

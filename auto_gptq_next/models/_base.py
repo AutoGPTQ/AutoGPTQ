@@ -25,7 +25,7 @@ from ..utils.marlin_utils import (_validate_marlin_compatibility,
                                   _validate_marlin_device_support, prepare_model_for_marlin_load)
 from ..version import __version__
 from ._const import CPU, CUDA_0, SUPPORTED_MODELS
-from ._utils import (auto_dtype_from_config, autogptq_post_init, convert_gptq_v1_to_v2_format,
+from ._utils import (auto_dtype_from_config, autogptq_next_post_init, convert_gptq_v1_to_v2_format,
                      convert_gptq_v2_to_v1_format, find_layers, get_checkpoints, get_device, get_module_by_name_prefix,
                      get_module_by_name_suffix, make_quant, move_to_device, pack_model, simple_dispatch_model)
 
