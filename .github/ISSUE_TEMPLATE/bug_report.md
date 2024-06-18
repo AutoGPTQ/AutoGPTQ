@@ -14,7 +14,17 @@ A clear and concise description of what the bug is.
 Information about CPU and GPU, such as RAM, number, etc.
 
 **Software version**
-Version of relevant software such as operation system, cuda toolkit, python, auto-gptq, pytorch, transformers, accelerate, etc.
+Operating system and version. 
+
+Show output of:
+```
+nvidia-smi
+```
+
+Show output of:
+```
+pip show torch auto_gptq_next, transformers, accelerate, triton
+```
 
 **To Reproduce**
 Steps to reproduce the behavior:
