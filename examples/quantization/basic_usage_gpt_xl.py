@@ -2,7 +2,7 @@ import random
 
 import numpy as np
 import torch
-from auto_gptq_next import AutoGPTQNext, BaseQuantizeConfig
+from auto_gptq_next import AutoGPTQNext, QuantizeConfig
 from datasets import load_dataset
 from transformers import TextGenerationPipeline
 
@@ -42,7 +42,7 @@ def main():
         tokenizer = AutoTokenizer.from_pretrained(pretrained_model_dir, use_fast=True)
 
     # load un-quantized model, the model will always be force loaded into cpu
-    quantize_config = BaseQuantizeConfig(
+    quantize_config = QuantizeConfig(
         bits=4,  # quantize model to 4-bit
         group_size=128,  # it is recommended to set the value to 128
         desc_act=False,  # desc_act and groupsize only works on triton

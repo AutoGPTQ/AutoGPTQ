@@ -18,7 +18,7 @@ Luckily, in AutoGPTQ, we provide some advanced arguments that users can tweak to
 Before `auto-gptq`'s existence, there are many users have already used other popular tools such as [GPTQ-for-LLaMa](https://github.com/qwopqwop200/GPTQ-for-LLaMa) to quantize their model and saved with different name without `quantize_config.json` file introduced in previous chapter.
 
 To address this, two more arguments were introduced in `.from_quantized` so that users can load quantized model with arbitrary names.
-- `quantize_config`: an optional `BaseQuantizeConfig` type argument, can be used to match model file and initialize model incase `quantize_config.json` not in the directory where model is saved.
+- `quantize_config`: an optional `QuantizeConfig` type argument, can be used to match model file and initialize model incase `quantize_config.json` not in the directory where model is saved.
 - `model_basename`: an optional `str` type argument, if specified, will be used to match model instead of using the file name format introduced in previous chapter.
 
 ## Multiple Devices Model Loading

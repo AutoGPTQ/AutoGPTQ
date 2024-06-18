@@ -13,7 +13,7 @@ from tqdm import tqdm
 from transformers import AutoConfig, PretrainedConfig
 from transformers.utils.hub import cached_file
 
-from ..quantization import BaseQuantizeConfig
+from ..quantization import QuantizeConfig
 from ..utils.import_utils import dynamically_import_QuantLinear
 from ..utils.modeling_utils import recurse_setattr
 from ._const import CPU, CUDA_0, EXLLAMA_DEFAULT_MAX_INPUT_LENGTH, SUPPORTED_MODELS
@@ -137,7 +137,7 @@ def make_quant(
 
 def convert_gptq_v1_to_v2_format(
     model,
-    quantize_config: BaseQuantizeConfig,
+    quantize_config: QuantizeConfig,
     qlinear_kernel: nn.Module,
 ):
     # Limit thread usage to avoid auto-parallizataion regression
@@ -172,7 +172,7 @@ def convert_gptq_v1_to_v2_format(
 
 def convert_gptq_v2_to_v1_format(
     model,
-    quantize_config: BaseQuantizeConfig,
+    quantize_config: QuantizeConfig,
     qlinear_kernel: nn.Module,
 ):
     # Limit thread usage to avoid auto-parallizataion regression

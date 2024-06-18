@@ -1,7 +1,7 @@
 from inspect import signature
 from typing import Dict, Optional, Union
 
-from ._base import BaseGPTQForCausalLM, BaseQuantizeConfig
+from ._base import BaseGPTQForCausalLM, QuantizeConfig
 from ._utils import check_and_get_model_type
 from .baichuan import BaiChuanGPTQForCausalLM
 from .bloom import BloomGPTQForCausalLM
@@ -76,7 +76,7 @@ class AutoGPTQNext:
     def from_pretrained(
         cls,
         pretrained_model_name_or_path: str,
-        quantize_config: BaseQuantizeConfig,
+        quantize_config: QuantizeConfig,
         max_memory: Optional[dict] = None,
         trust_remote_code: bool = False,
         **model_init_kwargs,
@@ -99,7 +99,7 @@ class AutoGPTQNext:
         device: Optional[Union[str, int]] = None,
         use_triton: bool = False,
         use_cuda_fp16: bool = True,
-        quantize_config: Optional[BaseQuantizeConfig | Dict] = None,
+        quantize_config: Optional[QuantizeConfig | Dict] = None,
         model_basename: Optional[str] = None,
         use_safetensors: bool = True,
         trust_remote_code: bool = False,

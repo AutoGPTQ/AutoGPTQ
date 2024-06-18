@@ -1,7 +1,7 @@
 import numpy as np
 import torch
 import torch.nn as nn
-from auto_gptq_next import AutoGPTQNext, BaseQuantizeConfig
+from auto_gptq_next import AutoGPTQNext, QuantizeConfig
 
 pretrained_model_dir = "facebook/opt-125m"
 quantized_model_dir = "opt-125m-4bit-128g"
@@ -135,7 +135,7 @@ def opt_eval(model, testenc, dev, seqlen=2048):
 def main():
     traindataset, testenc = get_wikitext2(128, 0, 2048, pretrained_model_dir)
 
-    quantize_config = BaseQuantizeConfig(
+    quantize_config = QuantizeConfig(
         bits=4,  # quantize model to 4-bit
         group_size=128,  # it is recommended to set the value to 128
         desc_act=False,  # desc_act and group size only works on triton

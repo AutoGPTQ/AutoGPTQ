@@ -65,7 +65,7 @@ QUANT_CONFIG_ARG_SYNONYMS = {
 
 
 @dataclass
-class BaseQuantizeConfig(PushToHubMixin):
+class QuantizeConfig(PushToHubMixin):
     bits: int = field(default=4, metadata={"choices": [2, 3, 4, 8]})
     group_size: int = field(default=-1)
     damp_percent: float = field(default=0.01)
@@ -305,3 +305,11 @@ class BaseQuantizeConfig(PushToHubMixin):
             # compact: until format PR is pushed 3rd party libs such as sglang/vllm, duplicate checkpoint_format
             FORMAT_FIELD_COMPAT: self.format,
         }
+
+
+# deprecated: will be removed in future update
+@dataclass
+class BaseQuantizeConfig(QuantizeConfig):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        logging.warning("BaseQuantizeConfig is re-named and pending deprecation. Please use `QuantizeConfig` instead.")

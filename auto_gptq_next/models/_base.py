@@ -11,14 +11,14 @@ import transformers
 from accelerate.hooks import remove_hook_from_module
 from safetensors.torch import save_file as safe_save
 from tqdm import tqdm
-from transformers import AutoConfig, AutoModelForCausalLM, PreTrainedModel
+from transformers import AutoConfig, AutoModelForCausalLM, PretrainedConfig, PreTrainedModel
 from transformers.modeling_utils import no_init_weights
 from transformers.utils.generic import ContextManagers
 from transformers.utils.hub import PushToHubMixin
 
-from ..quantization import GPTQ, BaseQuantizeConfig
+from ..quantization import GPTQ, QuantizeConfig
 from ..quantization.config import (FORMAT, META_FIELD_QUANTIZER, META_QUANTIZER_AUTOGPTQ,
-                                   MIN_VERSION_WITH_V2, QUANTIZE_BLACK_LIST)
+                                   MIN_VERSION_WITH_V2, QUANTIZE_BLACK_LIST, BaseQuantizeConfig)
 from ..utils.data_utils import collate_data
 from ..utils.import_utils import dynamically_import_QuantLinear
 from ..utils.marlin_utils import (_validate_marlin_compatibility,
@@ -58,7 +58,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         self,
         model: PreTrainedModel,
         quantized: bool,
-        quantize_config: BaseQuantizeConfig,
+        quantize_config: QuantizeConfig,
         is_triton_backend: bool = False,
         qlinear_kernel: nn.Module = None,
     ):
@@ -139,16 +139,16 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         cache_examples_on_gpu: bool = True,
     ):
         if self.quantized:
-            raise EnvironmentError("can't execute quantize because the model is quantized.")
+            raise EnvironmentError("quantize() is called a model that is already quantized")
 
         if self.quantize_config.quant_method in QUANTIZE_BLACK_LIST:
             raise ValueError(
                 f"Unsupported quantization operation for quant method: {self.quantize_config.quant_method}"
             )
 
-        # TODO: lm_head quantiation is yet ready but pending
+        # TODO: lm_head quantization is yet ready but pending
         if self.quantize_config.lm_head:
-            raise ValueError("lm_head quantization is currently inference only and not applicable for quantization. Please set `lm_head=False`. Feature pending.")
+            raise ValueError("lm_head quantization is currently inference only and not applicable for quantization. Please set `lm_head=False`.")
 
         device_map = self.hf_device_map
         if device_map:
@@ -549,7 +549,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
     def from_pretrained(
         cls,
         pretrained_model_name_or_path: str,
-        quantize_config: BaseQuantizeConfig,
+        quantize_config: QuantizeConfig,
         max_memory: Optional[dict] = None,
         trust_remote_code: bool = False,
         torch_dtype: [str | torch.dtype] = "auto",
@@ -635,7 +635,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         use_marlin: bool = True,
         torch_dtype: [str | torch.dtype] = "auto",
         use_cuda_fp16: bool = True,
-        quantize_config: Optional[BaseQuantizeConfig] = None,
+        quantize_config: Optional[QuantizeConfig] = None,
         model_basename: Optional[str] = None,
         use_safetensors: bool = True,
         trust_remote_code: bool = False,
@@ -700,12 +700,12 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             raise TypeError(f"{config.model_type} isn't supported yet.")
 
         if quantize_config is None:
-            quantize_config = BaseQuantizeConfig.from_pretrained(
+            quantize_config = QuantizeConfig.from_pretrained(
                 model_name_or_path, format=format, **cached_file_kwargs, **kwargs
             )
         else:
-            if not isinstance(quantize_config, BaseQuantizeConfig):
-                quantize_config = BaseQuantizeConfig.from_quant_config(quantize_config, format)
+            if not isinstance(quantize_config, QuantizeConfig):
+                quantize_config = QuantizeConfig.from_quant_config(quantize_config, format)
 
         if quantize_config.format == FORMAT.MARLIN:
             # format marlin requires marlin kernel
@@ -983,4 +983,4 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             return getattr(self.model, item)
 
 
-__all__ = ["BaseGPTQForCausalLM", "BaseQuantizeConfig"]
+__all__ = ["BaseGPTQForCausalLM", "BaseQuantizeConfig", "QuantizeConfig"]

@@ -3,7 +3,7 @@ from functools import partial
 
 import datasets
 import torch
-from auto_gptq_next import AutoGPTQNext, BaseQuantizeConfig
+from auto_gptq_next import AutoGPTQNext, QuantizeConfig
 from auto_gptq_next.eval_tasks import SequenceClassificationTask
 from transformers import AutoTokenizer
 
@@ -43,7 +43,7 @@ def main():
 
     tokenizer = AutoTokenizer.from_pretrained(args.base_model_dir)
 
-    model = AutoGPTQNext.from_pretrained(args.base_model_dir, BaseQuantizeConfig())
+    model = AutoGPTQNext.from_pretrained(args.base_model_dir, QuantizeConfig())
     model.to("cuda:0")
 
     task = SequenceClassificationTask(

@@ -1,4 +1,4 @@
-from auto_gptq_next import AutoGPTQNext, BaseQuantizeConfig
+from auto_gptq_next import AutoGPTQNext, QuantizeConfig
 from transformers import AutoTokenizer, TextGenerationPipeline
 
 pretrained_model_dir = "facebook/opt-125m"
@@ -13,7 +13,7 @@ def main():
         )
     ]
 
-    quantize_config = BaseQuantizeConfig(
+    quantize_config = QuantizeConfig(
         bits=4,  # quantize model to 4-bit
         group_size=128,  # it is recommended to set the value to 128
         desc_act=False,  # set to False can significantly speed up inference but the perplexity may slightly bad

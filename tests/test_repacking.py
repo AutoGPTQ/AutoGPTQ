@@ -1,9 +1,9 @@
 import copy
 import unittest
 
+import autogptq_next_marlin_cuda
 import torch
 import torch.nn as nn
-import autogptq_next_marlin_cuda
 from auto_gptq_next.nn_modules.qlinear.qlinear_cuda_old import QuantLinear as CudaOldQuantLinear
 from auto_gptq_next.nn_modules.qlinear.qlinear_marlin import QuantLinear as MarlinQuantLinear
 from auto_gptq_next.nn_modules.qlinear.qlinear_marlin import _get_perms, dequantize_weight

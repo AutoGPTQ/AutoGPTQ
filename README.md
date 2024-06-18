@@ -91,7 +91,7 @@ Below is an example for the simplest use of `auto_gptq_next` to quantize a model
 
 ```py
 from transformers import AutoTokenizer
-from auto_gptq_next import AutoGPTQNext, BaseQuantizeConfig
+from auto_gptq_next import AutoGPTQNext, QuantizeConfig
 
 pretrained_model_dir = "facebook/opt-125m"
 quant_output_dir = "opt-125m-4bit"
@@ -103,7 +103,7 @@ examples = [
     )
 ]
 
-quant_config = BaseQuantizeConfig(
+quant_config = QuantizeConfig(
     bits=4,  # 4-bit
     group_size=128,  # 128 is good balance between quality and performance
 )
@@ -177,7 +177,7 @@ from functools import partial
 
 import datasets
 from transformers import AutoTokenizer, AutoModelForCausalLM, GenerationConfig
-from auto_gptq_next import AutoGPTQNext, BaseQuantizeConfig
+from auto_gptq_next import AutoGPTQNext, QuantizeConfig
 from auto_gptq_next.eval_tasks import SequenceClassificationTask
 
 MODEL = "EleutherAI/gpt-j-6b"
@@ -205,7 +205,7 @@ def ds_refactor_fn(samples):
 
 
 #  model = AutoModelForCausalLM.from_pretrained(MODEL).eval().half().to("cuda:0")
-model = AutoGPTQNext.from_pretrained(MODEL, BaseQuantizeConfig())
+model = AutoGPTQNext.from_pretrained(MODEL, QuantizeConfig())
 tokenizer = AutoTokenizer.from_pretrained(MODEL)
 
 task = SequenceClassificationTask(

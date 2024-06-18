@@ -7,7 +7,7 @@ from itertools import chain
 from typing import Dict, List, Optional
 
 import torch
-from auto_gptq_next import AutoGPTQNext, BaseQuantizeConfig
+from auto_gptq_next import AutoGPTQNext, QuantizeConfig
 from datasets import Dataset
 from tqdm import tqdm
 from transformers import AutoTokenizer, GenerationConfig
@@ -158,7 +158,7 @@ def load_model_tokenizer(
     if from_pretrained:
         model = AutoGPTQNext.from_pretrained(
             pretrained_model_name_or_path=model_name_or_path,
-            quantize_config=BaseQuantizeConfig(),
+            quantize_config=QuantizeConfig(),
             max_memory=max_memory,
             trust_remote_code=trust_remote_code,
         )
@@ -251,7 +251,7 @@ def main():
 
     quantize_config = None
     if args.quantize_config_save_dir:
-        quantize_config = BaseQuantizeConfig.from_pretrained(args.quantize_config_save_dir)
+        quantize_config = QuantizeConfig.from_pretrained(args.quantize_config_save_dir)
 
     if args.use_safetensors:
         logger.warning(
