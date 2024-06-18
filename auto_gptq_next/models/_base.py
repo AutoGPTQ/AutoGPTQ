@@ -146,6 +146,10 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                 f"Unsupported quantization operation for quant method: {self.quantize_config.quant_method}"
             )
 
+        # TODO: lm_head quantiation is yet ready but pending
+        if self.quantize_config.lm_head:
+            raise ValueError("lm_head quantization is currently inference only and not applicable for quantization. Please set `lm_head=False`. Feature pending.")
+
         device_map = self.hf_device_map
         if device_map:
             for name, device in device_map.items():
