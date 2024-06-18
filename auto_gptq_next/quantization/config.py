@@ -301,9 +301,9 @@ class QuantizeConfig(PushToHubMixin):
             "model_file_base_name": self.model_file_base_name,
             QUANT_METHOD_FIELD: self.quant_method,
             FORMAT_FIELD: self.format,
-            META_FIELD: self.meta,
             # compact: until format PR is pushed 3rd party libs such as sglang/vllm, duplicate checkpoint_format
             FORMAT_FIELD_COMPAT: self.format,
+            META_FIELD: self.meta,
         }
 
 

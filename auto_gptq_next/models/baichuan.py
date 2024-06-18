@@ -1,7 +1,7 @@
 from ._base import BaseGPTQForCausalLM
 
 
-class BaiChuanGPTQForCausalLM(BaseGPTQForCausalLM):
+class BaiChuanGPTQ(BaseGPTQForCausalLM):
     layer_type = "DecoderLayer"
     layers_block_name = "model.layers"
     outside_layer_modules = ["model.embed_tokens", "model.norm"]

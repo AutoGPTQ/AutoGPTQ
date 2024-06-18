@@ -1,7 +1,7 @@
 from ._base import BaseGPTQForCausalLM
 
 
-class ChatGLMForCausalLM(BaseGPTQForCausalLM):
+class ChatGLM(BaseGPTQForCausalLM):
     layer_type = "GLMBlock"
     layers_block_name = "transformer.encoder.layers"
     outside_layer_modules = ["transformer.embedding.word_embeddings", "transformer.output_layer"]

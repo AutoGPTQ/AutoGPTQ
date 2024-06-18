@@ -1,7 +1,7 @@
 from ._base import BaseGPTQForCausalLM
 
 
-class XverseGPTQForCausalLM(BaseGPTQForCausalLM):
+class XverseGPTQ(BaseGPTQForCausalLM):
     layer_type = "XverseDecoderLayer"
     layers_block_name = "model.layers"
     outside_layer_modules = ["model.embed_tokens", "model.norm"]

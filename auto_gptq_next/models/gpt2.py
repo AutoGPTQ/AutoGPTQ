@@ -1,7 +1,7 @@
 from ._base import BaseGPTQForCausalLM
 
 
-class GPT2GPTQForCausalLM(BaseGPTQForCausalLM):
+class GPT2GPTQ(BaseGPTQForCausalLM):
     layer_type = "GPT2Block"
     layers_block_name = "transformer.h"
     outside_layer_modules = ["transformer.wte", "transformer.wpe", "transformer.ln_f"]

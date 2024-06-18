@@ -1,7 +1,7 @@
 from ._base import BaseGPTQForCausalLM
 
 
-class YiGPTQForCausalLM(BaseGPTQForCausalLM):
+class YiGPTQ(BaseGPTQForCausalLM):
     layer_type = "YiDecoderLayer"
     layers_block_name = "model.layers"
     outside_layer_modules = ["model.embed_tokens", "model.norm"]

@@ -1,7 +1,7 @@
 from ._base import BaseGPTQForCausalLM
 
 
-class MistralGPTQForCausalLM(BaseGPTQForCausalLM):
+class MistralGPTQ(BaseGPTQForCausalLM):
     layer_type = "MistralDecoderLayer"
     layers_block_name = "model.layers"
     outside_layer_modules = ["model.embed_tokens", "model.norm"]

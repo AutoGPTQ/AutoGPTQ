@@ -1,7 +1,7 @@
 from ._base import BaseGPTQForCausalLM
 
 
-class GPTNeoXGPTQForCausalLM(BaseGPTQForCausalLM):
+class GPTNeoXGPTQ(BaseGPTQForCausalLM):
     layer_type = "GPTNeoXLayer"
     layers_block_name = "gpt_neox.layers"
     outside_layer_modules = ["gpt_neox.embed_in", "gpt_neox.final_layer_norm"]

@@ -1,7 +1,7 @@
 from ._base import BaseGPTQForCausalLM
 
 
-class QwenGPTQForCausalLM(BaseGPTQForCausalLM):
+class QwenGPTQ(BaseGPTQForCausalLM):
     layer_type = "QWenBlock"
     layers_block_name = "transformer.h"
     outside_layer_modules = [

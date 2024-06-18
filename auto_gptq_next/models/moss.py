@@ -1,7 +1,7 @@
 from ._base import BaseGPTQForCausalLM
 
 
-class MOSSGPTQForCausalLM(BaseGPTQForCausalLM):
+class MOSSGPTQ(BaseGPTQForCausalLM):
     layer_type = "MossBlock"
     layers_block_name = "transformer.h"
     outside_layer_modules = ["transformer.wte", "transformer.ln_f"]

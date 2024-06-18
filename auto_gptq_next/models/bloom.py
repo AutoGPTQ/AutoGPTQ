@@ -1,7 +1,7 @@
 from ._base import BaseGPTQForCausalLM
 
 
-class BloomGPTQForCausalLM(BaseGPTQForCausalLM):
+class BloomGPTQ(BaseGPTQForCausalLM):
     layer_type = "BloomBlock"
     layers_block_name = "transformer.h"
     outside_layer_modules = [

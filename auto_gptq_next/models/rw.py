@@ -1,7 +1,7 @@
 from ._base import BaseGPTQForCausalLM
 
 
-class RWGPTQForCausalLM(BaseGPTQForCausalLM):
+class RWGPTQ(BaseGPTQForCausalLM):
     layer_type = "DecoderLayer"
     layers_block_name = "transformer.h"
     outside_layer_modules = ["transformer.word_embeddings", "transformer.ln_f"]

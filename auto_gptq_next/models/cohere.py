@@ -1,7 +1,7 @@
 from ._base import BaseGPTQForCausalLM
 
 
-class CohereGPTQForCausalLM(BaseGPTQForCausalLM):
+class CohereGPTQ(BaseGPTQForCausalLM):
     layer_type = "CohereDecoderLayer"
     layers_block_name = "model.layers"
     outside_layer_modules = ["model.embed_tokens", "model.norm"]

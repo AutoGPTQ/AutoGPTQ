@@ -3,64 +3,64 @@ from typing import Dict, Optional, Union
 
 from ._base import BaseGPTQForCausalLM, QuantizeConfig
 from ._utils import check_and_get_model_type
-from .baichuan import BaiChuanGPTQForCausalLM
-from .bloom import BloomGPTQForCausalLM
-from .chatglm import ChatGLMForCausalLM
-from .codegen import CodeGenGPTQForCausalLM
-from .cohere import CohereGPTQForCausalLM
-from .decilm import DeciLMGPTQForCausalLM
-from .gemma import GemmaGPTQForCausalLM
-from .gpt2 import GPT2GPTQForCausalLM
-from .gpt_bigcode import GPTBigCodeGPTQForCausalLM
-from .gpt_neox import GPTNeoXGPTQForCausalLM
-from .gptj import GPTJGPTQForCausalLM
-from .internlm import InternLMGPTQForCausalLM
-from .llama import LlamaGPTQForCausalLM
-from .longllama import LongLlamaGPTQForCausalLM
-from .mistral import MistralGPTQForCausalLM
-from .mixtral import MixtralGPTQForCausalLM
-from .moss import MOSSGPTQForCausalLM
-from .mpt import MPTGPTQForCausalLM
-from .opt import OPTGPTQForCausalLM
-from .phi import PhiGPTQForCausalLM
-from .qwen import QwenGPTQForCausalLM
-from .qwen2 import Qwen2GPTQForCausalLM
-from .rw import RWGPTQForCausalLM
-from .stablelmepoch import StableLMEpochGPTQForCausalLM
-from .starcoder2 import Starcoder2GPTQForCausalLM
-from .xverse import XverseGPTQForCausalLM
-from .yi import YiGPTQForCausalLM
+from .baichuan import BaiChuanGPTQ
+from .bloom import BloomGPTQ
+from .chatglm import ChatGLM
+from .codegen import CodeGenGPTQ
+from .cohere import CohereGPTQ
+from .decilm import DeciLMGPTQ
+from .gemma import GemmaGPTQ
+from .gpt2 import GPT2GPTQ
+from .gpt_bigcode import GPTBigCodeGPTQ
+from .gpt_neox import GPTNeoXGPTQ
+from .gptj import GPTJGPTQ
+from .internlm import InternLMGPTQ
+from .llama import LlamaGPTQ
+from .longllama import LongLlamaGPTQ
+from .mistral import MistralGPTQ
+from .mixtral import MixtralGPTQ
+from .moss import MOSSGPTQ
+from .mpt import MPTGPTQ
+from .opt import OPTGPTQ
+from .phi import PhiGPTQ
+from .qwen import QwenGPTQ
+from .qwen2 import Qwen2GPTQ
+from .rw import RWGPTQ
+from .stablelmepoch import StableLMEpochGPTQ
+from .starcoder2 import Starcoder2GPTQ
+from .xverse import XverseGPTQ
+from .yi import YiGPTQ
 
-GPTQ_CAUSAL_LM_MODEL_MAP = {
-    "bloom": BloomGPTQForCausalLM,
-    "gpt_neox": GPTNeoXGPTQForCausalLM,
-    "gptj": GPTJGPTQForCausalLM,
-    "gpt2": GPT2GPTQForCausalLM,
-    "llama": LlamaGPTQForCausalLM,
-    "opt": OPTGPTQForCausalLM,
-    "moss": MOSSGPTQForCausalLM,
-    "chatglm": ChatGLMForCausalLM,
-    "gpt_bigcode": GPTBigCodeGPTQForCausalLM,
-    "codegen": CodeGenGPTQForCausalLM,
-    "cohere": CohereGPTQForCausalLM,
-    "RefinedWebModel": RWGPTQForCausalLM,
-    "RefinedWeb": RWGPTQForCausalLM,
-    "falcon": RWGPTQForCausalLM,
-    "baichuan": BaiChuanGPTQForCausalLM,
-    "internlm": InternLMGPTQForCausalLM,
-    "qwen": QwenGPTQForCausalLM,
-    "mistral": MistralGPTQForCausalLM,
-    "Yi": YiGPTQForCausalLM,
-    "xverse": XverseGPTQForCausalLM,
-    "deci": DeciLMGPTQForCausalLM,
-    "stablelm_epoch": StableLMEpochGPTQForCausalLM,
-    "starcoder2": Starcoder2GPTQForCausalLM,
-    "mixtral": MixtralGPTQForCausalLM,
-    "qwen2": Qwen2GPTQForCausalLM,
-    "longllama": LongLlamaGPTQForCausalLM,
-    "gemma": GemmaGPTQForCausalLM,
-    "phi": PhiGPTQForCausalLM,
-    "mpt": MPTGPTQForCausalLM,
+MODEL_MAP = {
+    "bloom": BloomGPTQ,
+    "gpt_neox": GPTNeoXGPTQ,
+    "gptj": GPTJGPTQ,
+    "gpt2": GPT2GPTQ,
+    "llama": LlamaGPTQ,
+    "opt": OPTGPTQ,
+    "moss": MOSSGPTQ,
+    "chatglm": ChatGLM,
+    "gpt_bigcode": GPTBigCodeGPTQ,
+    "codegen": CodeGenGPTQ,
+    "cohere": CohereGPTQ,
+    "RefinedWebModel": RWGPTQ,
+    "RefinedWeb": RWGPTQ,
+    "falcon": RWGPTQ,
+    "baichuan": BaiChuanGPTQ,
+    "internlm": InternLMGPTQ,
+    "qwen": QwenGPTQ,
+    "mistral": MistralGPTQ,
+    "Yi": YiGPTQ,
+    "xverse": XverseGPTQ,
+    "deci": DeciLMGPTQ,
+    "stablelm_epoch": StableLMEpochGPTQ,
+    "starcoder2": Starcoder2GPTQ,
+    "mixtral": MixtralGPTQ,
+    "qwen2": Qwen2GPTQ,
+    "longllama": LongLlamaGPTQ,
+    "gemma": GemmaGPTQ,
+    "phi": PhiGPTQ,
+    "mpt": MPTGPTQ,
 }
 
 
@@ -82,7 +82,7 @@ class AutoGPTQNext:
         **model_init_kwargs,
     ) -> BaseGPTQForCausalLM:
         model_type = check_and_get_model_type(pretrained_model_name_or_path, trust_remote_code)
-        return GPTQ_CAUSAL_LM_MODEL_MAP[model_type].from_pretrained(
+        return MODEL_MAP[model_type].from_pretrained(
             pretrained_model_name_or_path=pretrained_model_name_or_path,
             quantize_config=quantize_config,
             max_memory=max_memory,
@@ -117,7 +117,7 @@ class AutoGPTQNext:
                 disable_exllama = True
 
         model_type = check_and_get_model_type(model_name_or_path, trust_remote_code)
-        quant_func = GPTQ_CAUSAL_LM_MODEL_MAP[model_type].from_quantized
+        quant_func = MODEL_MAP[model_type].from_quantized
         # A static list of kwargs needed for huggingface_hub
         huggingface_kwargs = [
             "cache_dir",

@@ -1,7 +1,7 @@
 from ._base import BaseGPTQForCausalLM
 
 
-class LongLlamaGPTQForCausalLM(BaseGPTQForCausalLM):
+class LongLlamaGPTQ(BaseGPTQForCausalLM):
     layer_type = "LongLlamaDecoderLayer"
     layers_block_name = "model.layers"
     outside_layer_modules = ["model.embed_tokens", "model.norm"]

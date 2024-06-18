@@ -1,7 +1,7 @@
 from ._base import BaseGPTQForCausalLM
 
 
-class GemmaGPTQForCausalLM(BaseGPTQForCausalLM):
+class GemmaGPTQ(BaseGPTQForCausalLM):
     layer_type = "GemmaDecoderLayer"
     layers_block_name = "model.layers"
     outside_layer_modules = ["model.embed_tokens", "model.norm"]

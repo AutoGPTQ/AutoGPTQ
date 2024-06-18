@@ -1,7 +1,7 @@
 from ._base import BaseGPTQForCausalLM
 
 
-class GPTBigCodeGPTQForCausalLM(BaseGPTQForCausalLM):
+class GPTBigCodeGPTQ(BaseGPTQForCausalLM):
     layer_type = "GPTBigCodeBlock"
     layers_block_name = "transformer.h"
     outside_layer_modules = ["transformer.wpe", "transformer.wte", "transformer.ln_f"]

@@ -1,7 +1,7 @@
 from ._base import BaseGPTQForCausalLM
 
 
-class CodeGenGPTQForCausalLM(BaseGPTQForCausalLM):
+class CodeGenGPTQ(BaseGPTQForCausalLM):
     layer_type = "CodeGenBlock"
     layers_block_name = "transformer.h"
     outside_layer_modules = ["transformer.wte", "transformer.ln_f"]
