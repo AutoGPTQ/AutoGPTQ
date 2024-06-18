@@ -946,7 +946,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             model.seqlen = 4096
 
         # Any post-initialization that require device information, for example buffers initialization on device.
-        model = autogptq_post_init(model, use_act_order=quantize_config.desc_act)
+        model = autogptq_next_post_init(model, use_act_order=quantize_config.desc_act)
 
         model.eval()
 

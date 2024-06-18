@@ -323,7 +323,7 @@ def simple_dispatch_model(model, device_map):
     return model
 
 
-def autogptq_post_init(model, use_act_order: bool, max_input_length: Optional[int] = None):
+def autogptq_next_post_init(model, use_act_order: bool, max_input_length: Optional[int] = None):
     """
     The max_input_length argument is specific to the exllama backend, that requires to initialize a buffer temp_state.
     """

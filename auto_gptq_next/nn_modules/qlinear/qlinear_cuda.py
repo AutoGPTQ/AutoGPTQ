@@ -12,12 +12,12 @@ try:
     import autogptq_next_cuda_64
     import autogptq_next_cuda_256
 
-    _autogptq_cuda_available = True
+    _autogptq_next_cuda_available = True
 except ImportError:
     logger.warning("CUDA extension not installed.")
     autogptq_next_cuda_256 = None
     autogptq_next_cuda_64 = None
-    _autogptq_cuda_available = False
+    _autogptq_next_cuda_available = False
 
 
 class QuantLinear(nn.Module):
@@ -34,7 +34,7 @@ class QuantLinear(nn.Module):
         weight_dtype=torch.float16,
     ):
         super().__init__()
-        global _autogptq_cuda_available
+        global _autogptq_next_cuda_available
         if bits not in [2, 3, 4, 8]:
             raise NotImplementedError("Only 2,3,4,8 bits are supported.")
 
@@ -88,13 +88,13 @@ class QuantLinear(nn.Module):
             ).reshape(1, 3, 12)
 
         self.kernel_switch_threshold = kernel_switch_threshold
-        self.autogptq_cuda_available = _autogptq_cuda_available
+        self.autogptq_next_cuda_available = _autogptq_next_cuda_available
 
-        self.autogptq_cuda = autogptq_next_cuda_256
+        self.autogptq_next_cuda = autogptq_next_cuda_256
         if infeatures % 256 != 0 or outfeatures % 256 != 0:
-            self.autogptq_cuda = autogptq_next_cuda_64
+            self.autogptq_next_cuda = autogptq_next_cuda_64
         if infeatures % 64 != 0 or outfeatures % 64 != 0:
-            self.autogptq_cuda_available = False
+            self.autogptq_next_cuda_available = False
 
     def post_init(self):
         pass
@@ -201,12 +201,12 @@ class QuantLinear(nn.Module):
         x_dtype = x.dtype
         if (
             x.device.type == "cuda"
-            and self.autogptq_cuda_available
+            and self.autogptq_next_cuda_available
             and (self.kernel_switch_threshold == 0 or x.shape[0] < self.kernel_switch_threshold)
         ):
             out = torch.zeros((x.shape[0], self.outfeatures), device=x.device, dtype=torch.float32)
             if self.bits == 2:
-                self.autogptq_cuda.vecquant2matmul(
+                self.autogptq_next_cuda.vecquant2matmul(
                     x.float(),
                     self.qweight,
                     out,
@@ -215,7 +215,7 @@ class QuantLinear(nn.Module):
                     self.g_idx,
                 )
             elif self.bits == 3:
-                self.autogptq_cuda.vecquant3matmul(
+                self.autogptq_next_cuda.vecquant3matmul(
                     x.float(),
                     self.qweight,
                     out,
@@ -224,7 +224,7 @@ class QuantLinear(nn.Module):
                     self.g_idx,
                 )
             elif self.bits == 4:
-                self.autogptq_cuda.vecquant4matmul(
+                self.autogptq_next_cuda.vecquant4matmul(
                     x.float(),
                     self.qweight,
                     out,
@@ -233,7 +233,7 @@ class QuantLinear(nn.Module):
                     self.g_idx,
                 )
             elif self.bits == 8:
-                self.autogptq_cuda.vecquant8matmul(
+                self.autogptq_next_cuda.vecquant8matmul(
                     x.float(),
                     self.qweight,
                     out,

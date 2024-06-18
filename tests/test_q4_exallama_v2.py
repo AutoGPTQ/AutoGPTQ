@@ -11,8 +11,8 @@ try:
 except ImportError as e:
     print(f"[WARNING] Could not load exllama_kernels: {e}")
 
-from auto_gptq_next import AutoGPTQForCausalLM  # noqa: E402
-from auto_gptq_next.models._utils import autogptq_post_init  # noqa: E402
+from auto_gptq_next import AutoGPTQNextForCausalLM  # noqa: E402
+from auto_gptq_next.models._utils import autogptq_next_post_init  # noqa: E402
 from transformers import AutoTokenizer  # noqa: E402
 
 from .test_q4_cuda import get_diff
@@ -48,7 +48,7 @@ class TestsQ4ExllamaV2(unittest.TestCase):
         linear = linear.eval()
         linear = linear.to(device)
 
-        linear = autogptq_post_init(linear, use_act_order=False)
+        linear = autogptq_next_post_init(linear, use_act_order=False)
 
         inp = torch.rand(1, m, k, dtype=torch.float16).to(device)
 
@@ -71,7 +71,7 @@ class TestsQ4ExllamaV2(unittest.TestCase):
 
         model_id = "TheBloke/WizardLM-7B-uncensored-GPTQ"
 
-        model_q = AutoGPTQForCausalLM.from_quantized(model_id, device="cuda:0", use_triton=False)
+        model_q = AutoGPTQNextForCausalLM.from_quantized(model_id, device="cuda:0", use_triton=False)
         tokenizer = AutoTokenizer.from_pretrained(model_id)
 
         inp = tokenizer(prompt, return_tensors="pt").to(device)
@@ -93,7 +93,7 @@ class TestsQ4ExllamaV2(unittest.TestCase):
         revision = "actorder"
         model_basename = "vicuna-13B-1.1-GPTQ-4bit-128g.latest"
 
-        model_q = AutoGPTQForCausalLM.from_quantized(
+        model_q = AutoGPTQNextForCausalLM.from_quantized(
             model_id,
             revision=revision,
             device="cuda:0",
@@ -119,7 +119,7 @@ class TestsQ4ExllamaV2(unittest.TestCase):
         revision = "actorder"
         model_basename = "vicuna-13B-1.1-GPTQ-4bit-128g.latest"
 
-        model_q = AutoGPTQForCausalLM.from_quantized(
+        model_q = AutoGPTQNextForCausalLM.from_quantized(
             model_id,
             revision=revision,
             device="cuda:0",

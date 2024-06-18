@@ -2,7 +2,7 @@ import random
 
 import numpy as np
 import torch
-from auto_gptq_next import AutoGPTQForCausalLM, BaseQuantizeConfig
+from auto_gptq_next import AutoGPTQNextForCausalLM, BaseQuantizeConfig
 from datasets import load_dataset
 from transformers import TextGenerationPipeline
 
@@ -49,7 +49,7 @@ def main():
     )
 
     # get model maximum sequence length
-    model = AutoGPTQForCausalLM.from_pretrained(pretrained_model_dir, quantize_config)
+    model = AutoGPTQNextForCausalLM.from_pretrained(pretrained_model_dir, quantize_config)
     model_config = model.config.to_dict()
     seq_len_keys = ["max_position_embeddings", "seq_length", "n_positions"]
     if any(k in model_config for k in seq_len_keys):
@@ -75,7 +75,7 @@ def main():
     model.save_quantized(quantized_model_dir, use_safetensors=True)
 
     # load quantized model, currently only support cpu or single gpu
-    model = AutoGPTQForCausalLM.from_quantized(quantized_model_dir, device="cuda:0", use_triton=False)
+    model = AutoGPTQNextForCausalLM.from_quantized(quantized_model_dir, device="cuda:0", use_triton=False)
 
     # inference with model.generate
     print(tokenizer.decode(model.generate(**tokenizer("test is", return_tensors="pt").to("cuda:0"))[0]))

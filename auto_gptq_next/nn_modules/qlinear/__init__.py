@@ -31,8 +31,8 @@ class GeneralQuantLinear(nn.Linear):
             self.wf = quant_linear_module.wf
         if hasattr(quant_linear_module, "kernel_switch_threshold"):
             self.kernel_switch_threshold = quant_linear_module.kernel_switch_threshold
-        if hasattr(quant_linear_module, "autogptq_cuda_available"):
-            self.autogptq_cuda_available = quant_linear_module.autogptq_cuda_available
+        if hasattr(quant_linear_module, "autogptq_next_cuda_available"):
+            self.autogptq_next_cuda_available = quant_linear_module.autogptq_next_cuda_available
 
         self.forward = quant_linear_module.forward
 

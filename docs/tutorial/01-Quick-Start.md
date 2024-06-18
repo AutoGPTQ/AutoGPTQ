@@ -36,8 +36,9 @@ set BUILD_CUDA_EXT=0 && pip install auto-gptq
 *The full script of basic usage demonstrated here is `examples/quantization/basic_usage.py`*
 
 The two main classes currently used in AutoGPTQ are `AutoGPTQForCausalLM` and `BaseQuantizeConfig`.
+
 ```python
-from auto_gptq_next import AutoGPTQForCausalLM, BaseQuantizeConfig
+from auto_gptq_next import AutoGPTQNextForCausalLM, BaseQuantizeConfig
 ```
 ### Quantize a pretrained model
 To quantize a model, you need to load pretrained model and tokenizer first, for example:
