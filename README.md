@@ -9,10 +9,9 @@
     </a>
 </p>
 
-## News or Update
+## News
 
 - 2024-06-XX - (News)   🤗 PENDING
-- 2024-02-15 - (News) - AutoGPTQ 0.7.0 is released, with [Marlin](https://github.com/IST-DASLab/marlin) int4*fp16 matrix multiplication kernel support, with the argument `use_marlin=True` when loading models.
 
 *For more histories please turn to [here](docs/NEWS_OR_UPDATE.md)*
 
@@ -23,7 +22,7 @@ AutoGPTQ-NEXT is an updated version of AugtoGPTQ with latest bug fixes applied, 
 
 ## Mission Statement
 
-We want AutoGPTQ-NEXT to be highy focused on GPTQ based quantization and target inference compatibility with Transformers, vLLM, and SGLang. 
+We want AutoGPTQ-NEXT to be highy focused on GPTQ based quantization and target inference compatibility with HF Transformers, vLLM, and SGLang. 
 
 ## Major Changes vs AutoGPTQ
 
@@ -64,8 +63,6 @@ Compile:
 ```bash
 pip install -vvv --no-build-isolation -e .
 ```
-
-As a last resort, if the above command fails, you can try `python setup.py install`.
 
 ## Quick Tour
 
