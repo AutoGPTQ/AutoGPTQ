@@ -28,7 +28,7 @@ We want AutoGPTQ-NEXT to be highy focused on GPTQ based quantization and target 
 * ChatGLM Model Support.
 * Better defaults resulting in faster inference.
 * Better default PPL with tweaked internal code (Result may vary depending on calibration set and gpu usage).
-* Removed non-working, partially working, or fully deprecated features: Peft, ROCM, AWQ Gemm execution via GPTQ kernels, Triton v1 (replaced by v2).
+* Removed non-working, partially working, or fully deprecated features: Peft, ROCM, AWQ Gemm execution via GPTQ kernels, Triton v1 (replaced by v2), Fused Attention (Replaced by Marlin/Exllama).
 * Fixed Packing Performance regression on high core-count systems.
 * Thousands of lines of refractor/cleanup. 
 * Complete tests with every feature and model tested. Everything that does not pass tests will be removed from repo. We want quality over quantity.
