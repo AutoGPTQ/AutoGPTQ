@@ -88,6 +88,12 @@ class QuantLinear(nn.Module):
         new_qweight = pack_tensor(weight)
         self.qweight = new_qweight.to('hpu')
 
+        # TODO: Support group indexing and remove the check
+        columns = self.qweight.shape[0]
+        g_idx_trivial = [i // self.group_size for i in range(columns)]
+        g_idx_trivial = torch.tensor(g_idx_trivial, dtype=torch.int32)
+        assert torch.equal(self.g_idx, g_idx_trivial), "Non-trivial tensor g_idx is not supported"
+
         zeros = self.unpack_zeros_from_cuda_old_format().cpu()
         new_qzeros = pack_tensor(zeros)
         self.qzeros = new_qzeros.to('hpu')
