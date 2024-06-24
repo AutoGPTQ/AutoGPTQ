@@ -1,84 +1,119 @@
-import os
-import math
-
-max_threads = str(min(8, os.cpu_count()))
-os.environ['OMP_NUM_THREADS'] = max_threads
-os.environ['OPENBLAS_NUM_THREADS'] = max_threads
-os.environ['MKL_NUM_THREADS'] = max_threads
-os.environ['VECLIB_MAXIMUM_THREADS'] = max_threads
-os.environ['NUMEXPR_NUM_THREADS'] = max_threads
-os.environ['NUMEXPR_MAX_THREADS'] = max_threads
-
-import tempfile
+import copy
 import unittest
 
-import torch.cuda
-from parameterized import parameterized
-from transformers import AutoTokenizer
+import autogptq_marlin_cuda
+import torch
+import torch.nn as nn
 
-from auto_gptq import AutoGPTQForCausalLM
-from auto_gptq.quantization import CHECKPOINT_FORMAT, QUANT_CONFIG_FILENAME, BaseQuantizeConfig
+from auto_gptq.nn_modules.qlinear.qlinear_cuda_old import QuantLinear as CudaOldQuantLinear
+from auto_gptq.nn_modules.qlinear.qlinear_marlin import QuantLinear as MarlinQuantLinear
+from auto_gptq.nn_modules.qlinear.qlinear_marlin import _get_perms, dequantize_weight
 
 
-class TestQuantization(unittest.TestCase):
-    @parameterized.expand([(False,), (True,)])
-    def test_quantize(self, use_marlin: bool):
-        pretrained_model_dir = "saibo/llama-1B"
+def gen_quant4(k, n, groupsize=-1):
+    maxq = 2 ** 4 - 1
+    w = torch.randn((k, n), dtype=torch.half, device="cpu")
 
-        tokenizer = AutoTokenizer.from_pretrained(pretrained_model_dir, use_fast=True)
-        examples = [
-            tokenizer(
-                "auto-gptq is an easy-to-use model quantization library with user-friendly apis, based on GPTQ algorithm."
-            ),
-            tokenizer(
-                "Today I am in Paris and it is a wonderful day."
-            ),
-        ]
+    original_w = w.clone()
 
-        quantize_config = BaseQuantizeConfig(
+    if groupsize != -1:
+        w = w.reshape((-1, groupsize, n))
+        w = w.permute(1, 0, 2)
+        w = w.reshape((groupsize, -1))
+
+    s = torch.max(torch.abs(w), 0, keepdim=True)[0]
+    s *= 2 / maxq
+
+    # Quantize.
+    w = torch.round(w / s).int()
+
+    # Unsigned storage.
+    w += (maxq + 1) // 2
+    w = torch.clamp(w, 0, maxq)
+
+    # Dequantize.
+    ref = (w - (maxq + 1) // 2).half() * s
+
+    if groupsize != -1:
+        def reshape(w):
+            w = w.reshape((groupsize, -1, n))
+            w = w.permute(1, 0, 2)
+            w = w.reshape((k, n)).contiguous()
+            return w
+        ref = reshape(ref)
+        w = reshape(w)
+
+    s = s.reshape((-1, n)).contiguous()
+    linear = nn.Linear(k, n, bias=False)
+    linear.weight.data = ref.t()
+
+    return original_w, linear, s
+
+original_w, linear, s = gen_quant4(64, 128)
+
+class TestRepacking(unittest.TestCase):
+    def test_marlin_fast_repacking(self):
+        k = 2048
+        n = 1024
+        m = 5
+        group_size = 128
+
+        _, linear, s = gen_quant4(k, n, group_size)
+        cuda_old_linear = CudaOldQuantLinear(bits=4, group_size=group_size, infeatures=k, outfeatures=n, bias=False)
+
+        zeros = torch.full((k // group_size, n), 8, dtype=torch.int32)
+
+        cuda_old_linear.pack(linear, s.T, zeros.T, g_idx=None)
+
+        # Adapted from utils.marlin_utils.convert_to_marlin
+        dequantized_weight, dequantized_qzeros = dequantize_weight(cuda_old_linear)
+        dequantized_weight = dequantized_weight.to(torch.float16)
+
+        self.assertTrue(torch.all(dequantized_qzeros == 8))
+
+        linear_module = torch.nn.Linear(
+            in_features=k,
+            out_features=n,
+            bias=False,
+            dtype=torch.float16,
+            device="cuda",
+        )
+        linear_module.weight.data.copy_(linear.weight.data)  # Not using dequantized_weight to avoid approx
+
+        # Create new linear method and copy to model.
+        marlin_linear = MarlinQuantLinear(
             bits=4,
-            group_size=128,
-            desc_act=False,
-            checkpoint_format=CHECKPOINT_FORMAT.MARLIN if use_marlin else CHECKPOINT_FORMAT.GPTQ,
+            group_size=group_size,
+            infeatures=k,
+            outfeatures=n,
+            bias=False,
+            trainable=False,
         )
 
-        model = AutoGPTQForCausalLM.from_pretrained(
-            pretrained_model_dir,
-            quantize_config=quantize_config,
-            use_flash_attention_2=False,
-        )
+        marlin_linear.pack(linear_module.to("cuda"), scales=copy.deepcopy(cuda_old_linear.scales.data.t()).to("cuda"))
 
-        model.quantize(examples)
+        inp = torch.rand(m, k, dtype=torch.float16, device="cuda")
 
-        with tempfile.TemporaryDirectory() as tmpdirname:
-            model.save_pretrained(tmpdirname)
+        cuda_old_linear = cuda_old_linear.to("cuda")
+        marlin_linear = marlin_linear.to("cuda")
+        with torch.no_grad():
+            res_cuda_old = cuda_old_linear(inp)
+            res_marlin = marlin_linear(inp)
 
-            model = AutoGPTQForCausalLM.from_quantized(tmpdirname, device="cuda:0", use_marlin=use_marlin)
-            del model
-            torch.cuda.empty_cache()
+        reldiff = (res_cuda_old - res_marlin).abs() / (res_cuda_old.abs() + 1e-12)
+        self.assertTrue(torch.mean(reldiff) < 4e-3)
 
-            # test compat: 1) with simple dict type 2) is_marlin_format
-            compat_quantize_config = {
-                "bits": 4,
-                "group_size": 128,
-                "desc_act": False,
-                "is_marlin_format": use_marlin,
-            }
-            model = AutoGPTQForCausalLM.from_quantized(tmpdirname, device="cuda:0", quantize_config=compat_quantize_config)
-            assert(isinstance(model.quantize_config, BaseQuantizeConfig))
+        weight_repacked = autogptq_marlin_cuda.gptq_repack(cuda_old_linear.qweight)
+        self.assertTrue(torch.allclose(weight_repacked, marlin_linear.B))
 
-            del model
-            torch.cuda.empty_cache()
+        _, _scale_perm, _scale_perm_single = _get_perms()
 
-            # test checkinpoint_format hint to from_quantized()
-            os.remove(f"{tmpdirname}/{QUANT_CONFIG_FILENAME}")
+        s = cuda_old_linear.scales.data.clone()
+        if group_size != k:
+            s = s.reshape((1, -1))
+            s = s.reshape((-1, len(_scale_perm)))[:, _scale_perm]
+        else:
+            s = s.reshape((-1, len(_scale_perm_single)))[:, _scale_perm_single]
+        s = s.reshape((-1, n)).contiguous()
 
-            compat_quantize_config = {
-                "bits": 4,
-                "group_size": 128,
-                "desc_act": False,
-            }
-            model = AutoGPTQForCausalLM.from_quantized(tmpdirname, device="cuda:0",
-                    quantize_config=compat_quantize_config,
-                    checkpoint_format=CHECKPOINT_FORMAT.MARLIN if use_marlin else None)
-            assert (isinstance(model.quantize_config, BaseQuantizeConfig))
+        self.assertTrue(torch.allclose(s, marlin_linear.s))
