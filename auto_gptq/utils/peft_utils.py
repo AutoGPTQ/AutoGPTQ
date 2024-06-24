@@ -13,6 +13,7 @@ from ..modeling._base import BaseGPTQForCausalLM
 from ..nn_modules.qlinear import GeneralQuantLinear
 from ..nn_modules.qlinear.qlinear_cuda import QuantLinear as QuantLinearCuda
 from ..nn_modules.qlinear.qlinear_cuda_old import QuantLinear as QuantLinearCudaOld
+from ..nn_modules.qlinear.qlinear_hpu import QuantLinear as QuantLinearHpu
 from ..nn_modules.qlinear.qlinear_exllama import QuantLinear as QuantLinearExllama
 from ..nn_modules.qlinear.qlinear_exllama import QuantLinear as QuantLinearExllamaV2
 from ..nn_modules.qlinear.qlinear_qigen import QuantLinear as QuantLinearQigen
@@ -24,6 +25,7 @@ LinearLayer = Union[
     GeneralQuantLinear,
     QuantLinearCuda,
     QuantLinearCudaOld,
+    QuantLinearHpu,
     QuantLinearExllama,
     QuantLinearExllamaV2,
     QuantLinearQigen,
@@ -145,6 +147,7 @@ class GPTQLoraModel(LoraModel):
             GeneralQuantLinear,
             QuantLinearCuda,
             QuantLinearCudaOld,
+            QuantLinearHpu,
             QuantLinearExllama,
             QuantLinearExllamaV2,
             QuantLinearQigen,
@@ -270,6 +273,7 @@ class GPTQAdaLoraModel(AdaLoraModel):
             GeneralQuantLinear,
             QuantLinearCuda,
             QuantLinearCudaOld,
+            QuantLinearHpu,
             QuantLinearExllama,
             QuantLinearExllamaV2,
             QuantLinearQigen,
