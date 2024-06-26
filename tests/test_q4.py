@@ -7,6 +7,7 @@ from auto_gptq.nn_modules.qlinear.qlinear_exllama import QuantLinear
 from auto_gptq.nn_modules.qlinear.qlinear_marlin import QuantLinear as MarlinQuantLinear
 from auto_gptq.nn_modules.qlinear.qlinear_tritonv2 import QuantLinear as TritonV2QuantLinear
 from auto_gptq.utils.import_utils import dynamically_import_QuantLinear
+import habana_frameworks.torch.core as htcore
 
 
 try:
@@ -2117,6 +2118,7 @@ class TestQ4Marlin(unittest.TestCase):
 
         self.assertTrue(predicted_text.startswith("Today I am in Paris and I am a student of the Master's"))
 
+
 class TestsQ4Triton(unittest.TestCase):
     def test_generation_no_act_order(self):
         prompt = "I am in Paris and"
@@ -2193,3 +2195,138 @@ class TestsQ4Triton(unittest.TestCase):
         predicted_text = tokenizer.decode(res[0])
 
         self.assertEqual(predicted_text, reference_output)
+
+
+class TestQ4HPU(unittest.TestCase):
+    @parameterized.expand(
+        [
+            ("hpu", torch.bfloat16),
+            ("hpu", torch.float),
+        ]
+    )
+    def test_generation(self, in_device, model_dtype):
+        # Reference generated with the cuda-old kernel and TheBloke/Llama-2-7B-Chat-GPTQ
+        reference_output = "<s> I am in Paris and I am feeling very sad and lonely. everybody I know is busy and I don't have any friends here. I am staying in a small apartment in the 11th arrondissement and I am feeling very isolated. I miss my friends and family back home and I don'"
+
+        prompt = "I am in Paris and"
+        device = torch.device(in_device)
+
+        model_id = "TheBloke/Llama-2-7B-Chat-GPTQ"
+
+        try:
+            from transformers import GPTQConfig, AutoModelForCausalLM
+            quantization_config = GPTQConfig(bits=4, use_exllama=False)
+            model_kwargs = {
+                "revision": "main",
+                "token": None
+            }
+            model_q = AutoModelForCausalLM.from_pretrained(model_id, torch_dtype=model_dtype, quantization_config=quantization_config, **model_kwargs)
+            model_q = model_q.eval().to(device)
+        except ValueError as e:
+            if torch.version.hip:
+                self.assertTrue("Can not use HPU int4 kernel" in e.text)
+                self.skipTest("Can not run this test on HPU")
+            else:
+                raise e
+
+        tokenizer_kwargs = {
+            "revision": "main",
+            "token": None
+        }
+        tokenizer = AutoTokenizer.from_pretrained(model_id, **tokenizer_kwargs)
+
+        if not model_q.config.is_encoder_decoder:
+            tokenizer.padding_side = "left"
+        # Some models like GPT2 do not have a PAD token so we have to set it if necessary
+        if model_q.config.model_type == "llama":
+            # unwind broken decapoda-research config
+            model_q.generation_config.pad_token_id = 0
+            model_q.generation_config.bos_token_id = 1
+            model_q.generation_config.eos_token_id = 2
+            tokenizer.bos_token_id = model_q.generation_config.bos_token_id
+            tokenizer.eos_token_id = model_q.generation_config.eos_token_id
+            tokenizer.pad_token_id = model_q.generation_config.pad_token_id
+            tokenizer.pad_token = tokenizer.decode(tokenizer.pad_token_id)
+            tokenizer.eos_token = tokenizer.decode(tokenizer.eos_token_id)
+            tokenizer.bos_token = tokenizer.decode(tokenizer.bos_token_id)
+
+        if tokenizer.pad_token is None:
+            tokenizer.pad_token = tokenizer.eos_token
+            model_q.generation_config.pad_token_id = model_q.generation_config.eos_token_id
+
+
+        inp = tokenizer(prompt, return_tensors="pt").to(device)
+
+        res = model_q.generate(**inp, num_beams=1, min_new_tokens=60, max_new_tokens=60)
+
+        predicted_text = tokenizer.decode(res[0])
+
+        self.assertEqual(predicted_text, reference_output)
+
+    @parameterized.expand(
+        [
+            ("hpu", torch.bfloat16),
+            ("hpu", torch.float),
+        ]
+    )
+    def test_bias(self, in_device, model_dtype):
+        device = torch.device(in_device)
+        # TheBloke/Llama-2-7B-Chat-GPTQ has bias, but they are all zeros, use a checkpoint which really uses bias.
+        model_id = "s3nh/starcoderbase-1b-GPTQ"
+        try:
+            model_kwargs = {
+                "revision": "main",
+                "token": None
+            }
+            model_q = AutoGPTQForCausalLM.from_quantized(model_id, torch_dtype=model_dtype, use_marlin=False, **model_kwargs)
+            model_q = model_q.eval().to(device)
+        except ValueError as e:
+            if torch.version.hip:
+                self.assertTrue("Can not use HPU int4 kernel" in e.text)
+                self.skipTest("Can not run this test on HPU")
+            else:
+                raise e
+
+        for _, param in model_q.named_parameters():
+            self.assertTrue(param.device != torch.device("meta"))
+
+        for _, param in model_q.named_buffers():
+            self.assertTrue(param.device != torch.device("meta"))
+
+        self.assertTrue(torch.count_nonzero(model_q.model.transformer.h[0].attn.c_proj.bias) > 0)
+        self.assertTrue(torch.count_nonzero(model_q.model.transformer.h[0].attn.c_attn.bias) > 0)
+
+        tokenizer_kwargs = {
+            "revision": "main",
+            "token": None
+        }
+        tokenizer = AutoTokenizer.from_pretrained("Xenova/starcoderbase-1b", **tokenizer_kwargs)
+
+        if not model_q.config.is_encoder_decoder:
+            tokenizer.padding_side = "left"
+        # Some models like GPT2 do not have a PAD token so we have to set it if necessary
+        if model_q.config.model_type == "llama":
+            # unwind broken decapoda-research config
+            model_q.generation_config.pad_token_id = 0
+            model_q.generation_config.bos_token_id = 1
+            model_q.generation_config.eos_token_id = 2
+            tokenizer.bos_token_id = model_q.generation_config.bos_token_id
+            tokenizer.eos_token_id = model_q.generation_config.eos_token_id
+            tokenizer.pad_token_id = model_q.generation_config.pad_token_id
+            tokenizer.pad_token = tokenizer.decode(tokenizer.pad_token_id)
+            tokenizer.eos_token = tokenizer.decode(tokenizer.eos_token_id)
+            tokenizer.bos_token = tokenizer.decode(tokenizer.bos_token_id)
+
+        if tokenizer.pad_token is None:
+            tokenizer.pad_token = tokenizer.eos_token
+            model_q.generation_config.pad_token_id = model_q.generation_config.eos_token_id
+
+        prompt = "Today I am in Paris and"
+        inp = tokenizer(prompt, return_tensors="pt").to(device)
+
+        res = model_q.generate(**inp, num_beams=1, min_new_tokens=60, max_new_tokens=60)
+
+        predicted_text = tokenizer.decode(res[0])
+
+        self.assertTrue(predicted_text.startswith("Today I am in Paris and I am a student of the Master's"))
+
