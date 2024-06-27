@@ -9,6 +9,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 import transformers
+import threadpoolctl as tctl
 from tqdm import tqdm
 from transformers import AutoConfig
 from transformers.utils.hub import cached_file
@@ -297,25 +298,29 @@ def pack_model(
     )
     qlayers = find_layers(model, [QuantLinear])
 
-    pbar = tqdm(qlayers.keys(), leave=True)
-    for name in pbar:
-        pbar.set_description(f"Packing {name}...", refresh=True)
+    # TODO remove once pack() thread regression is fixed
+    # Limit pack() thread usage to avoid slow-down: applies limit to all supported libs
+    with tctl.threadpool_limits(limits=1):
+        pbar = tqdm(qlayers.keys(), leave=True)
+        for name in pbar:
+            pbar.set_description(f"Packing {name}...", refresh=True)
 
-        quantizers[name], scale, zero, g_idx = quantizers[name]
-        # so far can only pack layer on CPU
-        layer_device = qlayers[name].device
-        qlayers[name].to(CPU)
-        layers[name], scale, zero, g_idx = (
-            layers[name].to(CPU),
-            scale.to(CPU),
-            zero.to(CPU),
-            g_idx.to(CPU),
-        )
-        if QuantLinear.QUANT_TYPE == "marlin":
-            qlayers[name].pack(layers[name], scale)
-        else:
-            qlayers[name].pack(layers[name], scale, zero, g_idx)
-        qlayers[name].to(layer_device)
+            quantizers[name], scale, zero, g_idx = quantizers[name]
+            # so far can only pack layer on CPU
+            layer_device = qlayers[name].device
+            qlayers[name].to(CPU)
+            layers[name], scale, zero, g_idx = (
+                layers[name].to(CPU),
+                scale.to(CPU),
+                zero.to(CPU),
+                g_idx.to(CPU),
+            )
+            if QuantLinear.QUANT_TYPE == "marlin":
+                qlayers[name].pack(layers[name], scale)
+            else:
+                qlayers[name].pack(layers[name], scale, zero, g_idx)
+            qlayers[name].to(layer_device)
+
     logger.info("Model packed.")
 
     if use_triton and warmup_triton:
