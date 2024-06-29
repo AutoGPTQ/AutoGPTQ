@@ -69,7 +69,7 @@ def dynamically_import_QuantLinear(
 ):
     try:
         import habana_frameworks.torch.hpu  # noqa: F401
-    except ImportError as e:
+    except Exception as e:
         pass
     else:
         from ..nn_modules.qlinear.qlinear_hpu import QuantLinear

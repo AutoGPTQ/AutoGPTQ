@@ -5,7 +5,19 @@ import numpy as np
 import torch
 import torch.nn as nn
 import transformers
-import habana_frameworks.torch.core as htcore
+try:
+    import habana_frameworks.torch.core as htcore
+    convert_from_uint4 = torch.ops.hpu.convert_from_uint4
+except Exception as e:
+    hpu_import_exception = e
+
+    def error_raiser_hpu(*args, **kwargs):
+        raise ValueError(
+            f"Trying to use HPU, but could not import the HPU framework with the following error: {hpu_import_exception}"
+        )
+
+    convert_from_uint4 = error_raiser_hpu
+
 
 logger = getLogger(__name__)
 
@@ -118,7 +130,7 @@ class QuantLinear(nn.Module):
         scales = self.scales
         qweight = self.qweight
         zeros = self.qzeros
-        weight = torch.ops.hpu.convert_from_uint4(qweight, scales, zeros, x_dtype)
+        weight = convert_from_uint4(qweight, scales, zeros, x_dtype)
         out = torch.matmul(x, weight)
         out = out.reshape(out_shape)
         out = out + self.bias if self.bias is not None else out
