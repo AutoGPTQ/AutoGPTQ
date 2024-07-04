@@ -129,6 +129,7 @@ requirements = [
     "transformers>=4.31.0",
     "peft>=0.5.0",
     "tqdm",
+    "threadpoolctl",
 ]
 
 extras_require = {
