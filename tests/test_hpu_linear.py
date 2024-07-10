@@ -2,7 +2,10 @@ import numpy as np
 import math
 import torch
 import pytest
-import habana_frameworks.torch.core as htcore
+try:
+    import habana_frameworks.torch.core as htcore
+except Exception as e:
+    pytestmark = pytest.mark.skip("Couldn't import HPU plugin, skipping HPU tests")
 
 def _convert_to_tensor_list(tensor_or_tensors):
     if isinstance(tensor_or_tensors, tuple):
