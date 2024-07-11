@@ -19,6 +19,7 @@ from .moss import MOSSGPTQForCausalLM
 from .mpt import MPTGPTQForCausalLM
 from .opt import OPTGPTQForCausalLM
 from .phi import PhiGPTQForCausalLM
+from .phi3 import Phi3GPTQForCausalLM
 from .qwen import QwenGPTQForCausalLM
 from .qwen2 import Qwen2GPTQForCausalLM
 from .rw import RWGPTQForCausalLM
