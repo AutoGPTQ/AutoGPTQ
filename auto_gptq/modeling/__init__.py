@@ -22,6 +22,7 @@ from .opt import OPTGPTQForCausalLM
 from .phi import PhiGPTQForCausalLM
 from .qwen import QwenGPTQForCausalLM
 from .qwen2 import Qwen2GPTQForCausalLM
+from .qwen2_moe import Qwen2MoeGPTQForCausalLM
 from .rw import RWGPTQForCausalLM
 from .stablelmepoch import StableLMEpochGPTQForCausalLM
 from .starcoder2 import Starcoder2GPTQForCausalLM

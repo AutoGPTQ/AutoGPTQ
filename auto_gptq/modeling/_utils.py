@@ -770,6 +770,21 @@ def get_checkpoints(model_name_or_path: str, extensions: List[str], possible_mod
     return False, resolved_archive_file, true_model_basename
 
 
+# generate inside layer modules for MoE models with massive experts
+def get_moe_inside_layer_modules(inside_layer_modules, num_experts):
+    new_inside_layer_modules = []
+    for names in inside_layer_modules:
+        new_inside_layer_modules.append([])
+        for n in names:
+            if "{expert_idx}" in n:
+                for expert_idx in range(num_experts):
+                    new_inside_layer_modules[-1].append(n.replace("{expert_idx}", str(expert_idx)))
+            else:
+                new_inside_layer_modules[-1].append(n)
+
+    return new_inside_layer_modules
+
+
 __all__ = [
     "get_device",
     "move_to_device",
