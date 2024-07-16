@@ -78,6 +78,12 @@ Use `--help` flag to see detailed descriptions for more command arguments.
 ## PEFT
 > Commands in this chapter should be run under `peft` folder.
 
+Install `🤗 peft` in addition to AutoGPTQ:
+
+```sh
+    pip install "peft<0.7.0"
+```
+
 ### Lora
 `peft_lora_clm_instruction_tuning.py` script gives an example of instruction tuning gptq quantized model's lora adapter using tools in `auto_gptq.utils.peft_utils` and `🤗 peft` on alpaca dataset.
 
