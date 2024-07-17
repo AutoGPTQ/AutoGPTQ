@@ -160,7 +160,6 @@ requirements = [
     "transformers>=4.31.0",
     "peft>=0.5.0",
     "tqdm",
-    "threadpoolctl",
 ]
 
 extras_require = {
@@ -339,8 +338,15 @@ if BUILD_SYCL_EXT:
                 "autogptq_extension/sycl/exllama/sycl_func/q4_matrix.cpp"
            
             ]
+    marlin_source_files=[
+                "autogptq_extension/sycl/marlin/marlin_repack.cpp"
+            ]
     extensions = [
-        
+        DPCPPExtension(name="marlin_sycl",
+                       sources=marlin_source_files,
+                       include_dirs=include_headers,
+                       extra_compile_args={'cxx': cxx_flags},
+                       extra_link_args=extra_ldflags),
         DPCPPExtension(name="exllama_sycl",
                        sources=exllama_source_files,
                        include_dirs=include_headers,
@@ -356,6 +362,7 @@ if BUILD_SYCL_EXT:
                        include_dirs=include_headers,
                        extra_compile_args={'cxx': cxx_flags},
                        extra_link_args=extra_ldflags),
+        
         
     ]
 
