@@ -541,7 +541,7 @@ def awq_reverse_reorder_int_tensor(int_tensor, bits: int):
     ).reshape(-1, 1)
     order_tensor = order_tensor.reshape(-1)
 
-    reverse_order_tensor = torch.arange(order_tensor.shape[0]).cuda()[order_tensor]
+    reverse_order_tensor = torch.arange(order_tensor.shape[0]).cuda()[order_tensor] if torch.cuda.is_available() else torch.arange(order_tensor.shape[0])[order_tensor]
     reverse_order_tensor = reverse_order_tensor[order_tensor]
     int_tensor = int_tensor[:, reverse_order_tensor]
     return int_tensor
@@ -571,8 +571,8 @@ def unpack_awq(
     """
     assert bits == 4
 
-    qzeros = awq_qzeros.cuda()
-    qweight = awq_qweight.cuda()
+    qzeros = awq_qzeros.cuda() if torch.cuda.is_available() else awq_qzeros
+    qweight = awq_qweight.cuda() if torch.cuda.is_available() else awq_qweight
     qweight = qweight.T.contiguous()
 
     infeatures = awq_qweight.shape[0]
@@ -602,7 +602,7 @@ def unpack_awq(
     weight = awq_reverse_reorder_int_tensor(weight, bits)
 
     # Dequantize weights.
-    scales = awq_scales.cuda()
+    scales = awq_scales.cuda() if torch.cuda.is_available() else awq_scales
     zeros = zeros.contiguous()
     scale_zeros = zeros * scales
 
@@ -612,7 +612,7 @@ def unpack_awq(
 
     qdq_weight_T = weight * scale_mat - scale_zeros_mat.half()
 
-    fp16_weight = qdq_weight_T.T.cuda()
+    fp16_weight = qdq_weight_T.T.cuda() if torch.cuda.is_available() else qdq_weight_T.T
 
     return fp16_weight, zeros
 
