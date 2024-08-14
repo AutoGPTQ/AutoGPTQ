@@ -518,7 +518,7 @@ def make_sure_no_tensor_in_meta_device(
 ):
     QuantLinear = dynamically_import_QuantLinear(use_triton, desc_act, group_size, bits=bits, disable_exllama=disable_exllama, disable_exllamav2=disable_exllamav2, use_marlin=use_marlin, use_tritonv2=use_tritonv2)
     for n, m in model.named_modules():
-        if isinstance(m, QuantLinear) and m.bias.device == torch.device("meta"):
+        if isinstance(m, QuantLinear) and m.bias is not None and m.bias.device == torch.device("meta"):
             m.register_buffer("bias", torch.zeros((m.outfeatures), dtype=torch.float16, device="cpu"))
 
 
