@@ -30,6 +30,17 @@ constexpr int ceildiv(int a, int b) {
   return (a + b - 1) / b;
 }
 
+// hfma2 on hardware with compute capability < 5.3
+// #if defined(__CUDA_ARCH__) && __CUDA_ARCH__ < 530
+// __device__ half2 __hfma2(half2 a, half2 b, half2 c)
+// {
+//     return __floats2half2_rn(
+//         fmaf(__low2float(a), __low2float(b), __low2float(c)),
+//         fmaf(__high2float(a), __high2float(b), __high2float(c))
+//     );
+// }
+// #endif
+
 // Instances of `Vec` are used to organize groups of >>registers<<, as needed for instance as inputs to tensor core
 // operations. Consequently, all corresponding index accesses must be compile-time constants, which is why we
 // extensively use `#pragma unroll` throughout the kernel code to guarantee this.
