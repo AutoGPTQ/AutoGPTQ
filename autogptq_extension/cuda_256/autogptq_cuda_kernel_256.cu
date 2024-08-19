@@ -4,6 +4,17 @@
 #include <cuda_runtime.h>
 #include <cuda_fp16.h>
 
+// hfma2 on hardware with compute capability < 5.3
+// #if defined(__CUDA_ARCH__) && __CUDA_ARCH__ < 530
+// __device__ half2 __hfma2(half2 a, half2 b, half2 c)
+// {
+//     return __floats2half2_rn(
+//         fmaf(__low2float(a), __low2float(b), __low2float(c)),
+//         fmaf(__high2float(a), __high2float(b), __high2float(c))
+//     );
+// }
+// #endif
+
 // atomicAdd for double-precision floating-point numbers on hardware with
 // compute capability < 6.0 from:
 // https://docs.nvidia.com/cuda/cuda-c-programming-guide/index.html#atomic-functions
