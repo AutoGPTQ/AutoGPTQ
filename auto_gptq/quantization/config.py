@@ -2,7 +2,7 @@ import json
 import logging
 import os
 from dataclasses import dataclass, field, fields
-from os.path import isdir, join
+from os.path import isdir, isfile, join
 from typing import Optional
 
 import huggingface_hub
@@ -185,6 +185,8 @@ class BaseQuantizeConfig(PushToHubMixin):
         ]:
             if isdir(save_dir):  # Local
                 resolved_config_file = join(save_dir, quantize_config_filename)
+                if not isfile(resolved_config_file):
+                    resolved_config_file = None
             else:  # Remote
                 resolved_config_file = cached_file(
                     save_dir,
