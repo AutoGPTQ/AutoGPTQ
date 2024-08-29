@@ -13,6 +13,7 @@ from .codegen import *
 from .baichuan import *
 from .internlm import *
 from .qwen import *
+from .qwen2vl import *
 from .mistral import *
 from .yi import *
 from .xverse import *
