@@ -51,6 +51,7 @@ GPTQ_CAUSAL_LM_MODEL_MAP = {
     "internlm": InternLMGPTQForCausalLM,
     "qwen": QwenGPTQForCausalLM,
     "mistral": MistralGPTQForCausalLM,
+    "minicpm3":MiniCPM3ForCausalLM,
     "Yi": YiGPTQForCausalLM,
     "xverse": XverseGPTQForCausalLM,
     "deci": DeciLMGPTQForCausalLM,
