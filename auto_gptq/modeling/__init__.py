@@ -26,3 +26,4 @@ from .stablelmepoch import StableLMEpochGPTQForCausalLM
 from .starcoder2 import Starcoder2GPTQForCausalLM
 from .xverse import XverseGPTQForCausalLM
 from .yi import YiGPTQForCausalLM
+from .minicpm import MiniCPMGPTQForCausalLM
