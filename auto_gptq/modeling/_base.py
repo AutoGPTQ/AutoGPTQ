@@ -774,7 +774,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                 "auto_gptq from source."
             )
             disable_exllama = True
-        if not disable_exllamav2 and not EXLLAMAV2_KERNELS_AVAILABLE:
+        if not disable_exllamav2 and not EXLLAMAV2_KERNELS_AVAILABLE and not use_ipex:
             logger.warning(
                 "Exllamav2 kernel is not installed, reset disable_exllamav2 to True. "
                 "This may because you installed auto_gptq using a pre-build wheel "
@@ -783,7 +783,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                 "auto_gptq from source."
             )
             disable_exllamav2 = True
-        if not AUTOGPTQ_CUDA_AVAILABLE:
+        if not AUTOGPTQ_CUDA_AVAILABLE and not use_ipex:
             logger.warning(
                 "CUDA kernels for auto_gptq are not installed, this will result in "
                 "very slow inference speed. This may because:\n"
@@ -810,6 +810,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             if not IPEX_AVAILABLE:
                 raise ValueError("No IPEX found. Please install with `pip install intel-extension-for-pytorch`.")
             torch_dtype = torch.bfloat16
+            logger.info("Use ipex optimization, set torch_dtype to torch.bfloat16")
             disable_exllama = True
             disable_exllamav2 = True
 
@@ -894,7 +895,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             else:
                 torch_dtype = torch.float32
 
-        if torch_dtype != torch.float16:
+        if torch_dtype != torch.float16 and not use_ipex:
             logger.warning("Overriding use_cuda_fp16 to False since torch_dtype is not torch.float16.")
             use_cuda_fp16 = False
 

@@ -4,7 +4,7 @@ On Linux and Windows, AutoGPTQ can be installed through pre-built wheels for spe
 
 | AutoGPTQ version | CUDA/ROCm/IPEX version | Installation                                                                                               | Built against PyTorch |
 |------------------|-------------------|------------------------------------------------------------------------------------------------------------|-----------------------|
-| latest    | IPEX 2.5.0         | `pip install auto-gptq[ipex]`          | 2.5.0+cpu           |
+| latest (0.8.0)   | IPEX 2.5.0        | `pip install auto-gptq[ipex]`                                                                              | 2.5.0+cpu             |
 | latest (0.7.1)   | CUDA 11.8         | `pip install auto-gptq --extra-index-url https://huggingface.github.io/autogptq-index/whl/cu118/`          | 2.2.1+cu118           |
 | latest (0.7.1)   | CUDA 12.1         | `pip install auto-gptq`                                                                                    | 2.2.1+cu121           |
 | latest (0.7.1)   | ROCm 5.7          | `pip install auto-gptq --extra-index-url https://huggingface.github.io/autogptq-index/whl/rocm571/`        | 2.2.1+rocm5.7         |
