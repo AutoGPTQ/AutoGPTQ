@@ -77,13 +77,14 @@ def main():
     model.save_quantized(quantized_model_dir, use_safetensors=True)
 
     # load quantized model, currently only support cpu or single gpu
-    model = AutoGPTQForCausalLM.from_quantized(quantized_model_dir, device="cuda:0", use_triton=False)
+    device = "cuda:0" if torch.cuda.is_available() else "cpu"
+    model = AutoGPTQForCausalLM.from_quantized(quantized_model_dir, device=device, use_triton=False)
 
     # inference with model.generate
-    print(tokenizer.decode(model.generate(**tokenizer("test is", return_tensors="pt").to("cuda:0"))[0]))
+    print(tokenizer.decode(model.generate(**tokenizer("test is", return_tensors="pt").to(device))[0]))
 
     # or you can also use pipeline
-    pipeline = TextGenerationPipeline(model=model, tokenizer=tokenizer, device="cuda:0")
+    pipeline = TextGenerationPipeline(model=model, tokenizer=tokenizer, device=device)
     print(pipeline("test is")[0]["generated_text"])
 
 

@@ -1,3 +1,4 @@
+import torch
 from transformers import AutoTokenizer, TextGenerationPipeline
 
 from auto_gptq import AutoGPTQForCausalLM, BaseQuantizeConfig
@@ -48,7 +49,8 @@ def main():
     model.save_quantized(quantized_model_dir, use_safetensors=True)
 
     # load quantized model to the first GPU
-    model = AutoGPTQForCausalLM.from_quantized(quantized_model_dir, device="cuda:0")
+    device = "cuda:0" if torch.cuda.is_available() else "cpu"
+    model = AutoGPTQForCausalLM.from_quantized(quantized_model_dir, device=device)
 
     # download quantized model from Hugging Face Hub and load to the first GPU
     # model = AutoGPTQForCausalLM.from_quantized(repo_id, device="cuda:0", use_safetensors=True, use_triton=False)

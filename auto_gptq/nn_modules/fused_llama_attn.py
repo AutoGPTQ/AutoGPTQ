@@ -146,6 +146,7 @@ class FusedLlamaAttentionForQuantizedModel(FusedBaseAttentionModule):
         bits: int = 4,
         disable_exllama=True,
         disable_exllamav2=False,
+        use_ipex=False,
         **kwargs,
     ):
         """
@@ -158,6 +159,7 @@ class FusedLlamaAttentionForQuantizedModel(FusedBaseAttentionModule):
             bits=bits,
             disable_exllama=disable_exllama,
             disable_exllamav2=disable_exllamav2,
+            use_ipex=use_ipex,
         )
 
         for name, m in model.named_modules():

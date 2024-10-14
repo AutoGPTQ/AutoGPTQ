@@ -157,9 +157,10 @@ def main():
     model.save_quantized(quantized_model_dir, use_safetensors=True)
 
     # load quantized model, currently only support cpu or single gpu
-    model = AutoGPTQForCausalLM.from_quantized(quantized_model_dir, device="cuda:0", use_triton=False)
+    device = "cuda:0" if torch.cuda.is_available() else "cpu"
+    model = AutoGPTQForCausalLM.from_quantized(quantized_model_dir, device=device, use_triton=False)
 
-    opt_eval(model.model, testenc, "cuda:0")
+    opt_eval(model.model, testenc, device)
 
 
 if __name__ == "__main__":

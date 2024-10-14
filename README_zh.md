@@ -86,6 +86,13 @@ pip uninstall autogptq_cuda -y
 pip install auto-gptq[triton]
 ```
 
+#### 支持CPU加速
+AutoGPTQ支持在CPU设备上的加速，使用以下命令安装 IPEX：
+> 警告：目前 IPEX 仅支持 4-bit 数值类型的量化
+```shell
+pip install auto-gptq[ipex]
+```
+
 ### 从源码安装
 <details>
 <summary>点击以查看详情</summary>

@@ -60,6 +60,10 @@ You can provide a string to this argument to use pre-set model loading strategie
 
 In the simplest way, you can set `device_map='auto'` and let 🤗 Accelerate handle the device map computation. For more details of this argument, you can reference to [this document](https://huggingface.co/docs/accelerate/main/en/usage_guides/big_modeling#designing-a-device-map).
 
+
+### Load model with IPEX optimization for CPU device
+In CPU only device, AutoGPTQ will load model with IPEX linear automatically. Or you can use the argument `use_ipex` in `.from_quantized`.
+
 ## Best Practice
 
 ### At Quantization

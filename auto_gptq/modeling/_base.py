@@ -41,6 +41,7 @@ from ..utils.import_utils import (
     MARLIN_AVAILABLE,
     QIGEN_AVAILABLE,
     TRITON_AVAILABLE,
+    IPEX_AVAILABLE,
     dynamically_import_QuantLinear,
 )
 from ..utils.marlin_utils import (
@@ -194,7 +195,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         device_map = self.hf_device_map
         if device_map:
             for name, device in device_map.items():
-                if device == "cpu":
+                if device == "cpu" and torch.cuda.is_available():
                     logger.info(f"truly offloading {name} to cpu with hook.")
                     module = get_module_by_name_suffix(self.model, name)
                     remove_hook_from_module(module, recurse=True)
@@ -243,7 +244,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             raise ValueError
 
         force_layer_back_to_cpu = False
-        if get_device(layers[0]) == CPU:
+        if get_device(layers[0]) == CPU and self.device.type != "cpu":
             layers[0] = layers[0].to(CUDA_0)
             force_layer_back_to_cpu = True
 
@@ -287,7 +288,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             logger.info(f"Start quantizing layer {i + 1}/{len(layers)}")
             layer = layers[i]
             force_layer_back_to_cpu = False
-            if get_device(layer) == CPU:
+            if get_device(layer) == CPU and self.device.type != "cpu":
                 move_to_device(layer, CUDA_0)
                 force_layer_back_to_cpu = True
             cur_layer_device = get_device(layer)
@@ -385,6 +386,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             warmup_triton=autotune_warmup_after_quantized,
             force_layer_back_to_cpu=force_layer_back_to_cpu,
             use_marlin=self.quantize_config.checkpoint_format == CHECKPOINT_FORMAT.MARLIN,
+            use_ipex=self.device.type == "cpu" and not torch.cuda.is_available(),
         )
         if device_map:
             self.model = remove_hook_from_module(self.model, recurse=True)
@@ -598,7 +600,10 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         """load un-quantized pretrained model to cpu"""
 
         if not torch.cuda.is_available():
-            raise EnvironmentError("Load pretrained model to do quantization requires CUDA available.")
+            logger.info("No cuda found, apply cpu quantization.")
+            if not IPEX_AVAILABLE:
+                raise ValueError("No IPEX found. Please install with `pip install intel-extension-for-pytorch`.")
+            torch_dtype = torch.bfloat16
 
         def skip(*args, **kwargs):
             pass
@@ -696,6 +701,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         use_triton: bool = False,
         use_qigen: bool = False,
         use_marlin: bool = False,
+        use_ipex: bool = False,
         torch_dtype: Optional[torch.dtype] = None,
         inject_fused_attention: bool = False,
         inject_fused_mlp: bool = False,
@@ -713,8 +719,12 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         **kwargs,
     ):
         """load quantized model from local disk"""
-        # If disable_exllamav2 is True, we want to fall back on the exllama kernel and not the cuda/cuda_old ones.
+        if not torch.cuda.is_available() or device == "cpu":
+            logger.info("No cuda found, apply cpu quantization.")
+            use_ipex = True
+
         if disable_exllama is None:
+            # If disable_exllamav2 is True, we want to fall back on the exllama kernel and not the cuda/cuda_old ones.
             if disable_exllamav2:
                 disable_exllama = False
             else:
@@ -795,6 +805,13 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                 "You have activated both exllama and exllamav2 kernel. Setting disable_exllama to True and keeping disable_exllamav2 to False"
             )
             disable_exllama = True
+
+        if use_ipex:
+            if not IPEX_AVAILABLE:
+                raise ValueError("No IPEX found. Please install with `pip install intel-extension-for-pytorch`.")
+            torch_dtype = torch.bfloat16
+            disable_exllama = True
+            disable_exllamav2 = True
 
         # == step1: prepare configs and file names == #
         config = AutoConfig.from_pretrained(
@@ -920,6 +937,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                     desc_act=quantize_config.desc_act,
                     trainable=trainable,
                     use_tritonv2=use_tritonv2,
+                    use_ipex=use_ipex,
                 )
                 model.tie_weights()
 
@@ -967,6 +985,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                     disable_exllama=disable_exllama,
                     disable_exllamav2=disable_exllamav2,
                     use_tritonv2=use_tritonv2,
+                    use_ipex=use_ipex,
                 )
 
             # TODO: move this logic in an awq_utils.py file.
@@ -1114,8 +1133,8 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                 dtype=torch_dtype,  # This is very hacky but works due to https://github.com/huggingface/accelerate/blob/bd72a5f1a80d5146554458823f8aeda0a9db5297/src/accelerate/utils/modeling.py#L292
                 checkpoint=model_save_name,
                 device_map=device_map,
-                offload_state_dict=True,
-                offload_buffers=True,
+                offload_state_dict=False if use_ipex else True,
+                offload_buffers=False if use_ipex else True,
             )
 
             # TODO: Why are we using this custom function and not dispatch_model?
@@ -1196,6 +1215,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                     disable_exllama=disable_exllama,
                     disable_exllamav2=disable_exllamav2,
                     use_tritonv2=use_tritonv2,
+                    use_ipex=use_ipex,
                 )
         if inject_fused_mlp:
             if cls.fused_mlp_module_type is None:
@@ -1279,13 +1299,14 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         disable_exllamav2: bool = False,
         use_marlin: bool = False,
         use_qigen: bool = False,
+        use_ipex: bool = False,
         use_tritonv2: bool = False,
     ):
         GeneralQuantLinear.inject_to_model(
             model,
             dynamically_import_QuantLinear(use_triton, desc_act, group_size, bits=bits, disable_exllama=disable_exllama,
-                                           disable_exllamav2=disable_exllamav2,
-                                           use_marlin=use_marlin, use_qigen=use_qigen),
+                                           disable_exllamav2=disable_exllamav2, use_marlin=use_marlin,
+                                           use_qigen=use_qigen, use_ipex=use_ipex),
         )
 
     def __getattr__(self, item):
