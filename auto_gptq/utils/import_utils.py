@@ -84,6 +84,10 @@ def dynamically_import_QuantLinear(
     else:
         from ..nn_modules.qlinear.qlinear_hpu import QuantLinear
         return QuantLinear
+
+    if not torch.cuda.is_available() and not use_ipex:
+        logger.warning("No cuda found, set use_ipex=True to use cpu")
+        use_ipex = True
     if use_qigen:
         if not QIGEN_AVAILABLE:
             raise ValueError(

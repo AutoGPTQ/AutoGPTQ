@@ -95,11 +95,15 @@ class QuantLinear(nn.Module):
 
         self.trainable = trainable
 
+        # for training forward
+        self.wf = torch.tensor(list(range(0, 32, self.bits)), dtype=torch.int32).unsqueeze(0)
+
     def post_init(self):
         assert self.qweight.device.type == "cpu"
-        self.ipex_linear = WeightOnlyQuantizedLinear.from_weight(self.qweight, self.scales, self.qzeros, \
-                                                                self.infeatures, self.outfeatures, None, self.bias, \
-                                                                self.group_size, self.g_idx, 0, 0)
+        if not self.trainable:
+            self.ipex_linear = WeightOnlyQuantizedLinear.from_weight(self.qweight, self.scales, self.qzeros, \
+                                                                    self.infeatures, self.outfeatures, None, self.bias, \
+                                                                    self.group_size, self.g_idx, 0, 0)
 
     def pack(self, linear, scales, zeros, g_idx=None):
         W = linear.weight.data.clone()
@@ -197,8 +201,47 @@ class QuantLinear(nn.Module):
         self.qzeros = torch.from_numpy(qzeros)
 
     def forward(self, x: torch.Tensor):
-        outputs = self.ipex_linear(x)
-        return outputs
+        if not self.trainable and hasattr(self, "ipex_linear"):
+            return self.ipex_linear(x)
+
+        out_shape = x.shape[:-1] + (self.outfeatures,)
+        x = x.reshape(-1, x.shape[-1])
+        x_dtype = x.dtype
+        zeros = torch.bitwise_right_shift(
+            torch.unsqueeze(self.qzeros, 2).expand(-1, -1, 32 // self.bits),
+            self.wf.unsqueeze(0),
+        ).to(torch.int16)
+        zeros = torch.bitwise_and(zeros, (2**self.bits) - 1)
+
+        zeros = zeros + 1
+        zeros = zeros.reshape(self.scales.shape)
+
+        weight = torch.bitwise_right_shift(
+            torch.unsqueeze(self.qweight, 1).expand(-1, 32 // self.bits, -1),
+            self.wf.unsqueeze(-1),
+        ).to(torch.int16)
+        weight = torch.bitwise_and(weight, (2**self.bits) - 1)
+
+        weight = weight.reshape(weight.shape[0] * weight.shape[1], weight.shape[2])
+        num_itr = self.g_idx.shape[0] // x.shape[-1]
+        if num_itr == 1:
+            weights = self.scales[self.g_idx.long()] * (weight - zeros[self.g_idx.long()])
+        else:
+            num_dim = self.g_idx.shape[0] // num_itr
+            weights = []
+            for i in range(num_itr):
+                scale_i = self.scales[:, i * num_dim : (i + 1) * num_dim]
+                weight_i = weight[:, i * num_dim : (i + 1) * num_dim]
+                zeros_i = zeros[:, i * num_dim : (i + 1) * num_dim]
+                g_idx_i = self.g_idx[i * num_dim : (i + 1) * num_dim]
+                weights.append(scale_i[g_idx_i.long()] * (weight_i - zeros_i[g_idx_i.long()]))
+            weights = torch.cat(weights, dim=1)
+        out = torch.matmul(x, weights)
+        out = out.to(x_dtype)
+        out = out.reshape(out_shape)
+        out = out + self.bias if self.bias is not None else out
+
+        return out
 
 
 @torch.no_grad()
