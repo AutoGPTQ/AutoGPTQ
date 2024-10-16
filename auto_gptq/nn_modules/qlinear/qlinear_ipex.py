@@ -44,7 +44,7 @@ class QuantLinear(nn.Module):
         outfeatures,
         bias,
         kernel_switch_threshold=128,
-        trainable=False,
+        training=False,
         weight_dtype=torch.bfloat16,
         **kwargs,
     ):
@@ -93,14 +93,14 @@ class QuantLinear(nn.Module):
 
         self.kernel_switch_threshold = kernel_switch_threshold
 
-        self.trainable = trainable
+        self.training = training
 
         # for training forward
         self.wf = torch.tensor(list(range(0, 32, self.bits)), dtype=torch.int32).unsqueeze(0)
 
     def post_init(self):
         assert self.qweight.device.type == "cpu"
-        if not self.trainable:
+        if not self.training:
             self.ipex_linear = WeightOnlyQuantizedLinear.from_weight(self.qweight, self.scales, self.qzeros, \
                                                                     self.infeatures, self.outfeatures, None, self.bias, \
                                                                     self.group_size, self.g_idx, 0, 0)
@@ -201,7 +201,7 @@ class QuantLinear(nn.Module):
         self.qzeros = torch.from_numpy(qzeros)
 
     def forward(self, x: torch.Tensor):
-        if not self.trainable and hasattr(self, "ipex_linear"):
+        if not self.training and hasattr(self, "ipex_linear"):
             return self.ipex_linear(x)
 
         out_shape = x.shape[:-1] + (self.outfeatures,)
