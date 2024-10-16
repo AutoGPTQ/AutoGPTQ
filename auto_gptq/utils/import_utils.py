@@ -57,6 +57,7 @@ try:
 
     IPEX_AVAILABLE = True
     IPEX_EXCEPTION = None
+    _warned = False
 except Exception as e:
     IPEX_AVAILABLE = False
     IPEX_EXCEPTION = e
@@ -86,7 +87,10 @@ def dynamically_import_QuantLinear(
         return QuantLinear
 
     if not torch.cuda.is_available() and not use_ipex:
-        logger.warning("No cuda found, set use_ipex=True to use cpu")
+        global _warned
+        if not _warned:
+            logger.warning("No cuda found, set use_ipex=True to use cpu")
+            _warned = True
         use_ipex = True
     if use_qigen:
         if not QIGEN_AVAILABLE:
