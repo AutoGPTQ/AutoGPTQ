@@ -73,7 +73,7 @@ class FusedLlamaAttentionForQuantizedModel(FusedBaseAttentionModule):
                 )
             kv_seq_len += past_key_value.get_usable_length(kv_seq_len, self.layer_idx)
 
-        cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)
+        cos, sin = self.rotary_emb(value_states, position_ids)
         query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin, position_ids)
         # [bsz, nh, t, hd]
 
@@ -146,6 +146,7 @@ class FusedLlamaAttentionForQuantizedModel(FusedBaseAttentionModule):
         bits: int = 4,
         disable_exllama=True,
         disable_exllamav2=False,
+        use_ipex=False,
         **kwargs,
     ):
         """
@@ -158,6 +159,7 @@ class FusedLlamaAttentionForQuantizedModel(FusedBaseAttentionModule):
             bits=bits,
             disable_exllama=disable_exllama,
             disable_exllamav2=disable_exllamav2,
+            use_ipex=use_ipex,
         )
 
         for name, m in model.named_modules():

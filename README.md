@@ -57,6 +57,8 @@ AutoGPTQ is available on Linux and Windows only. You can install the latest stab
 
 AutoGPTQ can be installed with the Triton dependency with `pip install auto-gptq[triton] --no-build-isolation` in order to be able to use the Triton backend (currently only supports linux, no 3-bits quantization).
 
+AutoGPTQ also support CPU device now and requires the installation of IPEX dependency with `pip install intel-extension-for-pytorch`. Or you can install auto-gptq with `pip install auto-gptq[ipex]`(currently only supports 4-bits quantization).
+
 For older AutoGPTQ, please refer to [the previous releases installation table](docs/INSTALLATION.md).
 
 On NVIDIA systems, AutoGPTQ does not support [Maxwell or lower](https://qiita.com/uyuni/items/733a93b975b524f89f46) GPUs.
@@ -90,15 +92,15 @@ The compilation can be speeded up by specifying the `PYTORCH_ROCM_ARCH` variable
 
 For ROCm systems, the packages `rocsparse-dev`, `hipsparse-dev`, `rocthrust-dev`, `rocblas-dev` and `hipblas-dev` are required to build.
 
-#### On Intel Gaudi 2 systems
+#### On Intel Gaudi 2 systems or Intel CPU
 
-To install from source for Intel Gaudi 2 HPUs, set the `BUILD_CUDA_EXT=0` environment variable to disable building the CUDA PyTorch extension. Example:
+To install from source for Intel Gaudi 2 HPUs or Intel CPU, set the `BUILD_CUDA_EXT=0` environment variable to disable building the CUDA PyTorch extension. Example:
 
 ```bash
 BUILD_CUDA_EXT=0 pip install -vvv --no-build-isolation -e .
 ```
 
->Notice that Intel Gaudi 2 uses an optimized kernel upon inference, and requires `BUILD_CUDA_EXT=0` on non-CUDA machines.
+>Notice that Intel Gaudi 2 and Intel CPU use an optimized kernel upon inference, and requires `BUILD_CUDA_EXT=0` on non-CUDA machines.
 
 ## Quick Tour
 

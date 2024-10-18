@@ -4,6 +4,7 @@ import tempfile
 import time
 import unittest
 
+from parameterized import parameterized
 from auto_gptq import AutoGPTQForCausalLM
 from auto_gptq.quantization import CHECKPOINT_FORMAT, CHECKPOINT_FORMAT_FIELD, QUANT_CONFIG_FILENAME
 from auto_gptq.quantization.config import QUANT_METHOD, BaseQuantizeConfig
@@ -23,9 +24,13 @@ class TestSerialization(unittest.TestCase):
         if is_cached:
             os.remove(model_cache_path)
 
-    def test_marlin_local_serialization(self):
+    @parameterized.expand([("cuda:0"), ("cpu")])
+    def test_marlin_and_ipex_local_serialization(self, device: str):
+        checkpoint_format = CHECKPOINT_FORMAT.MARLIN if device == "cuda:0" else CHECKPOINT_FORMAT.GPTQ
         start = time.time()
-        model = AutoGPTQForCausalLM.from_quantized(self.MODEL_ID, device="cuda:0", use_marlin=True)
+        model = AutoGPTQForCausalLM.from_quantized(self.MODEL_ID, device=device,
+                                                   use_marlin=True if device == "cuda:0" else False,
+                                                   use_ipex=True if device == "cpu" else False)
         end = time.time()
         first_load_time = end - start
 
@@ -39,20 +44,26 @@ class TestSerialization(unittest.TestCase):
             with open(os.path.join(tmpdir, QUANT_CONFIG_FILENAME), "r") as config_file:
                 config = json.load(config_file)
 
-            self.assertTrue(config[CHECKPOINT_FORMAT_FIELD] == CHECKPOINT_FORMAT.MARLIN)
+            self.assertTrue(model.quantize_config.checkpoint_format == checkpoint_format)
 
             start = time.time()
-            model = AutoGPTQForCausalLM.from_quantized(tmpdir, device="cuda:0", use_marlin=True)
+            model = AutoGPTQForCausalLM.from_quantized(tmpdir, device=device,
+                                                       use_marlin=True if device == "cuda:0" else False,
+                                                       use_ipex=True if device == "cpu" else False)
             end = time.time()
             second_load_time = end - start
 
         # Since we use a CUDA kernel to repack weights, the first load time is already small.
         self.assertTrue(second_load_time < first_load_time)
 
-    def test_marlin_hf_cache_serialization(self):
+    @parameterized.expand([("cuda:0"), ("cpu")])
+    def test_marlin_and_ipex_hf_cache_serialization(self, device: str):
+        checkpoint_format = CHECKPOINT_FORMAT.MARLIN if device == "cuda:0" else CHECKPOINT_FORMAT.GPTQ
         start = time.time()
-        model = AutoGPTQForCausalLM.from_quantized(self.MODEL_ID, device="cuda:0", use_marlin=True)
-        self.assertTrue(model.quantize_config.checkpoint_format == CHECKPOINT_FORMAT.MARLIN)
+        model = AutoGPTQForCausalLM.from_quantized(self.MODEL_ID, device=device,
+                                                   use_marlin=True if device == "cuda:0" else False,
+                                                   use_ipex=True if device == "cpu" else False)
+        self.assertTrue(model.quantize_config.checkpoint_format == checkpoint_format)
         end = time.time()
         first_load_time = end - start
 
@@ -61,8 +72,10 @@ class TestSerialization(unittest.TestCase):
         self.assertTrue(is_cached)
 
         start = time.time()
-        model = AutoGPTQForCausalLM.from_quantized(self.MODEL_ID, device="cuda:0", use_marlin=True)
-        self.assertTrue(model.quantize_config.checkpoint_format == CHECKPOINT_FORMAT.MARLIN)
+        model = AutoGPTQForCausalLM.from_quantized(self.MODEL_ID, device=device,
+                                                   use_marlin=True if device == "cuda:0" else False,
+                                                   use_ipex=True if device == "cpu" else False)
+        self.assertTrue(model.quantize_config.checkpoint_format == checkpoint_format)
         end = time.time()
         second_load_time = end - start
 

@@ -52,6 +52,16 @@ except Exception as e:
     MARLIN_AVAILABLE = False
     MARLIN_EXCEPTION = e
 
+try:
+    import intel_extension_for_pytorch   # noqa: F401
+
+    IPEX_AVAILABLE = True
+    IPEX_EXCEPTION = None
+    _warned = False
+except Exception as e:
+    IPEX_AVAILABLE = False
+    IPEX_EXCEPTION = e
+
 
 logger = getLogger(__name__)
 
@@ -66,6 +76,7 @@ def dynamically_import_QuantLinear(
     use_qigen: bool = False,
     use_marlin: bool = False,
     use_tritonv2: bool = False,
+    use_ipex: bool = False,
 ):
     try:
         import habana_frameworks.torch.hpu  # noqa: F401
@@ -74,6 +85,13 @@ def dynamically_import_QuantLinear(
     else:
         from ..nn_modules.qlinear.qlinear_hpu import QuantLinear
         return QuantLinear
+
+    if not torch.cuda.is_available() and not use_ipex:
+        global _warned
+        if not _warned:
+            logger.warning("No cuda found, set use_ipex=True to use cpu")
+            _warned = True
+        use_ipex = True
     if use_qigen:
         if not QIGEN_AVAILABLE:
             raise ValueError(
@@ -91,6 +109,13 @@ def dynamically_import_QuantLinear(
                 from ..nn_modules.qlinear.qlinear_tritonv2 import QuantLinear
             else:
                 from ..nn_modules.qlinear.qlinear_triton import QuantLinear
+        elif use_ipex:
+            assert bits == 4, "IPEX only support 4bit GPTQ"
+            if not IPEX_AVAILABLE:
+                raise ValueError(
+                    f"IPEX appears to be not available with the error: {IPEX_EXCEPTION}. Please install with `pip install intel-extension-for-pytorch`."
+                )
+            from ..nn_modules.qlinear.qlinear_ipex import QuantLinear
         else:
             # If disable_exllamav2 is True, we want to fall back on the exllama kernel and not the cuda/cuda_old ones.
             if disable_exllama is None:

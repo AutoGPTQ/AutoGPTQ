@@ -95,7 +95,7 @@ def _validate_marlin_device_support() -> bool:
         Returns:
             bool: indicates if CUDA device is compatible for Marlin
         """
-    return torch.cuda.get_device_capability()[0] >= 8
+    return torch.cuda.is_available() and torch.cuda.get_device_capability()[0] >= 8
 
 
 # Adapted from https://github.com/rib-2/marlin/tree/conversion
