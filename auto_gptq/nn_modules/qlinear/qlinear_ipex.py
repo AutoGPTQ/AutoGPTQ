@@ -100,7 +100,7 @@ class QuantLinear(nn.Module):
 
     def post_init(self):
         assert self.qweight.device.type == "cpu"
-        if not self.training:
+        if not self.training and IPEX_AVAILABLE:
             self.ipex_linear = WeightOnlyQuantizedLinear.from_weight(self.qweight, self.scales, self.qzeros, \
                                                                     self.infeatures, self.outfeatures, None, self.bias, \
                                                                     self.group_size, self.g_idx, 0, 0)

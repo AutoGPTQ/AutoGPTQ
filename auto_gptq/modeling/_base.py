@@ -720,7 +720,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
     ):
         """load quantized model from local disk"""
         if not torch.cuda.is_available() or device == "cpu":
-            logger.info("No cuda found, apply cpu quantization.")
+            logger.info("Set use_ipex=True to use cpu quantization.")
             use_ipex = True
 
         if disable_exllama is None:
