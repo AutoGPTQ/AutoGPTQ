@@ -64,7 +64,7 @@ On NVIDIA systems, AutoGPTQ does not support [Maxwell or lower](https://qiita.co
 
 Clone the source code:
 ```bash
-git clone https://github.com/PanQiWei/AutoGPTQ.git && cd AutoGPTQ
+git clone https://github.com/HabanaAI/AutoGPTQ.git && cd AutoGPTQ
 ```
 
 A few packages are required in order to build from source: `pip install numpy gekko pandas`.
