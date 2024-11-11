@@ -91,6 +91,8 @@ For ROCm systems, the packages `rocsparse-dev`, `hipsparse-dev`, `rocthrust-dev`
 
 #### On Intel® Gaudi® 2 systems
 
+>Notice: make sure you're in commit f54377a or later
+
 To install from source for Intel Gaudi 2 HPUs, set the `BUILD_CUDA_EXT=0` environment variable to disable building the CUDA PyTorch extension. Example:
 
 ```bash
