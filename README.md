@@ -64,7 +64,7 @@ On NVIDIA systems, AutoGPTQ does not support [Maxwell or lower](https://qiita.co
 
 Clone the source code:
 ```bash
-git clone https://github.com/HabanaAI/AutoGPTQ.git && cd AutoGPTQ
+git clone https://github.com/PanQiWei/AutoGPTQ.git && cd AutoGPTQ
 ```
 
 A few packages are required in order to build from source: `pip install numpy gekko pandas`.
@@ -91,7 +91,7 @@ For ROCm systems, the packages `rocsparse-dev`, `hipsparse-dev`, `rocthrust-dev`
 
 #### On Intel® Gaudi® 2 systems
 
->Notice: make sure you're in commit f54377a or later
+>Notice: make sure you're in commit 65c2e15 or later
 
 To install from source for Intel Gaudi 2 HPUs, set the `BUILD_CUDA_EXT=0` environment variable to disable building the CUDA PyTorch extension. Example:
 
