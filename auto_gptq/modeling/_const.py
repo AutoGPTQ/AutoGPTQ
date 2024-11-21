@@ -46,7 +46,11 @@ if compare_transformers_version("v4.38.0", op="ge"):
 if compare_transformers_version("v4.39.0.dev0", op="ge"):
     SUPPORTED_MODELS.append("starcoder2")
 if compare_transformers_version("v4.43.0.dev0", op="ge"):
-    SUPPORTED_MODELS.append("gemma2")    
+    SUPPORTED_MODELS.append("gemma2")
+if compare_transformers_version("v4.45.2", op="ge"):
+    SUPPORTED_MODELS.append("phi3")
+    SUPPORTED_MODELS.append("phimoe")
+
 
 EXLLAMA_DEFAULT_MAX_INPUT_LENGTH = 2048
 
