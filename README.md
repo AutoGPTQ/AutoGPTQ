@@ -53,7 +53,6 @@ AutoGPTQ is available on Linux and Windows only. You can install the latest stab
 | CUDA 11.8         | `pip install auto-gptq --no-build-isolation --extra-index-url https://huggingface.github.io/autogptq-index/whl/cu118/`   | 2.2.1+cu118           |
 | CUDA 12.1         | `pip install auto-gptq --no-build-isolation`                                                                            | 2.2.1+cu121           |
 | ROCm 5.7          | `pip install auto-gptq --no-build-isolation --extra-index-url https://huggingface.github.io/autogptq-index/whl/rocm573/` | 2.2.1+rocm5.7
-|  Intel® Gaudi® 2 AI accelerator          | `BUILD_CUDA_EXT=0 pip install auto-gptq --no-build-isolation` | [2.3.1+Intel Gaudi 1.17](https://docs.habana.ai/en/latest/Installation_Guide/)               |
 
 AutoGPTQ can be installed with the Triton dependency with `pip install auto-gptq[triton] --no-build-isolation` in order to be able to use the Triton backend (currently only supports linux, no 3-bits quantization).
 
@@ -90,7 +89,9 @@ The compilation can be speeded up by specifying the `PYTORCH_ROCM_ARCH` variable
 
 For ROCm systems, the packages `rocsparse-dev`, `hipsparse-dev`, `rocthrust-dev`, `rocblas-dev` and `hipblas-dev` are required to build.
 
-#### On Intel Gaudi 2 systems
+#### On Intel® Gaudi® 2 systems
+
+>Notice: make sure you're in commit 65c2e15 or later
 
 To install from source for Intel Gaudi 2 HPUs, set the `BUILD_CUDA_EXT=0` environment variable to disable building the CUDA PyTorch extension. Example:
 
