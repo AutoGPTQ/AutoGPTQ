@@ -1,4 +1,9 @@
 <h1 align="center">AutoGPTQ</h1>
+<h4 align="center">
+    <p>
+       🚨 AutoGPTQ developemet has stopped. Please switch to <a href="https://github.com/ModelCloud/GPTQModel">GPTQModel</a> as drop-in replacement. 🚨
+    </p>
+</h4>
 <p align="center">An easy-to-use LLM quantization package with user-friendly APIs, based on GPTQ algorithm (weight-only quantization).</p>
 <p align="center">
     <a href="https://github.com/PanQiWei/AutoGPTQ/releases">
@@ -8,12 +13,7 @@
         <img alt="PyPI - Downloads" src="https://img.shields.io/pypi/dd/auto-gptq">
     </a>
 </p>
-<h4 align="center">
-    <p>
-        <b>English</b> |
-        <a href="https://github.com/PanQiWei/AutoGPTQ/blob/main/README_zh.md">中文</a>
-    </p>
-</h4>
+
 
 ## News or Update
 
