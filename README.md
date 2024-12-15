@@ -1,7 +1,7 @@
 <h1 align="center">AutoGPTQ</h1>
 <h4 align="center">
     <p>
-       🚨 AutoGPTQ developemet has stopped. Please switch to <a href="https://github.com/ModelCloud/GPTQModel">GPTQModel</a> as drop-in replacement. 🚨
+       🚨 AutoGPTQ development has stopped. Please switch to <a href="https://github.com/ModelCloud/GPTQModel">GPTQModel</a> as drop-in replacement. 🚨
     </p>
 </h4>
 <p align="center">An easy-to-use LLM quantization package with user-friendly APIs, based on GPTQ algorithm (weight-only quantization).</p>
