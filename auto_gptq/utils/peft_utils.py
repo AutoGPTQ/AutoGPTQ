@@ -5,7 +5,6 @@ from typing import List, Optional, Tuple, Union
 import torch
 from peft import PeftConfig, PeftModel, PeftType, get_peft_model
 from peft.mapping import PEFT_TYPE_TO_CONFIG_MAPPING
-from peft.peft_model import PEFT_TYPE_TO_MODEL_MAPPING
 from peft.tuners.adalora import AdaLoraConfig, AdaLoraLayer, AdaLoraModel
 from peft.tuners.lora import LoraConfig, LoraLayer, LoraModel
 
@@ -13,11 +12,19 @@ from ..modeling._base import BaseGPTQForCausalLM
 from ..nn_modules.qlinear import GeneralQuantLinear
 from ..nn_modules.qlinear.qlinear_cuda import QuantLinear as QuantLinearCuda
 from ..nn_modules.qlinear.qlinear_cuda_old import QuantLinear as QuantLinearCudaOld
-from ..nn_modules.qlinear.qlinear_hpu import QuantLinear as QuantLinearHpu
 from ..nn_modules.qlinear.qlinear_exllama import QuantLinear as QuantLinearExllama
 from ..nn_modules.qlinear.qlinear_exllama import QuantLinear as QuantLinearExllamaV2
+from ..nn_modules.qlinear.qlinear_hpu import QuantLinear as QuantLinearHpu
 from ..nn_modules.qlinear.qlinear_qigen import QuantLinear as QuantLinearQigen
 from ..nn_modules.qlinear.qlinear_triton import QuantLinear as QuantLinearTriton
+
+
+try:
+    # This mapping was removed in https://github.com/huggingface/peft/pull/2282
+    # Use PEFT_TYPE_TO_TUNER_MAPPING instead for PEFT >= 0.15.0
+    from peft.peft_model import PEFT_TYPE_TO_MODEL_MAPPING as PEFT_TYPE_MAPPING
+except ImportError:
+    from peft.mapping import PEFT_TYPE_TO_TUNER_MAPPING as PEFT_TYPE_MAPPING
 
 
 LinearLayer = Union[
@@ -325,23 +332,23 @@ def find_all_linear_names(
 @contextmanager
 def hijack_peft_mappings():
     PEFT_TYPE_TO_CONFIG_MAPPING[PeftType.LORA] = GPTQLoraConfig
-    PEFT_TYPE_TO_MODEL_MAPPING[PeftType.LORA] = GPTQLoraModel
+    PEFT_TYPE_MAPPING[PeftType.LORA] = GPTQLoraModel
     PEFT_TYPE_TO_CONFIG_MAPPING[PeftType.ADALORA] = GPTQAdaLoraConfig
-    PEFT_TYPE_TO_MODEL_MAPPING[PeftType.ADALORA] = GPTQAdaLoraModel
+    PEFT_TYPE_MAPPING[PeftType.ADALORA] = GPTQAdaLoraModel
 
     try:
         yield
     except:
         PEFT_TYPE_TO_CONFIG_MAPPING[PeftType.LORA] = GPTQLoraConfig
-        PEFT_TYPE_TO_MODEL_MAPPING[PeftType.LORA] = GPTQLoraModel
+        PEFT_TYPE_MAPPING[PeftType.LORA] = GPTQLoraModel
         PEFT_TYPE_TO_CONFIG_MAPPING[PeftType.ADALORA] = GPTQAdaLoraConfig
-        PEFT_TYPE_TO_MODEL_MAPPING[PeftType.ADALORA] = GPTQAdaLoraModel
+        PEFT_TYPE_MAPPING[PeftType.ADALORA] = GPTQAdaLoraModel
         raise
     finally:
         PEFT_TYPE_TO_CONFIG_MAPPING[PeftType.LORA] = GPTQLoraConfig
-        PEFT_TYPE_TO_MODEL_MAPPING[PeftType.LORA] = GPTQLoraModel
+        PEFT_TYPE_MAPPING[PeftType.LORA] = GPTQLoraModel
         PEFT_TYPE_TO_CONFIG_MAPPING[PeftType.ADALORA] = GPTQAdaLoraConfig
-        PEFT_TYPE_TO_MODEL_MAPPING[PeftType.ADALORA] = GPTQAdaLoraModel
+        PEFT_TYPE_MAPPING[PeftType.ADALORA] = GPTQAdaLoraModel
 
 
 def get_gptq_peft_model(
