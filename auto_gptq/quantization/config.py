@@ -8,6 +8,12 @@ from typing import Optional
 import huggingface_hub
 from transformers.utils.hub import PushToHubMixin, cached_file
 
+import warnings
+warnings.warn(
+    "AutoGPTQ is deprecated. Please transition to GPTQModel: https://github.com/ModelCoud/GPTQModel. "
+    "GPTQModel has been merged into Transformers/Optimum, and full deprecation of AutoGPTQ within HF frameworks is planned in the near future.",
+)
+
 
 logger = logging.getLogger(__name__)
 handler = logging.StreamHandler()

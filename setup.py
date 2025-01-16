@@ -5,7 +5,19 @@ import sys
 from pathlib import Path
 
 from setuptools import find_packages, setup
+from setuptools.command.install import install
 
+class CustomInstallCommand(install):
+    """自定义 install 命令，用于在 pip install . 时输出警告。"""
+    def run(self):
+        sys.stderr.write(
+            "\n\033[93m"
+            "Warning: AutoGPTQ has stopped development. Please transition to GPTQModel.\n"
+            "GPTQModel repository: https://github.com/ModelCoud/GPTQModel\n"
+            "GPTQModel has been merged into Transformers/Optimum, and full deprecation of AutoGPTQ within HF frameworks is planned in the near-future.\n"
+            "\033[0m\n"
+        )
+        super().run()
 
 os.environ["CC"] = "g++"
 os.environ["CXX"] = "g++"
@@ -244,6 +256,9 @@ if BUILD_CUDA_EXT:
         "ext_modules": extensions,
         "cmdclass": {'build_ext': cpp_extension.BuildExtension}
     }
+
+additional_setup_kwargs["cmdclass"]["install"] = CustomInstallCommand
+
 common_setup_kwargs.update(additional_setup_kwargs)
 setup(
     packages=find_packages(),
