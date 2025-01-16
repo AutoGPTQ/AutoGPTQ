@@ -1,12 +1,5 @@
 from inspect import signature
 from typing import Dict, Optional, Union
-
-import warnings
-warnings.warn(
-    "AutoGPTQ is deprecated. Please transition to GPTQModel: https://github.com/ModelCoud/GPTQModel. "
-    "GPTQModel has been merged into Transformers/Optimum, and full deprecation of AutoGPTQ within HF frameworks is planned in the near future.",
-)
-
 from ._base import BaseGPTQForCausalLM, BaseQuantizeConfig
 from ._utils import check_and_get_model_type
 from .baichuan import BaiChuanGPTQForCausalLM
