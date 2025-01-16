@@ -73,10 +73,10 @@ formatter = logging.Formatter("%(levelname)s - %(message)s")
 handler.setFormatter(formatter)
 logger.propagate = False
 logger.addHandler(handler)
+logger.setLevel(logging.INFO)
 logger.warning(
     "AutoGPTQ has stopped development. Please transition to GPTQModel: https://github.com/ModelCoud/GPTQModel\n\nGPTQModel has been merged into Transformers/Optimum and full deprecation of AutoGPTQ within HF frameworks is planned in the near-future."
 )
-logger.setLevel(logging.WARNING)
 
 def nested_move_to_device(v, device):
     if isinstance(v, torch.Tensor):
