@@ -6,6 +6,11 @@ from pathlib import Path
 
 from setuptools import find_packages, setup
 
+print(
+    "\n\033[93m"
+    "WARNING: AutoGPTQ has stopped development. Please transition to GPTQModel: https://github.com/ModelCoud/GPTQModel\nGPTQModel has been merged into Transformers/Optimum and full deprecation of AutoGPTQ within HF frameworks is planned in the near-future."
+    "\033[0m\n"
+)
 
 os.environ["CC"] = "g++"
 os.environ["CXX"] = "g++"
@@ -244,6 +249,7 @@ if BUILD_CUDA_EXT:
         "ext_modules": extensions,
         "cmdclass": {'build_ext': cpp_extension.BuildExtension}
     }
+
 common_setup_kwargs.update(additional_setup_kwargs)
 setup(
     packages=find_packages(),
