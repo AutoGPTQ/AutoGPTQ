@@ -8,9 +8,7 @@ from setuptools import find_packages, setup
 
 print(
     "\n\033[93m"
-    "Warning: AutoGPTQ has stopped development. Please transition to GPTQModel.\n"
-    "GPTQModel repository: https://github.com/ModelCoud/GPTQModel\n"
-    "GPTQModel has been merged into Transformers/Optimum, and full deprecation of AutoGPTQ within HF frameworks is planned in the near-future.\n"
+    "WARNING: AutoGPTQ has stopped development. Please transition to GPTQModel: https://github.com/ModelCoud/GPTQModel\nGPTQModel has been merged into Transformers/Optimum and full deprecation of AutoGPTQ within HF frameworks is planned in the near-future."
     "\033[0m\n"
 )
 
