@@ -30,6 +30,7 @@ from .starcoder2 import Starcoder2GPTQForCausalLM
 from .xverse import XverseGPTQForCausalLM
 from .yi import YiGPTQForCausalLM
 from .minicpm3 import MiniCPM3GPTQForCausalLM
+from .telechat2 import TeleChat2GPTQForCausalLM
 
 
 GPTQ_CAUSAL_LM_MODEL_MAP = {
@@ -63,6 +64,7 @@ GPTQ_CAUSAL_LM_MODEL_MAP = {
     "gemma2": Gemma2GPTQForCausalLM,
     "phi": PhiGPTQForCausalLM,
     "mpt": MPTGPTQForCausalLM,
+    "telechat": TeleChat2GPTQForCausalLM,
 }
 
 

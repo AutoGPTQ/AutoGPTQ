@@ -3,7 +3,7 @@ import logging
 import os
 from dataclasses import dataclass, field, fields
 from os.path import isdir, join
-from typing import Optional
+from typing import Optional, List
 
 import huggingface_hub
 from transformers.utils.hub import PushToHubMixin, cached_file
@@ -67,6 +67,7 @@ class BaseQuantizeConfig(PushToHubMixin):
     checkpoint_format: str = field(default=CHECKPOINT_FORMAT.GPTQ)
     model_name_or_path: Optional[str] = field(default=None)
     model_file_base_name: Optional[str] = field(default=None)
+    modules_to_not_convert: Optional[List[str]] = field(default=None)
 
     def __post_init__(self):
         fields_info = fields(self)
@@ -251,6 +252,7 @@ class BaseQuantizeConfig(PushToHubMixin):
             "true_sequential": self.true_sequential,
             "model_name_or_path": self.model_name_or_path,
             "model_file_base_name": self.model_file_base_name,
+            "modules_to_not_convert": self.modules_to_not_convert,
             QUANT_METHOD_FIELD: self.quant_method,
             CHECKPOINT_FORMAT_FIELD: self.checkpoint_format,
         }
