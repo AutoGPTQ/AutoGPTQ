@@ -134,14 +134,7 @@ class QuantLinear(nn.Module):
         if linear.bias is not None:
             self.bias = linear.bias.clone().half()
 
-        intweight = []
-        for idx in range(self.infeatures):
-            intweight.append(
-                torch.round((W[:, idx] + scale_zeros[self.g_idx[idx]]) / self.scales[self.g_idx[idx]]).to(torch.int)[
-                    :, None
-                ]
-            )
-        intweight = torch.cat(intweight, dim=1)
+        intweight = torch.round((W + scale_zeros[g_idx].T) / scales[g_idx].T).to(torch.int)
         intweight = intweight.t().contiguous()
         intweight = intweight.numpy().astype(np.uint32)
 
