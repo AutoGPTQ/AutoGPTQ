@@ -30,6 +30,7 @@ from .starcoder2 import Starcoder2GPTQForCausalLM
 from .xverse import XverseGPTQForCausalLM
 from .yi import YiGPTQForCausalLM
 from .minicpm3 import MiniCPM3GPTQForCausalLM
+from .minicpmo import MiniCPMOGPTQForCausalLM
 
 
 GPTQ_CAUSAL_LM_MODEL_MAP = {
@@ -51,6 +52,7 @@ GPTQ_CAUSAL_LM_MODEL_MAP = {
     "qwen": QwenGPTQForCausalLM,
     "mistral": MistralGPTQForCausalLM,
     "minicpm3":MiniCPM3GPTQForCausalLM,
+    "minicpmo":MiniCPMOGPTQForCausalLM,
     "Yi": YiGPTQForCausalLM,
     "xverse": XverseGPTQForCausalLM,
     "deci": DeciLMGPTQForCausalLM,
