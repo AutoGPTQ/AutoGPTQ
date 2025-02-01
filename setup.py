@@ -157,7 +157,7 @@ if BUILD_CUDA_EXT:
         else:
             p = os.cpu_count()
         try:
-            subprocess.check_output(["python", "./autogptq_extension/qigen/generate.py", "--module", "--search", "--p", str(p)])
+            subprocess.check_output([sys.executable, "./autogptq_extension/qigen/generate.py", "--module", "--search", "--p", str(p)])
         except subprocess.CalledProcessError:
             raise Exception("Generating QiGen kernels failed with the error shown above.")
 
