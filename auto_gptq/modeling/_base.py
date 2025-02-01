@@ -818,12 +818,12 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             # format marlin requires marlin kernel
             use_marlin = True
 
-        marlin_compatible = _validate_marlin_device_support()
         if use_marlin and not MARLIN_AVAILABLE:
             raise TypeError("use_marlin is true but Marlin is not available due to cuda/device support.")
 
         if not use_marlin and MARLIN_AVAILABLE:
             unsupported_reason = _validate_marlin_compatibility(quantize_config)
+            marlin_compatible = _validate_marlin_device_support()
             if unsupported_reason is None and marlin_compatible:
                 logger.info(
                     "You passed a model that is compatible with the Marlin int4*fp16 GPTQ kernel but use_marlin is False. We recommend using `use_marlin=True` to use the optimized Marlin kernels for inference. Example: `model = AutoGPTQForCausalLM.from_quantized(..., use_marlin=True)`."
