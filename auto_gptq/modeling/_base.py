@@ -412,10 +412,14 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
     def forward(self, *args, **kwargs):
         return self.model(*args, **kwargs)
 
-    def generate(self, **kwargs):
+    def generate(self, *args, **kwargs):
         """shortcut for model.generate"""
         with torch.inference_mode(), torch.amp.autocast(device_type=self.device.type):
-            return self.model.generate(**kwargs)
+            return self.model.generate(*args, **kwargs)
+
+    def get_input_embeddings(self, *args, **kwargs):
+        """shortcut for model.get_input_embeddings"""
+        return self.model.get_input_embeddings(*args, **kwargs)
 
     def prepare_inputs_for_generation(self, *args, **kwargs):
         """shortcut for model.prepare_inputs_for_generation"""
