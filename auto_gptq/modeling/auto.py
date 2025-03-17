@@ -21,7 +21,7 @@ from .mixtral import MixtralGPTQForCausalLM
 from .moss import MOSSGPTQForCausalLM
 from .mpt import MPTGPTQForCausalLM
 from .opt import OPTGPTQForCausalLM
-from .phi import PhiGPTQForCausalLM
+from .phi import PhiGPTQForCausalLM, Phi3GPTQForCausalLM, PhiMoEGPTQForCausalLM
 from .qwen import QwenGPTQForCausalLM
 from .qwen2 import Qwen2GPTQForCausalLM
 from .rw import RWGPTQForCausalLM
@@ -63,6 +63,8 @@ GPTQ_CAUSAL_LM_MODEL_MAP = {
     "gemma2": Gemma2GPTQForCausalLM,
     "phi": PhiGPTQForCausalLM,
     "mpt": MPTGPTQForCausalLM,
+    "phi3": Phi3GPTQForCausalLM,
+    "phimoe": PhiMoEGPTQForCausalLM,
 }
 
 
