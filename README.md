@@ -1,9 +1,9 @@
+<h1 align="center"> 🚨 AutoGPTQ the project has reached End-of-Life 🚨 
+    <br>
+🚨 Switch to <a href="https://github.com/ModelCloud/GPTQModel">GPTQModel</a> for bug fixes and new models support 🚨
+</h1>
+
 <h1 align="center">AutoGPTQ</h1>
-<h4 align="center">
-    <p>
-       🚨 AutoGPTQ development has stopped. Please switch to <a href="https://github.com/ModelCloud/GPTQModel">GPTQModel</a> as drop-in replacement. 🚨
-    </p>
-</h4>
 <p align="center">An easy-to-use LLM quantization package with user-friendly APIs, based on GPTQ algorithm (weight-only quantization).</p>
 <p align="center">
     <a href="https://github.com/PanQiWei/AutoGPTQ/releases">
