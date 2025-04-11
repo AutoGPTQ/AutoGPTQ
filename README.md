@@ -1,6 +1,4 @@
-<h1 align="center"> 🚨 AutoGPTQ the project has reached End-of-Life 🚨 
-    <br>
-🚨 Switch to <a href="https://github.com/ModelCloud/GPTQModel">GPTQModel</a> for bug fixes and new models support 🚨
+<h1 align="center"> 🚨 AutoGPTQ is unmaintained - we suggest using <a href="https://github.com/ModelCloud/GPTQModel">GPTQModel</a> for bug fixes and new models support 🚨 
 </h1>
 
 <h1 align="center">AutoGPTQ</h1>
