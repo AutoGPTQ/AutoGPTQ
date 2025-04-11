@@ -69,7 +69,7 @@ from ._utils import (
 
 logger = logging.getLogger(__name__)
 handler = logging.StreamHandler()
-formatter = logging.Formatter("%(levelname)s - %(message)s")
+formatter = logging.Formatter("%(asctime)s ｜ %(levelname)s ｜ %(name)-27s ｜ %(message)s", datefmt="%Y-%m-%d ｜ %H:%M:%S")
 handler.setFormatter(formatter)
 logger.propagate = False
 logger.addHandler(handler)
@@ -286,7 +286,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             inside_layer_modules = [sum(inside_layer_modules, [])]
         quantizers = {}
         for i in range(len(layers)):
-            logger.info(f"Start quantizing layer {i + 1}/{len(layers)}")
+            logger.info(f"--- Start quantizing layer {i + 1}/{len(layers)} ---")
             layer = layers[i]
             force_layer_back_to_cpu = False
             if get_device(layer) == CPU:
