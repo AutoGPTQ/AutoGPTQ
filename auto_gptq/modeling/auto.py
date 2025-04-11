@@ -113,6 +113,7 @@ class AutoGPTQForCausalLM:
         disable_exllama: Optional[bool] = None,
         disable_exllamav2: bool = False,
         use_marlin: bool = False,
+        use_bitblas: bool = False,
         use_tritonv2: bool = False,
         **kwargs,
     ) -> BaseGPTQForCausalLM:
@@ -163,6 +164,7 @@ class AutoGPTQForCausalLM:
             disable_exllama=disable_exllama,
             disable_exllamav2=disable_exllamav2,
             use_marlin=use_marlin,
+            use_bitblas=use_bitblas,
             use_tritonv2=use_tritonv2,
             **keywords,
         )

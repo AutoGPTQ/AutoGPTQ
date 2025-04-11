@@ -36,6 +36,7 @@ from ..utils.accelerate_utils import load_checkpoint_in_model
 from ..utils.data_utils import collate_data
 from ..utils.import_utils import (
     AUTOGPTQ_CUDA_AVAILABLE,
+    BITBLAS_AVAILABLE,
     EXLLAMA_KERNELS_AVAILABLE,
     EXLLAMAV2_KERNELS_AVAILABLE,
     MARLIN_AVAILABLE,
@@ -47,6 +48,9 @@ from ..utils.marlin_utils import (
     _validate_marlin_compatibility,
     _validate_marlin_device_support,
     prepare_model_for_marlin_load,
+)
+from ..utils.bitblas_utils import (
+    prepare_model_for_bitblas_load,
 )
 from ._const import CPU, CUDA_0, SUPPORTED_MODELS
 from ._utils import (
@@ -387,6 +391,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             warmup_triton=autotune_warmup_after_quantized,
             force_layer_back_to_cpu=force_layer_back_to_cpu,
             use_marlin=self.quantize_config.checkpoint_format == CHECKPOINT_FORMAT.MARLIN,
+            use_bitblas=self.quantize_config.checkpoint_format == CHECKPOINT_FORMAT.BITBLAS,
         )
         if device_map:
             self.model = remove_hook_from_module(self.model, recurse=True)
@@ -698,6 +703,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         use_triton: bool = False,
         use_qigen: bool = False,
         use_marlin: bool = False,
+        use_bitblas: bool = False,
         torch_dtype: Optional[torch.dtype] = None,
         inject_fused_attention: bool = False,
         inject_fused_mlp: bool = False,
@@ -757,6 +763,9 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             logger.warning("Triton is not installed, reset use_triton to False.")
             use_triton = False
             use_tritonv2 = False
+        if use_bitblas and not BITBLAS_AVAILABLE:
+            logger.warning("BitBlas is not installed, reset use_bitblas to False.")
+            use_bitblas = False
         if not disable_exllama and not EXLLAMA_KERNELS_AVAILABLE:
             logger.warning(
                 "Exllama kernel is not installed, reset disable_exllama to True. "
@@ -789,6 +798,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             inject_fused_attention = False
             inject_fused_mlp = False
             use_triton = False
+            use_bitblas = False
             disable_exllama = True
             disable_exllamav2 = True
 
@@ -828,6 +838,10 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                 logger.info(
                     "You passed a model that is compatible with the Marlin int4*fp16 GPTQ kernel but use_marlin is False. We recommend using `use_marlin=True` to use the optimized Marlin kernels for inference. Example: `model = AutoGPTQForCausalLM.from_quantized(..., use_marlin=True)`."
                 )
+
+        if quantize_config.checkpoint_format == CHECKPOINT_FORMAT.BITBLAS:
+            # format bitblas requires bitblas kernel
+            use_bitblas = True
 
         if model_basename is None:
             if quantize_config.model_file_base_name:
@@ -1088,6 +1102,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                     disable_exllama=disable_exllama,
                     disable_exllamav2=disable_exllamav2,
                     use_marlin=False,
+                    use_bitblas=False,
                     use_tritonv2=use_tritonv2,  # Get the "original" QuantLienar class
                 )
 
@@ -1111,6 +1126,46 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                     inject_fused_attention = False
                     inject_fused_mlp = False
 
+            if use_bitblas:
+                if is_sharded:
+                    raise ValueError("The loading of sharded checkpoints with BitBLAS is currently not supported. Please raise an issue in AutoGPTQ repository.")
+                if torch.version.hip:
+                    raise ValueError("Can not use BitBLAS int4*fp16 kernel with AMD ROCm version of PyTorch as the kernel is not compatible. Please do not use `use_bitblas=True` when using ROCm devices.")
+
+                # Load the quant linear type we need.
+                # TODO: load directy bitblas with the right quantlinear class.
+                quant_linear_class = dynamically_import_QuantLinear(
+                    use_triton=use_triton,
+                    desc_act=quantize_config.desc_act,
+                    group_size=quantize_config.group_size,
+                    bits=quantize_config.bits,
+                    disable_exllama=disable_exllama,
+                    disable_exllamav2=disable_exllamav2,
+                    use_marlin=False,
+                    use_bitblas=False,
+                    use_tritonv2=use_tritonv2,  # Get the "original" QuantLienar class
+                )
+
+                # Prepare model for marlin load.
+                #   If stub is marlin serialzed         --> load from directly
+                #   If stub has cached marlin version   --> load from the cached versin
+                #   Otherwise                           --> convert to marlin, cache, load from cache
+                model, model_save_name = prepare_model_for_bitblas_load(
+                    model=model,
+                    quantize_config=quantize_config,
+                    quant_linear_class=quant_linear_class,
+                    torch_dtype=torch_dtype,
+                    current_model_save_name=model_save_name,
+                    device_map=device_map,
+                )
+
+                # Disable incompatible optimizations.
+                if inject_fused_attention or inject_fused_mlp:
+                    # TODO: Validate whether that can be used.
+                    logger.info("Disabling fused attention and mlp injection because BitBLAS kernel is used.")
+                    inject_fused_attention = False
+                    inject_fused_mlp = False
+                
             load_checkpoint_in_model(
                 model,
                 dtype=torch_dtype,  # This is very hacky but works due to https://github.com/huggingface/accelerate/blob/bd72a5f1a80d5146554458823f8aeda0a9db5297/src/accelerate/utils/modeling.py#L292
@@ -1159,6 +1214,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                 use_qigen=True,
                 use_tritonv2=use_tritonv2,
                 use_marlin=quantize_config.checkpoint_format == CHECKPOINT_FORMAT.MARLIN,
+                use_bitblas=quantize_config.checkpoint_format == CHECKPOINT_FORMAT.BITBLAS,
             )
             preprocess_checkpoint_qigen(
                 model,
@@ -1280,6 +1336,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         disable_exllama: bool = True,
         disable_exllamav2: bool = False,
         use_marlin: bool = False,
+        use_bitblas: bool = False,
         use_qigen: bool = False,
         use_tritonv2: bool = False,
     ):
@@ -1287,7 +1344,7 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
             model,
             dynamically_import_QuantLinear(use_triton, desc_act, group_size, bits=bits, disable_exllama=disable_exllama,
                                            disable_exllamav2=disable_exllamav2,
-                                           use_marlin=use_marlin, use_qigen=use_qigen),
+                                           use_marlin=use_marlin, use_bitblas=use_bitblas,use_qigen=use_qigen),
         )
 
     def __getattr__(self, item):

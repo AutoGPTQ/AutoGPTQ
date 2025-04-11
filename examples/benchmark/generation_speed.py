@@ -145,6 +145,7 @@ def load_model_tokenizer(
     quantize_config: Optional[str] = None,
     trust_remote_code: bool = False,
     use_triton: bool = False,
+    use_bitblas: bool = False,
     use_safetensors: bool = True,
     use_fast_tokenizer: bool = False,
     inject_fused_attention: bool = True,
@@ -172,6 +173,7 @@ def load_model_tokenizer(
             max_memory=max_memory,
             low_cpu_mem_usage=True,
             use_triton=use_triton,
+            use_bitblas=use_bitblas,
             inject_fused_attention=inject_fused_attention,
             inject_fused_mlp=inject_fused_mlp,
             use_cuda_fp16=True,
@@ -224,16 +226,17 @@ def benchmark_generation_speed(model, tokenizer, examples, generation_config):
         f"generation speed: {total_tokens / total_seconds}tokens/s"
     )
 
-
 def main():
     parser = ArgumentParser()
     parser.add_argument("--model_name_or_path", type=str)
+    parser.add_argument("--data_path", type=str, default="../quantization/dataset/alpaca_data_cleaned.json")
     parser.add_argument("--tokenizer_name_or_path", type=str, default=None)
     parser.add_argument("--from_pretrained", action="store_true")
     parser.add_argument("--model_basename", type=str, default=None)
     parser.add_argument("--quantize_config_save_dir", type=str, default=None)
     parser.add_argument("--trust_remote_code", action="store_true")
     parser.add_argument("--use_triton", action="store_true")
+    parser.add_argument("--use_bitblas", action="store_true")
     parser.add_argument("--use_safetensors", action="store_true")
     parser.add_argument("--use_fast_tokenizer", action="store_true")
     parser.add_argument("--disable_exllama", action="store_true")
@@ -278,6 +281,7 @@ def main():
         quantize_config=quantize_config,
         trust_remote_code=args.trust_remote_code,
         use_triton=args.use_triton,
+        use_bitblas=args.use_bitblas,
         use_safetensors=True,
         use_fast_tokenizer=args.use_fast_tokenizer,
         inject_fused_attention=not args.no_inject_fused_attention,
@@ -296,7 +300,7 @@ def main():
 
     logger.info("loading data")
     examples = load_data(
-        "../quantization/dataset/alpaca_data_cleaned.json",
+        args.data_path,
         tokenizer,
         args.num_samples,
         args.max_new_tokens,
@@ -314,7 +318,6 @@ def main():
 
     logger.info("benchmark generation speed")
     benchmark_generation_speed(model, tokenizer, examples, generation_config)
-
 
 if __name__ == "__main__":
     logging.basicConfig(

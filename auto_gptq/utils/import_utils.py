@@ -52,6 +52,14 @@ except Exception as e:
     MARLIN_AVAILABLE = False
     MARLIN_EXCEPTION = e
 
+try:
+    import bitblas  # noqa: F401
+
+    BITBLAS_AVAILABLE = True
+    BITBLAS_EXCEPTION = None
+except Exception as e:
+    BITBLAS_AVAILABLE = False
+    BITBLAS_EXCEPTION = e
 
 logger = getLogger(__name__)
 
@@ -65,6 +73,7 @@ def dynamically_import_QuantLinear(
     disable_exllamav2: bool = False,
     use_qigen: bool = False,
     use_marlin: bool = False,
+    use_bitblas: bool = True,
     use_tritonv2: bool = False,
 ):
     try:
@@ -98,6 +107,8 @@ def dynamically_import_QuantLinear(
                     disable_exllama = False
                 else:
                     disable_exllama = True
+            if use_bitblas:
+                from ..nn_modules.qlinear.qlinear_bitblas import QuantLinear
             if bits == 4 and use_marlin:
                 from ..nn_modules.qlinear.qlinear_marlin import QuantLinear
             elif bits == 4 and not disable_exllamav2 and EXLLAMAV2_KERNELS_AVAILABLE:

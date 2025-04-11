@@ -74,6 +74,7 @@ def make_quant(
     name="",
     use_triton: bool = False,
     use_marlin: bool = False,
+    use_bitblas: bool = False,
     disable_exllama: Optional[bool] = None,
     disable_exllamav2: bool = False,
     use_qigen: bool = False,
@@ -95,6 +96,7 @@ def make_quant(
         group_size=group_size,
         bits=bits,
         use_marlin=use_marlin,
+        use_bitblas=use_bitblas,
         disable_exllama=disable_exllama,
         disable_exllamav2=disable_exllamav2,
         use_qigen=use_qigen,
@@ -265,6 +267,7 @@ def pack_model(
     warmup_triton: bool = False,
     force_layer_back_to_cpu: bool = False,
     use_marlin: bool = False,
+    use_bitblas: bool = False,
     use_tritonv2: bool = False,
 ):
     QuantLinear = dynamically_import_QuantLinear(
@@ -275,6 +278,7 @@ def pack_model(
         disable_exllama=False,
         disable_exllamav2=True,
         use_marlin=use_marlin,
+        use_bitblas=use_bitblas,
         use_tritonv2=use_tritonv2,
     )
 
@@ -295,6 +299,7 @@ def pack_model(
         disable_exllama=False,
         disable_exllamav2=True,
         use_marlin=use_marlin,
+        use_bitblas=use_bitblas,
     )
     qlayers = find_layers(model, [QuantLinear])
 
@@ -381,7 +386,12 @@ def autogptq_post_init(model, use_act_order: bool, max_input_length: Optional[in
     """
     The max_input_length argument is specific to the exllama backend, that requires to initialize a buffer temp_state.
     """
+
+    # post init for bitblas backend.
     device_to_buffers_size = {}
+    for _, submodule in model.named_modules():
+        if hasattr(submodule, "QUANT_TYPE") and submodule.QUANT_TYPE == "bitblas":
+            submodule.post_init()
 
     model_uses_exllama = False
     for name, submodule in model.named_modules():
@@ -514,9 +524,9 @@ def autogptq_post_init(model, use_act_order: bool, max_input_length: Optional[in
 
 
 def make_sure_no_tensor_in_meta_device(
-    model, use_triton: bool, desc_act: bool, group_size: int, bits: int, disable_exllama: bool, disable_exllamav2: bool, use_marlin: bool = False, use_tritonv2: bool = False,
+    model, use_triton: bool, desc_act: bool, group_size: int, bits: int, disable_exllama: bool, disable_exllamav2: bool, use_marlin: bool = False, use_bitblas: bool = False, use_tritonv2: bool = False,
 ):
-    QuantLinear = dynamically_import_QuantLinear(use_triton, desc_act, group_size, bits=bits, disable_exllama=disable_exllama, disable_exllamav2=disable_exllamav2, use_marlin=use_marlin, use_tritonv2=use_tritonv2)
+    QuantLinear = dynamically_import_QuantLinear(use_triton, desc_act, group_size, bits=bits, disable_exllama=disable_exllama, disable_exllamav2=disable_exllamav2, use_marlin=use_marlin, use_bitblas=use_bitblas, use_tritonv2=use_tritonv2)
     for n, m in model.named_modules():
         if isinstance(m, QuantLinear) and m.bias is not None and m.bias.device == torch.device("meta"):
             m.register_buffer("bias", torch.zeros((m.outfeatures), dtype=torch.float16, device="cpu"))
