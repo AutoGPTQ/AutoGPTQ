@@ -168,6 +168,9 @@ def quant_matmul_248_kernel(
         b = (b >> shifter[:, None]) & maxq  # Extract the N-bit values
         b = (b - zeros) * scales  # Scale and shift
 
+        a = a.to(tl.float32)
+        b = b.to(tl.float32)
+
         accumulator += tl.dot(a, b)
         a_ptrs += BLOCK_SIZE_K
         b_ptrs += (BLOCK_SIZE_K // infearure_per_bits) * stride_bk
@@ -326,6 +329,9 @@ def transpose_quant_matmul_248_kernel(
         # Now we need to unpack b (which is N-bit values) into 32-bit values
         b = (b >> shifter[:, None]) & maxq  # Extract the N-bit values
         b = (b - zeros) * scales  # Scale and shift
+
+        a = a.to(tl.float32)
+        b = b.to(tl.float32)
         b = tl.trans(b)
 
         accumulator += tl.dot(a, b)
