@@ -82,6 +82,23 @@ public:
 
 // TODO: Rewrite all these dot product functions using functors or something, move to q4_matmul.cu
 
+// hfma and hfma2 on hardware with compute capability < 5.3
+// #if defined(__CUDA_ARCH__) && __CUDA_ARCH__ < 530
+// __device__ half __hfma(half a, half b, half c)
+// {
+//     return __float2half_rn(
+//         fmaf(__half2float(a), __half2float(b), __half2float(c))
+//     );
+// }
+// __device__ half2 __hfma2(half2 a, half2 b, half2 c)
+// {
+//     return __floats2half2_rn(
+//         fmaf(__low2float(a), __low2float(b), __low2float(c)),
+//         fmaf(__high2float(a), __high2float(b), __high2float(c))
+//     );
+// }
+// #endif
+
 // Accumulated dot product of 8-element row vectors in h and quantized column vectors in v, constant zero/scale
 
 __device__ __forceinline__ half2 dot_product_8

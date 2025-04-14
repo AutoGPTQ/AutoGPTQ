@@ -17,6 +17,17 @@ union half_uint16
     __device__ half_uint16(half val) : as_half(val) {}
 };
 
+// hfma2 on hardware with compute capability < 5.3
+// #if defined(__CUDA_ARCH__) && __CUDA_ARCH__ < 530
+// __device__ half2 __hfma2(half2 a, half2 b, half2 c)
+// {
+//     return __floats2half2_rn(
+//         fmaf(__low2float(a), __low2float(b), __low2float(c)),
+//         fmaf(__high2float(a), __high2float(b), __high2float(c))
+//     );
+// }
+// #endif
+
 // Max_scale premultiplied by 1/256
 
 __forceinline__ __device__ half dq_scale(const int qs, const half max_scale)
