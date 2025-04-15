@@ -259,9 +259,11 @@ class QuantLinear(nn.Module):
                     torch.unsqueeze(self.qzeros, 2).expand(-1, -1, 32 // self.bits),
                     self.wf.unsqueeze(0),
                 ).to(torch.int16 if self.bits == 8 else torch.int8)
-                zeros = torch.bitwise_and(zeros, (2**self.bits) - 1)
 
                 zeros = zeros + 1
+                zeros = torch.bitwise_and(
+                    zeros, (2**self.bits) - 1
+                )  # NOTE: It appears that casting here after the `zeros = zeros + 1` is important.
                 zeros = zeros.reshape(self.scales.shape)
 
                 weight = torch.bitwise_right_shift(
