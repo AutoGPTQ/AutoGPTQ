@@ -64,8 +64,8 @@ from ._utils import (
     preprocess_checkpoint_qigen,
     simple_dispatch_model,
     unpack_awq,
+    get_moe_inside_layer_modules,
 )
-
 
 logger = logging.getLogger(__name__)
 handler = logging.StreamHandler()
@@ -284,6 +284,11 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
         inside_layer_modules = self.inside_layer_modules
         if not self.quantize_config.true_sequential:
             inside_layer_modules = [sum(inside_layer_modules, [])]
+
+        if hasattr(self.model.config, "num_experts"):
+            inside_layer_modules = get_moe_inside_layer_modules(self.inside_layer_modules,
+                                                                self.model.config.num_experts)
+
         quantizers = {}
         for i in range(len(layers)):
             logger.info(f"Start quantizing layer {i + 1}/{len(layers)}")
@@ -898,6 +903,10 @@ class BaseGPTQForCausalLM(nn.Module, PushToHubMixin):
                 model = AutoModelForCausalLM.from_config(
                     config, trust_remote_code=trust_remote_code, torch_dtype=torch_dtype
                 )
+
+                if hasattr(config, "num_experts"):
+                    cls.inside_layer_modules = get_moe_inside_layer_modules(cls.inside_layer_modules,
+                                                                            config.num_experts)
 
                 layers = find_layers(model)
                 ignore_layers = [cls.lm_head_name] + cls.outside_layer_modules
